@@ -1,8 +1,11 @@
 // ==============================================================================
-// FILE: MasterEnum.scad [v3.4]
+// FILE: MasterEnum.scad [v3.7]
+// ARCHITECTURE: Layer 0 (The Lexicon & Dictionary)
 // ==============================================================================
+
 TYPE          = "TYPE"; WIDTH = "WIDTH"; LENGTH = "LENGTH"; HEIGHT = "HEIGHT";
-DIMENSION_MODE= "DIMENSION_MODE"; // [V3.4] Added Mode Tracking
+DIMENSION_MODE= "DIMENSION_MODE"; 
+BUILDER_VERSION = "BUILDER_VERSION"; // [V3.7] Added Version Tracker
 LAYER_HEIGHT  = "LAYER_HEIGHT"; WALL_LOOPS = "WALL_LOOPS"; NOZZLE_DIAMETER = "NOZZLE_DIAMETER";
 PATTERN       = "PATTERN"; HOLE_WALL = "HOLE_WALL"; HOLE_FLOOR = "HOLE_FLOOR"; HOLE_LID = "HOLE_LID";
 STRUT_WALL    = "STRUT_WALL"; STRUT_FLOOR = "STRUT_FLOOR"; STRUT_LID = "STRUT_LID";      
@@ -13,7 +16,7 @@ WALL_MODIFY   = "WALL_MODIFY"; WALL_TARGET = "WALL_TARGET";
 THICK_FLOOR   = "THICK_FLOOR"; THICK_LID = "THICK_LID"; THICK_WALL = "THICK_WALL"; THICK_DIVIDER = "THICK_DIVIDER";
 LID_MIN_SOLID = "LID_MIN_SOLID"; THICK_PEG_MULT = "THICK_PEG_MULT"; 
 TOL_SNAP_GAP  = "TOL_SNAP_GAP"; TOL_CLIP = "TOL_CLIP"; PLATTER_GAP = "PLATTER_GAP"; THREAD_PITCH = "THREAD_PITCH";
-PEG_HEIGHT    = "PEG_HEIGHT"; // [V3.4] Modular Peg tracking
+PEG_HEIGHT    = "PEG_HEIGHT"; 
 
 HONEYCOMB = "Honeycomb"; TEARDROP = "Teardrop"; SLOTTED = "Slotted";
 CIRCLE = "Circle"; SQUARE = "Square"; DIAMOND = "Diamond"; NONE = "None";
@@ -21,7 +24,7 @@ CIRCLE = "Circle"; SQUARE = "Square"; DIAMOND = "Diamond"; NONE = "None";
 NEEDS_GROOVE = "NEEDS_GROOVE"; HAS_THREADS = "HAS_THREADS"; HAS_BUILTIN_GRID = "HAS_BUILTIN_GRID"; 
 
 BOX = "BOX"; LID = "LID"; LID_GLIDE = "LID_GLIDE";     
-TRAY_SIMPLE = "TRAY_SIMPLE"; TRAY_STACK = "TRAY_STACK"; PEG = "PEG"; // [V3.4] Added Peg Entity
+TRAY_SIMPLE = "TRAY_SIMPLE"; TRAY_STACK = "TRAY_STACK"; PEG = "PEG"; 
 BOX_GRID = "BOX_GRID"; JAR_GRID = "JAR_GRID";
 JAR = "JAR"; JAR_LID = "JAR_LID";
 PLAQUE = "PLAQUE"; PLAQUE_JAR = "PLAQUE_JAR";
