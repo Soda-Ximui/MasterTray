@@ -1,7 +1,7 @@
 // ==============================================================================
-// FILE: MasterBuilder.scad [v3.1]
+// FILE: MasterBuilder.scad [v3.3]
 // ARCHITECTURE: Layer 3 (The UI & Controller)
-// DEPENDENCIES: MasterEnum v3.1, MasterEngine v3.1, MasterRender v3.1
+// DEPENDENCIES: MasterEnum v3.1+, MasterEngine v3.1+, MasterRender v3.3
 // ==============================================================================
 
 /* [Build Selection] */
@@ -29,14 +29,14 @@ modify_wall = "None"; // ["None", "Dropped", "50%", "25%"]
 target_wall = "All Walls"; // ["All Walls", "Front", "Back", "Left", "Right"]
 
 /* [Grid System] */
-// --- [V3.1] Added Grid Type dropdown ---
 grid_type = "Built-in"; // ["Built-in", "Drop-in", "None"]
+// --- [V3.3 FIX] Reset layout string back to Pill Box default ---
 grid_layout = "7x2"; 
 grid_has_base = true;
 
 /* [Plaque / Labels] */
 plaque_style = "None"; // ["None", "Embedded", "Standalone"]
-plaque_text = "Coffee Beans";
+plaque_text = "";
 plaque_text_size = 6; // [4:1:20]
 
 /* [Core Engineering (R&D Exposed)] */
@@ -60,7 +60,6 @@ ui_payload = [
     [STRUT_WALL,         strut_wall_perc], [STRUT_FLOOR,        strut_floor_perc], [STRUT_LID,          strut_lid_perc],
     [WALL_MODIFY,        modify_wall], [WALL_TARGET,        target_wall], 
     
-    // [V3.1] Maps Grid System toggles dynamically
     [GRID_LAYOUT,        grid_layout], [GRID_TYPE,          grid_type], [GRID_HAS_BASE,      grid_has_base], 
     [HAS_BUILTIN_GRID,   (grid_type == "Built-in")],
     
@@ -96,7 +95,6 @@ function get_raw_queue(intent, global_payload) =
     (intent == "S4 Wedge Box") ? [ make_part(BOX, concat([[HEIGHT, 90]], global_payload)), make_part(LID, global_payload) ] :
     (intent == "S4 Set") ? make_assembly(["S4 Center Jar", "S4 Wedge Box"], global_payload) : [ make_part(BOX, global_payload) ];
 
-// --- [V3.1] Only auto-spawns external parts if Grid Type is "Drop-in" ---
 function auto_spawn_grids(raw_queue, global_payload) =
     let( g_str = get_val(GRID_LAYOUT, global_payload, ""), 
          is_drop_in = get_val(GRID_TYPE, global_payload, "Built-in") == "Drop-in",

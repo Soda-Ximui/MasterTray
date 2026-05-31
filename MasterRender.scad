@@ -1,5 +1,5 @@
 // ==============================================================================
-// FILE: MasterRender.scad [v3.1]
+// FILE: MasterRender.scad [v3.3]
 // ARCHITECTURE: Layer 2 (The Render Pipeline & Geometry Modules)
 // ==============================================================================
 
@@ -27,7 +27,6 @@ module cylindrical_mesh_wall(data, d, h, wall_t, cfg=undef) {
     }
 }
 
-// --- [V3.1] Built-In Grid Generator (Draws walls directly into the Box or Jar) ---
 module render_internal_grid(data) {
     if (get_val(HAS_BUILTIN_GRID, data, false)) {
         type = get_val(TYPE, data, BOX); bw = m_bw(data); bl = m_bl(data); bh = m_bh(data); sf = m_safe_floor(data); sw = m_safe_wall(data); div_t = get_val(THICK_DIVIDER, data, 1.2);
@@ -36,11 +35,12 @@ module render_internal_grid(data) {
         if (type == JAR) {
             lip_h = 8.0; has_threads = get_val(HAS_THREADS, data, false);
             int_h = has_threads ? bh - sf - lip_h - sw*1.5 : bh - sf; int_d = bw - sw*2;
-            tok_r = [for (tok=tokens) if (tok[0]=="R" || tok[0]=="r") tok]; rays = len(tok_r)>0 ? to_num(get_digits(tok_r[0])) : 0;
-            tok_c = [for (tok=tokens) if (tok[0]=="C" || tok[0]=="c") tok]; has_c = len(tok_c)>0; c_dia = has_c ? to_num(get_digits(tok_c[0])) : 6.0; 
+            tok_r = [for (tok=tokens) if (tok[0]=="R" || tok[0]=="r") tok]; rays = len(tok_r)>0 ? (len(get_digits(tok_r[0]))>0 ? to_num(get_digits(tok_r[0])) : 4) : 0; 
+            tok_c = [for (tok=tokens) if (tok[0]=="C" || tok[0]=="c") tok]; has_c = len(tok_c)>0; c_dia = has_c ? (len(get_digits(tok_c[0]))>0 ? to_num(get_digits(tok_c[0])) : 10.0) : 6.0; 
             up(sf) {
-                if (has_c) difference() { cyl(d=c_dia, h=int_h, anchor=BOTTOM); down(1) cyl(d=c_dia-div_t*2, h=int_h+2, anchor=BOTTOM); } else cyl(d=c_dia, h=int_h, anchor=BOTTOM); 
-                if (rays > 0) { for(i=[0:rays-1]) zrot(i * 360/rays) translate([c_dia/2 - 0.1, -div_t/2, 0]) cuboid([int_d/2 - c_dia/2 + 0.1, div_t, int_h], anchor=BOTTOM+LEFT); }
+                inner_dia = c_dia - (div_t * 2); c_eff = (inner_dia >= 1.5) ? c_dia : max(4.0, c_dia); 
+                if (inner_dia >= 1.5) { difference() { cyl(d=c_eff, h=int_h, anchor=BOTTOM); down(1) cyl(d=inner_dia, h=int_h+2, anchor=BOTTOM); } } else { cyl(d=c_eff, h=int_h, anchor=BOTTOM); }
+                if (rays > 0) { for(i=[0:rays-1]) zrot(i * 360/rays) translate([c_eff/2 - 0.1, -div_t/2, 0]) cuboid([int_d/2 - c_eff/2 + 0.1, div_t, int_h], anchor=BOTTOM+LEFT); }
             }
         } else {
             int_w = bw - sw*2; int_l = bl - sw*2; int_h = bh - sf;
@@ -76,14 +76,15 @@ module render_jar_grid(data) {
     bw = m_bw(data); bh = m_bh(data); sf = m_safe_floor(data); sw = m_safe_wall(data); div_t = get_val(THICK_DIVIDER, data, 1.2);
     has_threads = get_val(HAS_THREADS, data, false); lip_h = 8.0; int_h = has_threads ? bh - sf - lip_h - sw*1.5 - 0.5 : bh - sf - 0.5; int_d = bw - sw*2 - 0.4; 
     g_str = get_val(GRID_LAYOUT, data, ""); tokens = str_split(g_str, " ");
-    tok_r = [for (tok=tokens) if (tok[0]=="R" || tok[0]=="r") tok]; rays = len(tok_r)>0 ? to_num(get_digits(tok_r[0])) : 0;
-    tok_c = [for (tok=tokens) if (tok[0]=="C" || tok[0]=="c") tok]; has_c = len(tok_c)>0; c_dia = has_c ? to_num(get_digits(tok_c[0])) : 6.0; 
+    tok_r = [for (tok=tokens) if (tok[0]=="R" || tok[0]=="r") tok]; rays = len(tok_r)>0 ? (len(get_digits(tok_r[0]))>0 ? to_num(get_digits(tok_r[0])) : 4) : 0; 
+    tok_c = [for (tok=tokens) if (tok[0]=="C" || tok[0]=="c") tok]; has_c = len(tok_c)>0; c_dia = has_c ? (len(get_digits(tok_c[0]))>0 ? to_num(get_digits(tok_c[0])) : 10.0) : 6.0; 
     has_base = get_val(GRID_HAS_BASE, data, false); base_t = has_base ? m_lh(data)*4 : 0;
     union() {
         if (has_base) cyl(d=int_d, h=base_t, anchor=BOTTOM);
         up(base_t) {
-            if (has_c) difference() { cyl(d=c_dia, h=int_h, anchor=BOTTOM); down(1) cyl(d=c_dia-div_t*2, h=int_h+2, anchor=BOTTOM); } else cyl(d=c_dia, h=int_h, anchor=BOTTOM); 
-            if (rays > 0) { for(i=[0:rays-1]) zrot(i * 360/rays) translate([c_dia/2 - 0.1, -div_t/2, 0]) cuboid([int_d/2 - c_dia/2 + 0.1, div_t, int_h], anchor=BOTTOM+LEFT); }
+            inner_dia = c_dia - (div_t * 2); c_eff = (inner_dia >= 1.5) ? c_dia : max(4.0, c_dia);
+            if (inner_dia >= 1.5) { difference() { cyl(d=c_eff, h=int_h, anchor=BOTTOM); down(1) cyl(d=inner_dia, h=int_h+2, anchor=BOTTOM); } } else { cyl(d=c_eff, h=int_h, anchor=BOTTOM); }
+            if (rays > 0) { for(i=[0:rays-1]) zrot(i * 360/rays) translate([c_eff/2 - 0.1, -div_t/2, 0]) cuboid([int_d/2 - c_eff/2 + 0.1, div_t, int_h], anchor=BOTTOM+LEFT); }
         }
     }
 }
@@ -99,7 +100,7 @@ module core_tray_chassis(data) {
         translate([0, bl / 2 - sw / 2, (sf + h_back / 2)]) xrot(90) framed_mesh(data, bw, h_back, sw, false, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL)); 
         translate([-bw / 2 + sw / 2, 0, (sf + h_left / 2)]) zrot(90) xrot(90) framed_mesh(data, bl, h_left, sw, false, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL)); 
         translate([bw / 2 - sw / 2, 0, (sf + h_right / 2)]) zrot(90) xrot(90) framed_mesh(data, bl, h_right, sw, false, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL)); 
-        render_internal_grid(data); // [V3.1] Integrates built-in walls
+        render_internal_grid(data); 
     }
 }
 
@@ -109,46 +110,53 @@ module render_box(data) {
     } 
 }
 
+// --- [V3.3 FIX] Narrowed the pedestal width under the hinge to hinge_d/2 (2mm) ---
 module render_flip_box(data) {
     bw = m_bw(data); bl = m_bl(data); bh = m_bh(data); sw = m_safe_wall(data); hinge_d = 4.0;
     union() {
         render_box(data); 
-        translate([0, bl/2 + hinge_d/2 - 0.5, bh - hinge_d/2]) { yrot(90) cyl(d=hinge_d, h=bw - sw*2, chamfer=0.5); down(hinge_d/4) cuboid([bw - sw*2, hinge_d, hinge_d/2], anchor=BOTTOM); }
+        translate([0, bl/2 + hinge_d/2 - 0.5, bh - hinge_d/2]) { 
+            yrot(90) cyl(d=hinge_d, h=bw - sw*2, chamfer=0.5); 
+            down(hinge_d/4) cuboid([bw - sw*2, hinge_d/2, hinge_d/2], anchor=BOTTOM); // FIXED
+        }
         translate([0, -bl/2, bh - 3]) cuboid([bw - sw*2, 1.5, 1.5], rounding=0.5, edges="X", anchor=BACK);
     }
 }
 
-// --- [V3.1] Double Flip Box Central Spine Math Updated for perfect clearance ---
+// --- [V3.3 FIX] Removed the engulfing block and replaced with narrow 2mm pedestals ---
 module render_double_flip_box(data) {
     bw = m_bw(data); bl = m_bl(data); bh = m_bh(data); sw = m_safe_wall(data); hinge_d = 4.0;
-    L = (bl - 10) / 2; // Original Compartment Length
     hinge_offset = 3 + sw; 
-    spine_w = hinge_offset * 2 + hinge_d; 
-    
     union() {
         render_box(data);
-        translate([0, 0, bh - hinge_d]) cuboid([bw - sw*2, spine_w, hinge_d], anchor=BOTTOM);
-        translate([0, -hinge_offset, bh - hinge_d/2]) yrot(90) cyl(d=hinge_d, h=bw - sw*2, chamfer=0.5);
-        translate([0, hinge_offset, bh - hinge_d/2]) yrot(90) cyl(d=hinge_d, h=bw - sw*2, chamfer=0.5);
+        
+        // Lower central bridge (stops exactly underneath the pedestals so it doesn't block the C-clips)
+        translate([0, 0, bh - hinge_d*1.5]) cuboid([bw - sw*2, hinge_offset*2 + hinge_d, hinge_d], anchor=BOTTOM);
+        
+        // AM Hinge Bar + Narrow Pedestal (Front)
+        translate([0, -hinge_offset, bh - hinge_d/2]) {
+            yrot(90) cyl(d=hinge_d, h=bw - sw*2, chamfer=0.5);
+            down(hinge_d/4) cuboid([bw - sw*2, hinge_d/2, hinge_d/2], anchor=BOTTOM);
+        }
+        
+        // PM Hinge Bar + Narrow Pedestal (Back)
+        translate([0, hinge_offset, bh - hinge_d/2]) {
+            yrot(90) cyl(d=hinge_d, h=bw - sw*2, chamfer=0.5);
+            down(hinge_d/4) cuboid([bw - sw*2, hinge_d/2, hinge_d/2], anchor=BOTTOM);
+        }
+        
         translate([0, -bl/2, bh - 3]) cuboid([bw - sw*2, 1.5, 1.5], rounding=0.5, edges="X", anchor=BACK);
         translate([0, bl/2, bh - 3]) cuboid([bw - sw*2, 1.5, 1.5], rounding=0.5, edges="X", anchor=FRONT);
     }
 }
 
-// --- [V3.1] CRITICAL BUG FIX: Removed anchor=BOTTOM so hinge is perfectly centered! ---
 module render_flip_lid(data) {
     bw = m_bw(data); bl = m_bl(data); sl = m_safe_lid(data); sw = m_safe_wall(data); hinge_d = 4.0; clearance = 0.2;
     lid_w = bw; lid_l = bl + hinge_d; txt = get_val(PLAQUE_TEXT, data, ""); txt_size = get_val(PLAQUE_TEXT_SIZE, data, 8);
     difference() {
         union() {
             apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data)) { up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false, get_mesh_cfg(data, HOLE_LID, STRUT_LID, true)); }
-            translate([0, lid_l/2 - hinge_d/2, sl]) { 
-                difference() { 
-                    yrot(90) cyl(d=hinge_d + sw*2.5, h=lid_w - sw*2, chamfer=0.5); // Perfectly centered!
-                    yrot(90) cyl(d=hinge_d + clearance*2, h=lid_w); 
-                    up(hinge_d/2) cuboid([lid_w, hinge_d*0.8, hinge_d], anchor=BOTTOM); 
-                } 
-            }
+            translate([0, lid_l/2 - hinge_d/2, sl]) { difference() { yrot(90) cyl(d=hinge_d + sw*2.5, h=lid_w - sw*2, chamfer=0.5); yrot(90) cyl(d=hinge_d + clearance*2, h=lid_w); up(hinge_d/2) cuboid([lid_w, hinge_d*0.8, hinge_d], anchor=BOTTOM); } }
             translate([0, -lid_l/2 + sw, sl]) { difference() { cuboid([lid_w - sw*2, sw + 1.5, 4], anchor=BOTTOM+FRONT); up(1.5) cuboid([lid_w, 2, 1.5], rounding=0.5, edges="X", anchor=FRONT); } }
         }
         if (txt != "") { translate([0, 0, sl - 0.4]) linear_extrude(1) text(txt, size=txt_size, font="Arial Black", halign="center", valign="center"); }
@@ -159,17 +167,7 @@ module render_tray_simple(data) { apply_master_bounds(m_bw(data), m_bl(data), m_
 module render_tray_stack(data) { render_tray_simple(data); down(2) apply_master_bounds(m_bw(data)-m_safe_wall(data)*2, m_bl(data)-m_safe_wall(data)*2, 2, m_c_rad(data)-m_safe_wall(data), m_chamf(data)) cuboid([m_bw(data), m_bl(data), 2.1], anchor=BOTTOM); }
 module render_lid(data) { bw = m_bw(data); bl = m_bl(data); sl = m_safe_lid(data); sw = m_safe_wall(data); lid_w = bw - sw - 0.6; lid_l = bl - sw / 2 - 0.6; apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data)) { up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false, get_mesh_cfg(data, HOLE_LID, STRUT_LID, true)); } }
 module render_lid_glide(data) { bw = m_bw(data); bl = m_bl(data); sl = m_safe_lid(data); sw = m_safe_wall(data); lid_w = bw - sw + 0.2; lid_l = bl - sw / 2; apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data)) { up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false, get_mesh_cfg(data, HOLE_LID, STRUT_LID, true)); } }
-
-module render_jar(data) {
-    has_threads = get_val(HAS_THREADS, data, false); bw = m_bw(data); sf = m_safe_floor(data); sw = m_safe_wall(data); lip_h = 8.0; actual_wall_h = m_bh(data) - sf; cyl_wall_h = max(0.1, has_threads ? (actual_wall_h - lip_h - sw * 1.5) : actual_wall_h); neck_od = bw - sw * 2 - 0.6; neck_id = neck_od - sw * 2; 
-    union() { 
-        up(sf / 2) framed_mesh(data, bw, bw, sf, true, get_mesh_cfg(data, HOLE_FLOOR, STRUT_FLOOR)); 
-        up(sf) cylindrical_mesh_wall(data, bw, cyl_wall_h, sw, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL)); 
-        render_internal_grid(data); // [V3.1] Built-in radial grid integration
-        if (has_threads) { up(sf + cyl_wall_h) { difference() { cyl(d1=bw, d2=neck_od, h=sw * 1.5, anchor=BOTTOM); down(1) cyl(d=neck_id, h=sw * 1.5 + 2, anchor=BOTTOM); } } up(sf + cyl_wall_h + sw * 1.5) { difference() { threaded_rod(d=neck_od, l=lip_h, pitch=get_val(THREAD_PITCH, data, 2.0), internal=false, anchor=BOTTOM, $fn=30); down(1) cyl(d=neck_id, h=lip_h + 2, anchor=BOTTOM); } } } 
-    } 
-}
-
+module render_jar(data) { has_threads = get_val(HAS_THREADS, data, false); bw = m_bw(data); sf = m_safe_floor(data); sw = m_safe_wall(data); lip_h = 8.0; actual_wall_h = m_bh(data) - sf; cyl_wall_h = max(0.1, has_threads ? (actual_wall_h - lip_h - sw * 1.5) : actual_wall_h); neck_od = bw - sw * 2 - 0.6; neck_id = neck_od - sw * 2; union() { up(sf / 2) framed_mesh(data, bw, bw, sf, true, get_mesh_cfg(data, HOLE_FLOOR, STRUT_FLOOR)); up(sf) cylindrical_mesh_wall(data, bw, cyl_wall_h, sw, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL)); render_internal_grid(data); if (has_threads) { up(sf + cyl_wall_h) { difference() { cyl(d1=bw, d2=neck_od, h=sw * 1.5, anchor=BOTTOM); down(1) cyl(d=neck_id, h=sw * 1.5 + 2, anchor=BOTTOM); } } up(sf + cyl_wall_h + sw * 1.5) { difference() { threaded_rod(d=neck_od, l=lip_h, pitch=get_val(THREAD_PITCH, data, 2.0), internal=false, anchor=BOTTOM, $fn=30); down(1) cyl(d=neck_id, h=lip_h + 2, anchor=BOTTOM); } } } } }
 module render_jar_lid(data) { bw = m_bw(data); sw = m_safe_wall(data); sl = m_safe_lid(data); lip_h = 8.0; cap_h = max(0.1, lip_h + sw * 1.5); neck_od = bw - sw * 2 - 0.6; difference() { union() { up(cap_h + sl / 2) framed_mesh(data, bw, bw, sl, true, get_mesh_cfg(data, HOLE_LID, STRUT_LID, true)); cyl(d=bw, h=cap_h, chamfer2=m_chamf(data), anchor=BOTTOM); } up(-0.1) threaded_rod(d=neck_od + 0.8, l=cap_h + 1, pitch=get_val(THREAD_PITCH, data, 2.0), internal=false, anchor=BOTTOM, $fn=30); } }
 module render_plaque(data) { txt = get_val(PLAQUE_TEXT, data, ""); txt_size = get_val(PLAQUE_TEXT_SIZE, data, 8); p_w = get_val(WIDTH, data, max(25, txt_size * len(txt) * 0.65)); difference() { cuboid([p_w, 20, 1.0], rounding=1.5, edges="Z", anchor=BOTTOM); up(0.4) linear_extrude(1) text(txt, size=txt_size, font="Arial Black", halign="center", valign="center"); } }
 
