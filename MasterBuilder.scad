@@ -1,16 +1,20 @@
 // ==============================================================================
-// FILE: MasterBuilder.scad [v3.3]
+// FILE: MasterBuilder.scad [v3.7]
 // ARCHITECTURE: Layer 3 (The UI & Controller)
-// DEPENDENCIES: MasterEnum v3.1+, MasterEngine v3.1+, MasterRender v3.3
+// DEPENDENCIES: MasterEnum v3.7, MasterEngine v3.6, MasterUtility v3.7, MasterRender v3.7
 // ==============================================================================
 
 /* [Build Selection] */
-Part_To_Build = "14-Day AM/PM Box"; // ["Box", "Standalone Box", "Flip Box", "7-Day Pill Box", "14-Day AM/PM Box", "Lid", "Simple Tray", "Stackable Tray", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Center Jar", "S4 Wedge Box", "S4 Set", "Plaque"]
+Part_To_Build = "14-Day AM/PM Box"; // ["Box", "Standalone Box", "Flip Box", "7-Day Pill Box", "14-Day AM/PM Box", "Lid", "Simple Tray", "Stackable Tray", "Stackable Tray with Pegs", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Center Jar", "S4 Wedge Box", "S4 Set", "Plaque"]
 
 /* [Dimensions] */
+dimension_mode = "Total"; // ["Total", "Usable"]
 part_width = 30;  // [10 : 1 : 250]
 part_length = 40; // [10 : 1 : 250]
 part_height = 30; // [5 : 1 : 250]
+
+/* [High-Peg Mod] */
+stackable_peg_height = 80; // [20 : 10 : 200]
 
 /* [Printer / Slicer Setting] */
 Layer_Height = "Standard (0.20mm)"; 
@@ -30,7 +34,6 @@ target_wall = "All Walls"; // ["All Walls", "Front", "Back", "Left", "Right"]
 
 /* [Grid System] */
 grid_type = "Built-in"; // ["Built-in", "Drop-in", "None"]
-// --- [V3.3 FIX] Reset layout string back to Pill Box default ---
 grid_layout = "7x2"; 
 grid_has_base = true;
 
@@ -53,20 +56,48 @@ thread_pitch = 2.0;
 
 include <MasterRender.scad>
 
+actual_w = (dimension_mode == "Usable") ? part_width + (wall_thickness * 2) : part_width;
+actual_l = (dimension_mode == "Usable") ? part_length + (wall_thickness * 2) : part_length;
+actual_h = (dimension_mode == "Usable") ? part_height + floor_thickness + lid_thickness : part_height;
+
 ui_payload = [
-    [WIDTH,              part_width], [LENGTH,             part_length], [HEIGHT,             part_height],
-    [LAYER_HEIGHT,       Layer_Height], [WALL_LOOPS,         Wall_Loops], [NOZZLE_DIAMETER,    Nozzle_Diameter],
-    [PATTERN,            mesh_pattern], [HOLE_WALL,          mesh_hole_size], [HOLE_FLOOR,         mesh_hole_size], [HOLE_LID,           mesh_hole_size],
-    [STRUT_WALL,         strut_wall_perc], [STRUT_FLOOR,        strut_floor_perc], [STRUT_LID,          strut_lid_perc],
-    [WALL_MODIFY,        modify_wall], [WALL_TARGET,        target_wall], 
+    [BUILDER_VERSION,    "v3.7"], // [V3.7] Tracking passed to Utility
+    [DIMENSION_MODE,     dimension_mode], 
+    [WIDTH,              actual_w], 
+    [LENGTH,             actual_l], 
+    [HEIGHT,             actual_h],
+    [PEG_HEIGHT,         stackable_peg_height], 
+    [LAYER_HEIGHT,       Layer_Height], 
+    [WALL_LOOPS,         Wall_Loops], 
+    [NOZZLE_DIAMETER,    Nozzle_Diameter],
+    [PATTERN,            mesh_pattern], 
+    [HOLE_WALL,          mesh_hole_size], 
+    [HOLE_FLOOR,         mesh_hole_size], 
+    [HOLE_LID,           mesh_hole_size],
+    [STRUT_WALL,         strut_wall_perc], 
+    [STRUT_FLOOR,        strut_floor_perc], 
+    [STRUT_LID,          strut_lid_perc],
+    [WALL_MODIFY,        modify_wall], 
+    [WALL_TARGET,        target_wall], 
     
-    [GRID_LAYOUT,        grid_layout], [GRID_TYPE,          grid_type], [GRID_HAS_BASE,      grid_has_base], 
+    [GRID_LAYOUT,        grid_layout], 
+    [GRID_TYPE,          grid_type], 
+    [GRID_HAS_BASE,      grid_has_base], 
     [HAS_BUILTIN_GRID,   (grid_type == "Built-in")],
     
-    [PLAQUE_STYLE,       plaque_style], [PLAQUE_TEXT,        plaque_text], [PLAQUE_TEXT_SIZE,   plaque_text_size],
-    [THICK_FLOOR,        floor_thickness], [THICK_LID,          lid_thickness], [THICK_WALL,         wall_thickness], [THICK_DIVIDER,      divider_thickness],
-    [LID_MIN_SOLID,      min_solid_edge_for_lid], [THICK_PEG_MULT,     peg_thickness_multiplier], [TOL_SNAP_GAP,       snap_tolerance_gap], [TOL_CLIP,           clip_tolerance],
-    [PLATTER_GAP,        platter_gap], [THREAD_PITCH,       thread_pitch]
+    [PLAQUE_STYLE,       plaque_style], 
+    [PLAQUE_TEXT,        plaque_text], 
+    [PLAQUE_TEXT_SIZE,   plaque_text_size],
+    [THICK_FLOOR,        floor_thickness], 
+    [THICK_LID,          lid_thickness], 
+    [THICK_WALL,         wall_thickness], 
+    [THICK_DIVIDER,      divider_thickness],
+    [LID_MIN_SOLID,      min_solid_edge_for_lid], 
+    [THICK_PEG_MULT,     peg_thickness_multiplier], 
+    [TOL_SNAP_GAP,       snap_tolerance_gap], 
+    [TOL_CLIP,           clip_tolerance],
+    [PLATTER_GAP,        platter_gap], 
+    [THREAD_PITCH,       thread_pitch]
 ];
 
 function make_assembly(intents, global_payload, idx=0) = (idx >= len(intents)) ? [] : concat(get_raw_queue(intents[idx], global_payload), make_assembly(intents, global_payload, idx + 1));
@@ -77,18 +108,27 @@ function get_raw_queue(intent, global_payload) =
     (intent == "Flip Box") ? [ make_part(FLIP_BOX, global_payload), make_part(FLIP_LID, global_payload) ] :
     
     (intent == "7-Day Pill Box") ? let(days = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]) concat(
-        [ make_part(FLIP_BOX, concat([[WIDTH, part_width * 7], [GRID_LAYOUT, "7x1"]], global_payload)) ],
-        [ for (i=[0:6]) make_part(FLIP_LID, concat([[WIDTH, part_width - 0.6], [PLAQUE_TEXT, days[i]]], global_payload)) ]
+        [ make_part(FLIP_BOX, concat([[WIDTH, actual_w * 7], [GRID_LAYOUT, "7x1"]], global_payload)) ],
+        [ for (i=[0:6]) make_part(FLIP_LID, concat([[WIDTH, actual_w - 0.6], [PLAQUE_TEXT, days[i]]], global_payload)) ]
     ) :
     
     (intent == "14-Day AM/PM Box") ? let(days = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]) concat(
-        [ make_part(DOUBLE_FLIP_BOX, concat([[WIDTH, part_width * 7], [LENGTH, part_length * 2 + 10], [GRID_LAYOUT, "7x2"]], global_payload)) ],
-        [ for (i=[0:6]) make_part(FLIP_LID, concat([[WIDTH, part_width - 0.6], [LENGTH, part_length], [PLAQUE_TEXT, str(days[i], " AM")]], global_payload)) ],
-        [ for (i=[0:6]) make_part(FLIP_LID, concat([[WIDTH, part_width - 0.6], [LENGTH, part_length], [PLAQUE_TEXT, str(days[i], " PM")]], global_payload)) ]
+        [ make_part(DOUBLE_FLIP_BOX, concat([[WIDTH, actual_w * 7], [LENGTH, actual_l * 2 + 10], [GRID_LAYOUT, "7x2"]], global_payload)) ],
+        [ for (i=[0:6]) make_part(FLIP_LID, concat([[WIDTH, actual_w - 0.6], [LENGTH, actual_l], [PLAQUE_TEXT, str(days[i], " AM")]], global_payload)) ],
+        [ for (i=[0:6]) make_part(FLIP_LID, concat([[WIDTH, actual_w - 0.6], [LENGTH, actual_l], [PLAQUE_TEXT, str(days[i], " PM")]], global_payload)) ]
     ) :
     
-    (intent == "Lid") ? [ make_part(LID, global_payload) ] : (intent == "Simple Tray") ? [ make_part(TRAY_SIMPLE, global_payload) ] : (intent == "Stackable Tray") ? [ make_part(TRAY_STACK, global_payload) ] : (intent == "Plaque") ? [ make_part(PLAQUE, global_payload) ] :
-    (intent == "Open Jar") ? [ make_part(JAR, concat([[WIDTH, part_length], [HAS_THREADS, false]], global_payload)), make_part(JAR, concat([[WIDTH, part_width], [HAS_THREADS, false]], global_payload)) ] :
+    (intent == "Stackable Tray with Pegs") ? [ 
+        make_part(TRAY_STACK, global_payload), 
+        make_part(PEG, global_payload), make_part(PEG, global_payload), 
+        make_part(PEG, global_payload), make_part(PEG, global_payload) 
+    ] :
+    
+    (intent == "Lid") ? [ make_part(LID, global_payload) ] : 
+    (intent == "Simple Tray") ? [ make_part(TRAY_SIMPLE, global_payload) ] : 
+    (intent == "Stackable Tray") ? [ make_part(TRAY_STACK, global_payload) ] : 
+    (intent == "Plaque") ? [ make_part(PLAQUE, global_payload) ] :
+    (intent == "Open Jar") ? [ make_part(JAR, concat([[WIDTH, actual_l], [HAS_THREADS, false]], global_payload)), make_part(JAR, concat([[WIDTH, actual_w], [HAS_THREADS, false]], global_payload)) ] :
     (intent == "Threaded Jar") ? [ make_part(JAR, concat([[HAS_THREADS, true]], global_payload)) ] :
     (intent == "Jar with Lid") ? [ make_part(JAR, concat([[HAS_THREADS, true]], global_payload)), make_part(JAR_LID, global_payload) ] :
     (intent == "S4 Center Jar") ? [ make_part(JAR, concat([[HAS_THREADS, true]], global_payload)), make_part(JAR_LID, global_payload) ] :
