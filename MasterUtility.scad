@@ -1,10 +1,11 @@
 // ==============================================================================
-// FILE: MasterUtility.scad [v4.7]
+// FILE: MasterUtility.scad [v4.8]
 // ARCHITECTURE: Layer 1.5 (Utilities & Output Pipelines)
 // ==============================================================================
 
 include <MasterChecks.scad>
 include <MasterText.scad>
+include <MasterValidation.scad>
 
 // [V4.7: Advanced Spec Tag Migration]
 // Moved from MasterRender to MasterUtility. This centralizes all metadata/reporting 

@@ -1,11 +1,12 @@
 // ==============================================================================
-// FILE: MasterEngine.scad [v4.9]
+// FILE: MasterEngine.scad [v4.10]
 // ARCHITECTURE: Layer 1 (The Math Kernel & Data Router)
 // ==============================================================================
 
 include <BOSL2/std.scad>
 include <BOSL2/threading.scad>
 include <MasterEnum.scad>
+include <MasterConstants.scad>
 
 WIDTH0=50; LENGTH0=50; HEIGHT0=50; LAYER_HEIGHT0="Standard (0.20mm)"; WALL_LOOPS0="Standard (3 loops)"; NOZZLE_DIAMETER0=0.4;
 MIN_HOLE_SPACING0=1.2; PATTERN0=TEARDROP; STRUT_WALL0=25; STRUT_FLOOR0=25; STRUT_LID0=25;
