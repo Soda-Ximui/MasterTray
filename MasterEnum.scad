@@ -1,11 +1,11 @@
 // ==============================================================================
-// FILE: MasterEnum.scad [v3.7]
+// FILE: MasterEnum.scad [v4.0]
 // ARCHITECTURE: Layer 0 (The Lexicon & Dictionary)
 // ==============================================================================
 
 TYPE          = "TYPE"; WIDTH = "WIDTH"; LENGTH = "LENGTH"; HEIGHT = "HEIGHT";
 DIMENSION_MODE= "DIMENSION_MODE"; 
-BUILDER_VERSION = "BUILDER_VERSION"; // [V3.7] Added Version Tracker
+BUILDER_VERSION = "BUILDER_VERSION"; 
 LAYER_HEIGHT  = "LAYER_HEIGHT"; WALL_LOOPS = "WALL_LOOPS"; NOZZLE_DIAMETER = "NOZZLE_DIAMETER";
 PATTERN       = "PATTERN"; HOLE_WALL = "HOLE_WALL"; HOLE_FLOOR = "HOLE_FLOOR"; HOLE_LID = "HOLE_LID";
 STRUT_WALL    = "STRUT_WALL"; STRUT_FLOOR = "STRUT_FLOOR"; STRUT_LID = "STRUT_LID";      
@@ -24,7 +24,11 @@ CIRCLE = "Circle"; SQUARE = "Square"; DIAMOND = "Diamond"; NONE = "None";
 NEEDS_GROOVE = "NEEDS_GROOVE"; HAS_THREADS = "HAS_THREADS"; HAS_BUILTIN_GRID = "HAS_BUILTIN_GRID"; 
 
 BOX = "BOX"; LID = "LID"; LID_GLIDE = "LID_GLIDE";     
-TRAY_SIMPLE = "TRAY_SIMPLE"; TRAY_STACK = "TRAY_STACK"; PEG = "PEG"; 
+TRAY_SIMPLE = "TRAY_SIMPLE"; 
+TRAY_STACK_NEST = "TRAY_STACK_NEST"; 
+TRAY_STACK_PEG = "TRAY_STACK_PEG";   
+PEG = "PEG"; 
+
 BOX_GRID = "BOX_GRID"; JAR_GRID = "JAR_GRID";
 JAR = "JAR"; JAR_LID = "JAR_LID";
 PLAQUE = "PLAQUE"; PLAQUE_JAR = "PLAQUE_JAR";

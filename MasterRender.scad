@@ -1,5 +1,5 @@
 // ==============================================================================
-// FILE: MasterRender.scad [v3.7]
+// FILE: MasterRender.scad [v4.0]
 // ARCHITECTURE: Layer 2 (The Render Pipeline & Geometry Modules)
 // ==============================================================================
 
@@ -48,7 +48,6 @@ module render_internal_grid(data) {
             if (len(tok_x) > 0) {
                 dims = str_split(tok_x[0], "xX"); cols = max(1, to_num(get_digits(dims[0]))); rows = max(1, to_num(get_digits(dims[1])));
                 up(sf) {
-                    // [V3.7 FIX] Changed center=true to anchor=CENTER for BOSL2 cuboid compatibility
                     for(i=[1:cols-1]) translate([-int_w/2 + i*(int_w/cols), 0, int_h/2]) cuboid([div_t, int_l, int_h], anchor=CENTER);
                     for(j=[1:rows-1]) translate([0, -int_l/2 + j*(int_l/rows), int_h/2]) cuboid([int_w, div_t, int_h], anchor=CENTER);
                 }
@@ -67,7 +66,6 @@ module render_box_grid(data) {
     apply_master_bounds(int_w, int_l, int_h, m_c_rad(data)-sw, m_chamf(data)/2) { 
         if (has_base) cuboid([int_w, int_l, base_t], anchor=BOTTOM);
         up(base_t) {
-            // [V3.7 FIX] Changed center=true to anchor=CENTER for BOSL2 cuboid compatibility
             for(i=[1:cols-1]) translate([-int_w/2 + i*(int_w/cols), 0, int_h/2]) cuboid([div_t, int_l, int_h], anchor=CENTER);
             for(j=[1:rows-1]) translate([0, -int_l/2 + j*(int_l/rows), int_h/2]) cuboid([int_w, div_t, int_h], anchor=CENTER);
         }
@@ -138,39 +136,60 @@ module render_double_flip_box(data) {
     }
 }
 
+// [V4.0] Integrated proper MasterText.scad rendering function
 module render_flip_lid(data) {
     bw = m_bw(data); bl = m_bl(data); sl = m_safe_lid(data); sw = m_safe_wall(data); hinge_d = 4.0; clearance = 0.2;
     lid_w = bw; lid_l = bl; clip_len = lid_w - sw*6;
     txt = get_val(PLAQUE_TEXT, data, ""); txt_size = get_val(PLAQUE_TEXT_SIZE, data, 8);
-    difference() {
-        union() {
-            apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data)) { up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false, get_mesh_cfg(data, HOLE_LID, STRUT_LID, true)); }
-            translate([0, lid_l/2 + hinge_d/2, sl]) { 
-                difference() { 
-                    yrot(90) cyl(d=hinge_d + sw*2.5, h=clip_len, chamfer=0.5, $fn=36); 
-                    yrot(90) cyl(d=hinge_d + clearance*2, h=clip_len + 2, $fn=36); 
-                    translate([0, hinge_d/2, 0]) cuboid([clip_len + 2, hinge_d, hinge_d*0.8], anchor=CENTER); 
-                } 
-                translate([0, -hinge_d/4, 0]) cuboid([clip_len, hinge_d/2 + 0.1, sl], anchor=CENTER);
+    
+    union() {
+        difference() {
+            apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data)) { 
+                up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false, get_mesh_cfg(data, HOLE_LID, STRUT_LID, true)); 
             }
-            translate([0, -lid_l/2 + sw, sl]) { difference() { cuboid([lid_w - sw*2, sw + 1.5, 4], anchor=BOTTOM+FRONT); up(1.5) cuboid([lid_w, 2, 1.5], rounding=0.5, edges="X", anchor=FRONT); } }
+            // Uses the auto-centering embossed wrapper
+            translate([0, 0, sl - 0.4]) render_embossed_text(txt, txt_size, 1.0);
         }
-        if (txt != "") { translate([0, 0, sl - 0.4]) linear_extrude(1) text(txt, size=txt_size, font="Arial Black", halign="center", valign="center"); }
+        
+        translate([0, lid_l/2 + hinge_d/2, sl]) { 
+            difference() { 
+                yrot(90) cyl(d=hinge_d + sw*2.5, h=clip_len, chamfer=0.5, $fn=36); 
+                yrot(90) cyl(d=hinge_d + clearance*2, h=clip_len + 2, $fn=36); 
+                translate([0, hinge_d/2, 0]) cuboid([clip_len + 2, hinge_d, hinge_d*0.8], anchor=CENTER); 
+            } 
+            translate([0, -hinge_d/4, 0]) cuboid([clip_len, hinge_d/2 + 0.1, sl], anchor=CENTER);
+        }
+        
+        translate([0, -lid_l/2 + sw, sl]) { 
+            difference() { 
+                cuboid([lid_w - sw*2, sw + 1.5, 4], anchor=BOTTOM+FRONT); 
+                up(1.5) cuboid([lid_w, 2, 1.5], rounding=0.5, edges="X", anchor=FRONT); 
+            } 
+        }
     }
 }
 
 module render_tray_simple(data) { apply_master_bounds(m_bw(data), m_bl(data), m_bh(data), m_c_rad(data), m_chamf(data)) { core_tray_chassis(data); } }
 
-module render_tray_stack(data) { 
-    bw = m_bw(data); bl = m_bl(data); bh = m_bh(data); sw = m_safe_wall(data); sf = m_safe_floor(data);
+module render_tray_stack_nest(data) {
+    bw = m_bw(data); bl = m_bl(data); sw = m_safe_wall(data);
+    union() {
+        render_tray_simple(data);
+        down(2) apply_master_bounds(bw-sw*2, bl-sw*2, 2, m_c_rad(data)-sw, m_chamf(data)) cuboid([bw, bl, 2.1], anchor=BOTTOM);
+    }
+}
+
+module render_tray_stack_peg(data) { 
+    bw = m_bw(data); bl = m_bl(data); bh = m_bh(data); sw = m_safe_wall(data);
     socket_d = 8.0; 
     boss_d = socket_d + sw*2; 
-    
     cx = bw/2 - sw - boss_d/2 + 0.1; 
-    cy = bl/2 - sw - boss_d/2 + 0.1;
+    cy = bl/2 - sw - boss_d/2 + 0.1; 
     
-    socket_depth = 12.0; 
-    
+    max_total_z = bh + 2.1; 
+    safe_top_depth = min(12.0, max(3.0, (max_total_z / 2) - 1));
+    safe_bot_depth = min(12.0, max(3.0, (max_total_z / 2) - 1));
+
     difference() {
         union() { 
             render_tray_simple(data); 
@@ -178,8 +197,8 @@ module render_tray_stack(data) {
             for(x=[-1,1]) for(y=[-1,1]) translate([x*cx, y*cy, -2]) cyl(d=boss_d, h=bh + 2, anchor=BOTTOM);
         }
         for(x=[-1,1]) for(y=[-1,1]) {
-            translate([x*cx, y*cy, bh + 0.1]) cyl(d=socket_d, h=socket_depth, anchor=TOP);
-            translate([x*cx, y*cy, -2.1]) cyl(d=socket_d, h=socket_depth, anchor=BOTTOM);
+            translate([x*cx, y*cy, bh + 0.1]) cyl(d=socket_d, h=safe_top_depth + 0.1, anchor=TOP);
+            translate([x*cx, y*cy, -2.1]) cyl(d=socket_d, h=safe_bot_depth + 0.1, anchor=BOTTOM);
         }
     }
 }
@@ -193,14 +212,26 @@ module render_lid(data) { bw = m_bw(data); bl = m_bl(data); sl = m_safe_lid(data
 module render_lid_glide(data) { bw = m_bw(data); bl = m_bl(data); sl = m_safe_lid(data); sw = m_safe_wall(data); lid_w = bw - sw + 0.2; lid_l = bl - sw / 2; apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data)) { up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false, get_mesh_cfg(data, HOLE_LID, STRUT_LID, true)); } }
 module render_jar(data) { has_threads = get_val(HAS_THREADS, data, false); bw = m_bw(data); sf = m_safe_floor(data); sw = m_safe_wall(data); lip_h = 8.0; actual_wall_h = m_bh(data) - sf; cyl_wall_h = max(0.1, has_threads ? (actual_wall_h - lip_h - sw * 1.5) : actual_wall_h); neck_od = bw - sw * 2 - 0.6; neck_id = neck_od - sw * 2; union() { up(sf / 2) framed_mesh(data, bw, bw, sf, true, get_mesh_cfg(data, HOLE_FLOOR, STRUT_FLOOR)); up(sf) cylindrical_mesh_wall(data, bw, cyl_wall_h, sw, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL)); render_internal_grid(data); if (has_threads) { up(sf + cyl_wall_h) { difference() { cyl(d1=bw, d2=neck_od, h=sw * 1.5, anchor=BOTTOM); down(1) cyl(d=neck_id, h=sw * 1.5 + 2, anchor=BOTTOM); } } up(sf + cyl_wall_h + sw * 1.5) { difference() { threaded_rod(d=neck_od, l=lip_h, pitch=get_val(THREAD_PITCH, data, 2.0), internal=false, anchor=BOTTOM, $fn=30); down(1) cyl(d=neck_id, h=lip_h + 2, anchor=BOTTOM); } } } } }
 module render_jar_lid(data) { bw = m_bw(data); sw = m_safe_wall(data); sl = m_safe_lid(data); lip_h = 8.0; cap_h = max(0.1, lip_h + sw * 1.5); neck_od = bw - sw * 2 - 0.6; difference() { union() { up(cap_h + sl / 2) framed_mesh(data, bw, bw, sl, true, get_mesh_cfg(data, HOLE_LID, STRUT_LID, true)); cyl(d=bw, h=cap_h, chamfer2=m_chamf(data), anchor=BOTTOM); } up(-0.1) threaded_rod(d=neck_od + 0.8, l=cap_h + 1, pitch=get_val(THREAD_PITCH, data, 2.0), internal=false, anchor=BOTTOM, $fn=30); } }
-module render_plaque(data) { txt = get_val(PLAQUE_TEXT, data, ""); txt_size = get_val(PLAQUE_TEXT_SIZE, data, 8); p_w = get_val(WIDTH, data, max(25, txt_size * len(txt) * 0.65)); difference() { cuboid([p_w, 20, 1.0], rounding=1.5, edges="Z", anchor=BOTTOM); up(0.4) linear_extrude(1) text(txt, size=txt_size, font="Arial Black", halign="center", valign="center"); } }
+
+// [V4.0] Plaque dynamically sized using MasterText.scad
+module render_plaque(data) { 
+    txt = get_val(PLAQUE_TEXT, data, ""); 
+    txt_size = get_val(PLAQUE_TEXT_SIZE, data, 8); 
+    p_w = get_val(WIDTH, data, get_text_plaque_width(txt, txt_size)); 
+    
+    difference() { 
+        cuboid([p_w, 20, 1.0], rounding=1.5, edges="Z", anchor=BOTTOM); 
+        up(0.4) render_embossed_text(txt, txt_size, 1.0); 
+    } 
+}
 
 module build_part(data) {
     generate_preflight_report(data);
     type = get_val(TYPE, data, BOX);
     if (type == BOX || type == DESICCANT_BOX) render_box(data);
     else if (type == TRAY_SIMPLE) render_tray_simple(data);
-    else if (type == TRAY_STACK) render_tray_stack(data);
+    else if (type == TRAY_STACK_NEST) render_tray_stack_nest(data); 
+    else if (type == TRAY_STACK_PEG) render_tray_stack_peg(data);   
     else if (type == PEG) render_peg(data);
     else if (type == FLIP_BOX) render_flip_box(data);
     else if (type == DOUBLE_FLIP_BOX) render_double_flip_box(data);

@@ -1,9 +1,10 @@
 // ==============================================================================
-// FILE: MasterUtility.scad [v3.7]
+// FILE: MasterUtility.scad [v4.0]
 // ARCHITECTURE: Layer 1.5 (Utilities & Output Pipelines)
 // ==============================================================================
 
-include <MasterEngine.scad>
+include <MasterChecks.scad>
+include <MasterText.scad>
 
 module generate_preflight_report(data) {
     type = get_val(TYPE, data, BOX);

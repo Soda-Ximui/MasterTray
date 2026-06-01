@@ -1,5 +1,5 @@
 // ==============================================================================
-// FILE: MasterEngine.scad [v3.5]
+// FILE: MasterEngine.scad [v4.0]
 // ARCHITECTURE: Layer 1 (The Math Kernel & Data Router)
 // ==============================================================================
 
@@ -34,15 +34,8 @@ function m_bw(data) = max(10, get_val(WIDTH, data, WIDTH0)); function m_bl(data)
 function m_bh(data) = max(5, get_val(HEIGHT, data, HEIGHT0)); function m_noz(data) = get_val(NOZZLE_DIAMETER, data, NOZZLE_DIAMETER0);
 function m_lh(data) = let(s = get_val(LAYER_HEIGHT, data, LAYER_HEIGHT0)) (s=="Detailed (0.12mm)")?0.12:0.20; function m_wloops(data) = 3;
 
-function m_safe_floor(data) = max(m_lh(data), round(min(get_val(THICK_FLOOR, data, THICK_FLOOR0), m_bh(data) * 0.35) / m_lh(data)) * m_lh(data));
-function m_safe_lid(data) = max(m_lh(data), round(min(get_val(THICK_LID, data, THICK_LID0), m_bh(data) * 0.35) / m_lh(data)) * m_lh(data));
-function m_safe_wall(data) = max(m_noz(data) * m_wloops(data), round(min(get_val(THICK_WALL, data, THICK_WALL0), min(m_bw(data), m_bl(data)) * 0.45) / m_noz(data)) * m_noz(data));
-function m_c_rad(data) = m_safe_wall(data) + ((m_noz(data) * m_wloops(data)) / 2) - 0.5; function m_chamf(data) = m_noz(data) * 2.5;
-
 function get_digits(s) = [ for (i = [0 : len(s)-1]) let(o = ord(s[i])) if (o >= 48 && o <= 57) o - 48 ];
 function to_num(d) = len(d)==0 ? 0 : len(d)==1 ? d[0] : len(d)==2 ? d[0]*10 + d[1] : len(d)==3 ? d[0]*100 + d[1]*10 + d[2] : 0;
-
-function m_wall_mod_p(data) = let(s = str(get_val(WALL_MODIFY, data, WALL_MODIFY0))) (s == "None") ? 100 : (s == "Dropped") ? 0 : let(n = get_digits(s)) len(n)==1?n[0]:len(n)==2?n[0]*10+n[1]:len(n)==3?n[0]*100+n[1]*10+n[2]:100;
 
 function get_mesh_cfg(data, h_key, s_key, needs_margin=false) = let(pat = get_val(PATTERN, data, PATTERN0), hole = get_val(h_key, data, 1.6), strut = get_val(s_key, data, 25), req_s = (200 * get_val(LID_MIN_SOLID, data, LID_MIN_SOLID0)) / min(m_bw(data), m_bl(data)), final_s = needs_margin ? max(max(2, strut), req_s) : max(2, strut)) (pat == NONE || hole <= 0.05 || final_s >= 99) ? undef : [hole, final_s]; 
 

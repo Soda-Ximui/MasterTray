@@ -1,11 +1,11 @@
 // ==============================================================================
-// FILE: MasterBuilder.scad [v3.7]
+// FILE: MasterBuilder.scad [v4.0]
 // ARCHITECTURE: Layer 3 (The UI & Controller)
-// DEPENDENCIES: MasterEnum v3.7, MasterEngine v3.6, MasterUtility v3.7, MasterRender v3.7
+// DEPENDENCIES: MasterEnum v4.0, MasterRender v4.0
 // ==============================================================================
 
 /* [Build Selection] */
-Part_To_Build = "14-Day AM/PM Box"; // ["Box", "Standalone Box", "Flip Box", "7-Day Pill Box", "14-Day AM/PM Box", "Lid", "Simple Tray", "Stackable Tray", "Stackable Tray with Pegs", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Center Jar", "S4 Wedge Box", "S4 Set", "Plaque"]
+Part_To_Build = "14-Day AM/PM Box"; // ["Box", "Standalone Box", "Flip Box", "7-Day Pill Box", "14-Day AM/PM Box", "Lid", "Simple Tray", "Nesting Tray (Short)", "Modular Peg Tray (Long)", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Center Jar", "S4 Wedge Box", "S4 Set", "Plaque"]
 
 /* [Dimensions] */
 dimension_mode = "Total"; // ["Total", "Usable"]
@@ -61,7 +61,7 @@ actual_l = (dimension_mode == "Usable") ? part_length + (wall_thickness * 2) : p
 actual_h = (dimension_mode == "Usable") ? part_height + floor_thickness + lid_thickness : part_height;
 
 ui_payload = [
-    [BUILDER_VERSION,    "v3.7"], // [V3.7] Tracking passed to Utility
+    [BUILDER_VERSION,    "v4.0"], // [V4.0] Version bump
     [DIMENSION_MODE,     dimension_mode], 
     [WIDTH,              actual_w], 
     [LENGTH,             actual_l], 
@@ -103,7 +103,7 @@ ui_payload = [
 function make_assembly(intents, global_payload, idx=0) = (idx >= len(intents)) ? [] : concat(get_raw_queue(intents[idx], global_payload), make_assembly(intents, global_payload, idx + 1));
 
 function get_raw_queue(intent, global_payload) =
-    (intent == "Box") ? [ make_part(TRAY_STACK, global_payload), make_part(LID, global_payload) ] :
+    (intent == "Box") ? [ make_part(TRAY_STACK_NEST, global_payload), make_part(LID, global_payload) ] :
     (intent == "Standalone Box") ? [ make_part(BOX, concat([[WALL_MODIFY, "Dropped"], [WALL_TARGET, "Front"], [NEEDS_GROOVE, true]], global_payload)), make_part(LID_GLIDE, global_payload) ] :
     (intent == "Flip Box") ? [ make_part(FLIP_BOX, global_payload), make_part(FLIP_LID, global_payload) ] :
     
@@ -118,15 +118,15 @@ function get_raw_queue(intent, global_payload) =
         [ for (i=[0:6]) make_part(FLIP_LID, concat([[WIDTH, actual_w - 0.6], [LENGTH, actual_l], [PLAQUE_TEXT, str(days[i], " PM")]], global_payload)) ]
     ) :
     
-    (intent == "Stackable Tray with Pegs") ? [ 
-        make_part(TRAY_STACK, global_payload), 
+    (intent == "Nesting Tray (Short)") ? [ make_part(TRAY_STACK_NEST, global_payload) ] : 
+    (intent == "Modular Peg Tray (Long)") ? [ 
+        make_part(TRAY_STACK_PEG, global_payload), 
         make_part(PEG, global_payload), make_part(PEG, global_payload), 
         make_part(PEG, global_payload), make_part(PEG, global_payload) 
     ] :
     
     (intent == "Lid") ? [ make_part(LID, global_payload) ] : 
     (intent == "Simple Tray") ? [ make_part(TRAY_SIMPLE, global_payload) ] : 
-    (intent == "Stackable Tray") ? [ make_part(TRAY_STACK, global_payload) ] : 
     (intent == "Plaque") ? [ make_part(PLAQUE, global_payload) ] :
     (intent == "Open Jar") ? [ make_part(JAR, concat([[WIDTH, actual_l], [HAS_THREADS, false]], global_payload)), make_part(JAR, concat([[WIDTH, actual_w], [HAS_THREADS, false]], global_payload)) ] :
     (intent == "Threaded Jar") ? [ make_part(JAR, concat([[HAS_THREADS, true]], global_payload)) ] :
@@ -142,7 +142,7 @@ function auto_spawn_grids(raw_queue, global_payload) =
          has_cart = len([for (tok=tokens) if (len(search("x", tok))>0 || len(search("X", tok))>0) tok]) > 0,
          has_rad = len([for (tok=tokens) if (tok[0]=="R" || tok[0]=="r") tok]) > 0 )
     [ for (part = raw_queue) let(t = get_val(TYPE, part)) for (out =
-            ((t == BOX || t == TRAY_SIMPLE || t == TRAY_STACK || t == FLIP_BOX || t == DOUBLE_FLIP_BOX) && has_cart && is_drop_in) ? [part, make_part(BOX_GRID, global_payload)] :
+            ((t == BOX || t == TRAY_SIMPLE || t == TRAY_STACK_NEST || t == TRAY_STACK_PEG || t == FLIP_BOX || t == DOUBLE_FLIP_BOX) && has_cart && is_drop_in) ? [part, make_part(BOX_GRID, global_payload)] :
             (t == JAR && has_rad && is_drop_in) ? [part, make_part(JAR_GRID, global_payload)] : [part]
         ) out ];
 
