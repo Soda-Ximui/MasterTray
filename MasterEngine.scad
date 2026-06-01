@@ -1,5 +1,5 @@
 // ==============================================================================
-// FILE: MasterEngine.scad [v4.0]
+// FILE: MasterEngine.scad [v4.9]
 // ARCHITECTURE: Layer 1 (The Math Kernel & Data Router)
 // ==============================================================================
 
@@ -37,7 +37,10 @@ function m_lh(data) = let(s = get_val(LAYER_HEIGHT, data, LAYER_HEIGHT0)) (s=="D
 function get_digits(s) = [ for (i = [0 : len(s)-1]) let(o = ord(s[i])) if (o >= 48 && o <= 57) o - 48 ];
 function to_num(d) = len(d)==0 ? 0 : len(d)==1 ? d[0] : len(d)==2 ? d[0]*10 + d[1] : len(d)==3 ? d[0]*100 + d[1]*10 + d[2] : 0;
 
-function get_mesh_cfg(data, h_key, s_key, needs_margin=false) = let(pat = get_val(PATTERN, data, PATTERN0), hole = get_val(h_key, data, 1.6), strut = get_val(s_key, data, 25), req_s = (200 * get_val(LID_MIN_SOLID, data, LID_MIN_SOLID0)) / min(m_bw(data), m_bl(data)), final_s = needs_margin ? max(max(2, strut), req_s) : max(2, strut)) (pat == NONE || hole <= 0.05 || final_s >= 99) ? undef : [hole, final_s]; 
+// [V4.9: Surgical Syntax Fix] Explicitly grouped the ternary result to satisfy the parser.
+function get_mesh_cfg(data, h_key, s_key, needs_margin=false) = 
+    let(pat = get_val(PATTERN, data, PATTERN0), hole = get_val(h_key, data, 1.6), strut = get_val(s_key, data, 25), req_s = (200 * get_val(LID_MIN_SOLID, data, LID_MIN_SOLID0)) / min(m_bw(data), m_bl(data)), final_s = needs_margin ? max(max(2, strut), req_s) : max(2, strut)) 
+    ((pat == NONE || hole <= 0.05 || final_s >= 99) ? undef : [hole, final_s]); 
 
 function get_grid_step(hole, min_sp, noz) = hole + max(min_sp, max(noz, round(max(noz * 2, hole * 0.25) / noz) * noz));
 function get_mesh_dim(dim, perc) = max(0.1, dim * (1 - (perc / 100)));

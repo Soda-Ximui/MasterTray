@@ -1,5 +1,5 @@
 // ==============================================================================
-// FILE: MasterRender.scad [v4.0]
+// FILE: MasterRender.scad [v4.8]
 // ARCHITECTURE: Layer 2 (The Render Pipeline & Geometry Modules)
 // ==============================================================================
 
@@ -111,55 +111,78 @@ module render_box(data) {
 }
 
 module render_flip_box(data) {
-    bw = m_bw(data); bl = m_bl(data); bh = m_bh(data); sw = m_safe_wall(data); sl = m_safe_lid(data); hinge_d = 4.0;
+    bw = m_bw(data); bl = m_bl(data); bh = m_bh(data); sw = m_safe_wall(data); sl = m_safe_lid(data); noz = m_noz(data);
+    hinge_d = 4.0; clearance = 0.2; clip_wall = noz * 4;
+    clip_outer_d = hinge_d + (clearance*2) + (clip_wall*2);
+    cc_z = clip_outer_d / 2; hinge_y_offset = clip_outer_d / 2;
+    
     union() {
         render_box(data); 
-        translate([-(bw - sw*2)/2 + sw/2, bl/2 - 0.5, bh - 1]) cuboid([sw*3, hinge_d + 1, sl + 1], anchor=BOTTOM+FRONT);
-        translate([(bw - sw*2)/2 - sw/2, bl/2 - 0.5, bh - 1]) cuboid([sw*3, hinge_d + 1, sl + 1], anchor=BOTTOM+FRONT);
-        translate([0, bl/2 + hinge_d/2, bh + sl]) { yrot(90) cyl(d=hinge_d, h=bw - sw*2, chamfer=0.5, $fn=36); }
+        translate([-(bw - sw*2)/2 + sw/2, bl/2 - 0.5, bh - 1]) cuboid([sw*3, hinge_y_offset + 1, cc_z + 1], anchor=BOTTOM+FRONT);
+        translate([(bw - sw*2)/2 - sw/2, bl/2 - 0.5, bh - 1]) cuboid([sw*3, hinge_y_offset + 1, cc_z + 1], anchor=BOTTOM+FRONT);
+        translate([0, bl/2 + hinge_y_offset, bh + cc_z]) { yrot(90) cyl(d=hinge_d, h=bw - sw*2, chamfer=0.5, $fn=36); }
         translate([0, -bl/2, bh - 3]) cuboid([bw - sw*2, 1.5, 1.5], rounding=0.5, edges="X", anchor=BACK);
     }
 }
 
 module render_double_flip_box(data) {
-    bw = m_bw(data); bl = m_bl(data); bh = m_bh(data); sw = m_safe_wall(data); sl = m_safe_lid(data); hinge_d = 4.0;
-    hinge_offset = 3 + sw; 
+    bw = m_bw(data); bl = m_bl(data); bh = m_bh(data); sw = m_safe_wall(data); sl = m_safe_lid(data); noz = m_noz(data);
+    hinge_d = 4.0; clearance = 0.2; clip_wall = noz * 4;
+    clip_outer_d = hinge_d + (clearance*2) + (clip_wall*2);
+    cc_z = clip_outer_d / 2; hinge_y_offset = clip_outer_d / 2;
+    spine_w = hinge_y_offset * 2;
+    
     union() {
         render_box(data);
-        translate([0, 0, bh - hinge_d]) cuboid([bw - sw*2, hinge_offset*2, hinge_d], anchor=BOTTOM);
-        translate([-(bw - sw*2)/2 + sw/2, 0, bh - 1]) cuboid([sw*3, hinge_offset*2, sl + 1], anchor=BOTTOM);
-        translate([(bw - sw*2)/2 - sw/2, 0, bh - 1]) cuboid([sw*3, hinge_offset*2, sl + 1], anchor=BOTTOM);
-        translate([0, -hinge_offset, bh + sl]) yrot(90) cyl(d=hinge_d, h=bw - sw*2, chamfer=0.5, $fn=36);
-        translate([0, hinge_offset, bh + sl]) yrot(90) cyl(d=hinge_d, h=bw - sw*2, chamfer=0.5, $fn=36);
+        translate([0, 0, bh - hinge_d]) cuboid([bw - sw*2, spine_w, hinge_d], anchor=BOTTOM);
+        translate([-(bw - sw*2)/2 + sw/2, 0, bh - 1]) cuboid([sw*3, spine_w, cc_z + 1], anchor=BOTTOM);
+        translate([(bw - sw*2)/2 - sw/2, 0, bh - 1]) cuboid([sw*3, spine_w, cc_z + 1], anchor=BOTTOM);
+        translate([0, -hinge_y_offset, bh + cc_z]) yrot(90) cyl(d=hinge_d, h=bw - sw*2, chamfer=0.5, $fn=36);
+        translate([0, hinge_y_offset, bh + cc_z]) yrot(90) cyl(d=hinge_d, h=bw - sw*2, chamfer=0.5, $fn=36);
         translate([0, -bl/2, bh - 3]) cuboid([bw - sw*2, 1.5, 1.5], rounding=0.5, edges="X", anchor=BACK);
         translate([0, bl/2, bh - 3]) cuboid([bw - sw*2, 1.5, 1.5], rounding=0.5, edges="X", anchor=FRONT);
     }
 }
 
-// [V4.0] Integrated proper MasterText.scad rendering function
+// [V4.10: Structural Bridge Patch] 
+// Deepened the connecting bridge geometry to force a manifold fusion 
+// between the C-clip cylinder and the main lid body.
+// [V4.11: True C-Clip Geometry Fix]
+// Re-oriented the clip gap to face UP (+Z). This removes all overhangs, 
+// prevents slicer bridging failures, and guarantees a pure snap-fit U-shape.
 module render_flip_lid(data) {
-    bw = m_bw(data); bl = m_bl(data); sl = m_safe_lid(data); sw = m_safe_wall(data); hinge_d = 4.0; clearance = 0.2;
+    bw = m_bw(data); bl = m_bl(data); sl = m_safe_lid(data); sw = m_safe_wall(data); noz = m_noz(data);
+    hinge_d = 4.0; clearance = 0.2; clip_wall = noz * 4;
+    clip_outer_d = hinge_d + (clearance*2) + (clip_wall*2);
+    cc_z = clip_outer_d / 2; hinge_y_offset = clip_outer_d / 2;
+    
     lid_w = bw; lid_l = bl; clip_len = lid_w - sw*6;
     txt = get_val(PLAQUE_TEXT, data, ""); txt_size = get_val(PLAQUE_TEXT_SIZE, data, 8);
-    
+
     union() {
-        difference() {
-            apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data)) { 
-                up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false, get_mesh_cfg(data, HOLE_LID, STRUT_LID, true)); 
-            }
-            // Uses the auto-centering embossed wrapper
-            translate([0, 0, sl - 0.4]) render_embossed_text(txt, txt_size, 1.0);
+        // Main Lid Body
+        apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data)) { 
+            up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false, get_mesh_cfg(data, HOLE_LID, STRUT_LID, true)); 
         }
         
-        translate([0, lid_l/2 + hinge_d/2, sl]) { 
+        // The True C-Clip
+        translate([0, lid_l/2 + hinge_y_offset, cc_z]) { 
             difference() { 
-                yrot(90) cyl(d=hinge_d + sw*2.5, h=clip_len, chamfer=0.5, $fn=36); 
+                yrot(90) cyl(d=clip_outer_d, h=clip_len, chamfer=0.5, $fn=36); 
                 yrot(90) cyl(d=hinge_d + clearance*2, h=clip_len + 2, $fn=36); 
-                translate([0, hinge_d/2, 0]) cuboid([clip_len + 2, hinge_d, hinge_d*0.8], anchor=CENTER); 
+                
+                // Pure vertical cut facing UP (+Z). 
+                // Width is exactly 80% of the axle to create snap-fit jaws.
+                translate([0, 0, clip_outer_d/2])
+                    cuboid([clip_len + 2, hinge_d * 0.8, clip_outer_d], anchor=CENTER);
             } 
-            translate([0, -hinge_d/4, 0]) cuboid([clip_len, hinge_d/2 + 0.1, sl], anchor=CENTER);
         }
         
+        // The Manifold Bridge (Includes the v4.10 +2.0mm depth fix)
+        translate([0, lid_l/2 + hinge_y_offset/2, sl/2]) 
+            cuboid([clip_len, hinge_y_offset + 2.0, sl], anchor=CENTER);
+        
+        // The Front Clasp
         translate([0, -lid_l/2 + sw, sl]) { 
             difference() { 
                 cuboid([lid_w - sw*2, sw + 1.5, 4], anchor=BOTTOM+FRONT); 
@@ -181,15 +204,8 @@ module render_tray_stack_nest(data) {
 
 module render_tray_stack_peg(data) { 
     bw = m_bw(data); bl = m_bl(data); bh = m_bh(data); sw = m_safe_wall(data);
-    socket_d = 8.0; 
-    boss_d = socket_d + sw*2; 
-    cx = bw/2 - sw - boss_d/2 + 0.1; 
-    cy = bl/2 - sw - boss_d/2 + 0.1; 
-    
-    max_total_z = bh + 2.1; 
-    safe_top_depth = min(12.0, max(3.0, (max_total_z / 2) - 1));
-    safe_bot_depth = min(12.0, max(3.0, (max_total_z / 2) - 1));
-
+    socket_d = 8.0; boss_d = socket_d + sw*2; cx = bw/2 - sw - boss_d/2 + 0.1; cy = bl/2 - sw - boss_d/2 + 0.1; 
+    max_total_z = bh + 2.1; safe_top_depth = min(12.0, max(3.0, (max_total_z / 2) - 1)); safe_bot_depth = min(12.0, max(3.0, (max_total_z / 2) - 1));
     difference() {
         union() { 
             render_tray_simple(data); 
@@ -213,36 +229,29 @@ module render_lid_glide(data) { bw = m_bw(data); bl = m_bl(data); sl = m_safe_li
 module render_jar(data) { has_threads = get_val(HAS_THREADS, data, false); bw = m_bw(data); sf = m_safe_floor(data); sw = m_safe_wall(data); lip_h = 8.0; actual_wall_h = m_bh(data) - sf; cyl_wall_h = max(0.1, has_threads ? (actual_wall_h - lip_h - sw * 1.5) : actual_wall_h); neck_od = bw - sw * 2 - 0.6; neck_id = neck_od - sw * 2; union() { up(sf / 2) framed_mesh(data, bw, bw, sf, true, get_mesh_cfg(data, HOLE_FLOOR, STRUT_FLOOR)); up(sf) cylindrical_mesh_wall(data, bw, cyl_wall_h, sw, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL)); render_internal_grid(data); if (has_threads) { up(sf + cyl_wall_h) { difference() { cyl(d1=bw, d2=neck_od, h=sw * 1.5, anchor=BOTTOM); down(1) cyl(d=neck_id, h=sw * 1.5 + 2, anchor=BOTTOM); } } up(sf + cyl_wall_h + sw * 1.5) { difference() { threaded_rod(d=neck_od, l=lip_h, pitch=get_val(THREAD_PITCH, data, 2.0), internal=false, anchor=BOTTOM, $fn=30); down(1) cyl(d=neck_id, h=lip_h + 2, anchor=BOTTOM); } } } } }
 module render_jar_lid(data) { bw = m_bw(data); sw = m_safe_wall(data); sl = m_safe_lid(data); lip_h = 8.0; cap_h = max(0.1, lip_h + sw * 1.5); neck_od = bw - sw * 2 - 0.6; difference() { union() { up(cap_h + sl / 2) framed_mesh(data, bw, bw, sl, true, get_mesh_cfg(data, HOLE_LID, STRUT_LID, true)); cyl(d=bw, h=cap_h, chamfer2=m_chamf(data), anchor=BOTTOM); } up(-0.1) threaded_rod(d=neck_od + 0.8, l=cap_h + 1, pitch=get_val(THREAD_PITCH, data, 2.0), internal=false, anchor=BOTTOM, $fn=30); } }
 
-// [V4.0] Plaque dynamically sized using MasterText.scad
 module render_plaque(data) { 
-    txt = get_val(PLAQUE_TEXT, data, ""); 
-    txt_size = get_val(PLAQUE_TEXT_SIZE, data, 8); 
-    p_w = get_val(WIDTH, data, get_text_plaque_width(txt, txt_size)); 
-    
-    difference() { 
-        cuboid([p_w, 20, 1.0], rounding=1.5, edges="Z", anchor=BOTTOM); 
-        up(0.4) render_embossed_text(txt, txt_size, 1.0); 
-    } 
+    txt = get_val(PLAQUE_TEXT, data, ""); txt_size = get_val(PLAQUE_TEXT_SIZE, data, 8); p_w = get_val(WIDTH, data, get_text_plaque_width(txt, txt_size)); 
+    difference() { cuboid([p_w, 20, 1.0], rounding=1.5, edges="Z", anchor=BOTTOM); up(0.4) render_embossed_text(txt, txt_size, 1.0); } 
 }
 
 module build_part(data) {
-    generate_preflight_report(data);
-    type = get_val(TYPE, data, BOX);
-    if (type == BOX || type == DESICCANT_BOX) render_box(data);
-    else if (type == TRAY_SIMPLE) render_tray_simple(data);
+    generate_preflight_report(data); type = get_val(TYPE, data, BOX);
+    if (type == BOX || type == DESICCANT_BOX) render_box(data); 
+    else if (type == TRAY_SIMPLE) render_tray_simple(data); 
     else if (type == TRAY_STACK_NEST) render_tray_stack_nest(data); 
-    else if (type == TRAY_STACK_PEG) render_tray_stack_peg(data);   
-    else if (type == PEG) render_peg(data);
-    else if (type == FLIP_BOX) render_flip_box(data);
-    else if (type == DOUBLE_FLIP_BOX) render_double_flip_box(data);
-    else if (type == FLIP_LID) render_flip_lid(data);
-    else if (type == LID || type == DESICCANT_LID) render_lid(data);
-    else if (type == LID_GLIDE) render_lid_glide(data);
-    else if (type == PLAQUE) render_plaque(data);
+    else if (type == TRAY_STACK_PEG) render_tray_stack_peg(data); 
+    else if (type == PEG) render_peg(data); 
+    else if (type == FLIP_BOX) render_flip_box(data); 
+    else if (type == DOUBLE_FLIP_BOX) render_double_flip_box(data); 
+    else if (type == FLIP_LID) render_flip_lid(data); 
+    else if (type == LID || type == DESICCANT_LID) render_lid(data); 
+    else if (type == LID_GLIDE) render_lid_glide(data); 
+    else if (type == PLAQUE) render_plaque(data); 
     else if (type == JAR) render_jar(data); 
-    else if (type == JAR_LID) render_jar_lid(data);
-    else if (type == BOX_GRID) render_box_grid(data);
+    else if (type == JAR_LID) render_jar_lid(data); 
+    else if (type == BOX_GRID) render_box_grid(data); 
     else if (type == JAR_GRID) render_jar_grid(data);
+    else if (type == SPEC_TAG) render_spec_tag(data); 
 }
 
 module build_platter(manifest) { for (i = [0 : len(manifest) - 1]) { pos = get_xy(manifest, i); translate([pos[0], pos[1], 0]) build_part(manifest[i]); } }

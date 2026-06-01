@@ -1,11 +1,11 @@
 // ==============================================================================
-// FILE: MasterBuilder.scad [v4.0]
+// FILE: MasterBuilder.scad [v4.9.1]
 // ARCHITECTURE: Layer 3 (The UI & Controller)
-// DEPENDENCIES: MasterEnum v4.0, MasterRender v4.0
+// DEPENDENCIES: MasterEnum v4.5, MasterUtility v4.7, MasterRender v4.8, MasterEngine v4.9
 // ==============================================================================
 
 /* [Build Selection] */
-Part_To_Build = "14-Day AM/PM Box"; // ["Box", "Standalone Box", "Flip Box", "7-Day Pill Box", "14-Day AM/PM Box", "Lid", "Simple Tray", "Nesting Tray (Short)", "Modular Peg Tray (Long)", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Center Jar", "S4 Wedge Box", "S4 Set", "Plaque"]
+Part_To_Build = "14-Day AM/PM Box"; // ["Box", "Standalone Box", "Flip Box", "7-Day Pill Box", "14-Day AM/PM Box", "Lid", "Simple Tray", "Nesting Tray (Short)", "Modular Peg Tray (Long)", "Standalone Box Grid", "Standalone Jar Grid", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Center Jar", "S4 Wedge Box", "S4 Set", "Plaque"]
 
 /* [Dimensions] */
 dimension_mode = "Total"; // ["Total", "Usable"]
@@ -61,7 +61,7 @@ actual_l = (dimension_mode == "Usable") ? part_length + (wall_thickness * 2) : p
 actual_h = (dimension_mode == "Usable") ? part_height + floor_thickness + lid_thickness : part_height;
 
 ui_payload = [
-    [BUILDER_VERSION,    "v4.0"], // [V4.0] Version bump
+    [BUILDER_VERSION,    "v4.9.1"], // [V4.9.1] Universal Spec Tag Injection
     [DIMENSION_MODE,     dimension_mode], 
     [WIDTH,              actual_w], 
     [LENGTH,             actual_l], 
@@ -79,12 +79,10 @@ ui_payload = [
     [STRUT_LID,          strut_lid_perc],
     [WALL_MODIFY,        modify_wall], 
     [WALL_TARGET,        target_wall], 
-    
     [GRID_LAYOUT,        grid_layout], 
     [GRID_TYPE,          grid_type], 
     [GRID_HAS_BASE,      grid_has_base], 
     [HAS_BUILTIN_GRID,   (grid_type == "Built-in")],
-    
     [PLAQUE_STYLE,       plaque_style], 
     [PLAQUE_TEXT,        plaque_text], 
     [PLAQUE_TEXT_SIZE,   plaque_text_size],
@@ -106,25 +104,12 @@ function get_raw_queue(intent, global_payload) =
     (intent == "Box") ? [ make_part(TRAY_STACK_NEST, global_payload), make_part(LID, global_payload) ] :
     (intent == "Standalone Box") ? [ make_part(BOX, concat([[WALL_MODIFY, "Dropped"], [WALL_TARGET, "Front"], [NEEDS_GROOVE, true]], global_payload)), make_part(LID_GLIDE, global_payload) ] :
     (intent == "Flip Box") ? [ make_part(FLIP_BOX, global_payload), make_part(FLIP_LID, global_payload) ] :
-    
-    (intent == "7-Day Pill Box") ? let(days = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]) concat(
-        [ make_part(FLIP_BOX, concat([[WIDTH, actual_w * 7], [GRID_LAYOUT, "7x1"]], global_payload)) ],
-        [ for (i=[0:6]) make_part(FLIP_LID, concat([[WIDTH, actual_w - 0.6], [PLAQUE_TEXT, days[i]]], global_payload)) ]
-    ) :
-    
-    (intent == "14-Day AM/PM Box") ? let(days = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]) concat(
-        [ make_part(DOUBLE_FLIP_BOX, concat([[WIDTH, actual_w * 7], [LENGTH, actual_l * 2 + 10], [GRID_LAYOUT, "7x2"]], global_payload)) ],
-        [ for (i=[0:6]) make_part(FLIP_LID, concat([[WIDTH, actual_w - 0.6], [LENGTH, actual_l], [PLAQUE_TEXT, str(days[i], " AM")]], global_payload)) ],
-        [ for (i=[0:6]) make_part(FLIP_LID, concat([[WIDTH, actual_w - 0.6], [LENGTH, actual_l], [PLAQUE_TEXT, str(days[i], " PM")]], global_payload)) ]
-    ) :
-    
+    (intent == "7-Day Pill Box") ? concat([ make_part(FLIP_BOX, concat([[WIDTH, actual_w * 7], [GRID_LAYOUT, "7x1"]], global_payload)) ], [ for (i=[0:6]) make_part(FLIP_LID, concat([[WIDTH, actual_w - 0.6], [PLAQUE_TEXT, ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"][i]]], global_payload)) ]) :
+    (intent == "14-Day AM/PM Box") ? concat([ make_part(DOUBLE_FLIP_BOX, concat([[WIDTH, actual_w * 7], [LENGTH, actual_l * 2 + 10], [GRID_LAYOUT, "7x2"]], global_payload)) ], [ for (i=[0:6]) make_part(FLIP_LID, concat([[WIDTH, actual_w - 0.6], [LENGTH, actual_l], [PLAQUE_TEXT, str(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"][i], " AM")]], global_payload)) ], [ for (i=[0:6]) make_part(FLIP_LID, concat([[WIDTH, actual_w - 0.6], [LENGTH, actual_l], [PLAQUE_TEXT, str(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"][i], " PM")]], global_payload)) ]) :
     (intent == "Nesting Tray (Short)") ? [ make_part(TRAY_STACK_NEST, global_payload) ] : 
-    (intent == "Modular Peg Tray (Long)") ? [ 
-        make_part(TRAY_STACK_PEG, global_payload), 
-        make_part(PEG, global_payload), make_part(PEG, global_payload), 
-        make_part(PEG, global_payload), make_part(PEG, global_payload) 
-    ] :
-    
+    (intent == "Modular Peg Tray (Long)") ? [ make_part(TRAY_STACK_PEG, global_payload), make_part(PEG, global_payload), make_part(PEG, global_payload), make_part(PEG, global_payload), make_part(PEG, global_payload) ] :
+    (intent == "Standalone Box Grid") ? [ make_part(BOX_GRID, global_payload) ] :
+    (intent == "Standalone Jar Grid") ? [ make_part(JAR_GRID, global_payload) ] :
     (intent == "Lid") ? [ make_part(LID, global_payload) ] : 
     (intent == "Simple Tray") ? [ make_part(TRAY_SIMPLE, global_payload) ] : 
     (intent == "Plaque") ? [ make_part(PLAQUE, global_payload) ] :
@@ -136,17 +121,13 @@ function get_raw_queue(intent, global_payload) =
     (intent == "S4 Set") ? make_assembly(["S4 Center Jar", "S4 Wedge Box"], global_payload) : [ make_part(BOX, global_payload) ];
 
 function auto_spawn_grids(raw_queue, global_payload) =
-    let( g_str = get_val(GRID_LAYOUT, global_payload, ""), 
-         is_drop_in = get_val(GRID_TYPE, global_payload, "Built-in") == "Drop-in",
-         tokens = str_split(g_str, " "),
-         has_cart = len([for (tok=tokens) if (len(search("x", tok))>0 || len(search("X", tok))>0) tok]) > 0,
-         has_rad = len([for (tok=tokens) if (tok[0]=="R" || tok[0]=="r") tok]) > 0 )
-    [ for (part = raw_queue) let(t = get_val(TYPE, part)) for (out =
-            ((t == BOX || t == TRAY_SIMPLE || t == TRAY_STACK_NEST || t == TRAY_STACK_PEG || t == FLIP_BOX || t == DOUBLE_FLIP_BOX) && has_cart && is_drop_in) ? [part, make_part(BOX_GRID, global_payload)] :
-            (t == JAR && has_rad && is_drop_in) ? [part, make_part(JAR_GRID, global_payload)] : [part]
-        ) out ];
+    let( g_str = get_val(GRID_LAYOUT, global_payload, ""), is_drop_in = get_val(GRID_TYPE, global_payload, "Built-in") == "Drop-in", tokens = str_split(g_str, " "), has_cart = len([for (tok=tokens) if (len(search("x", tok))>0 || len(search("X", tok))>0) tok]) > 0, has_rad = len([for (tok=tokens) if (tok[0]=="R" || tok[0]=="r") tok]) > 0 )
+    [ for (part = raw_queue) let(t = get_val(TYPE, part, BOX)) for (out = (((t == BOX || t == TRAY_SIMPLE || t == TRAY_STACK_NEST || t == TRAY_STACK_PEG || t == FLIP_BOX || t == DOUBLE_FLIP_BOX) && has_cart && is_drop_in) ? [part, make_part(BOX_GRID, global_payload)] : (t == JAR && has_rad && is_drop_in) ? [part, make_part(JAR_GRID, global_payload)] : [part]) ) out ];
 
-function compile_manifest(intent, global_payload) = let(raw_q = get_raw_queue(intent, global_payload), grid_q = auto_spawn_grids(raw_q, global_payload)) [ for (part = grid_q) process_part(part) ];
+// [V4.9.1] Unconditionally append a single SPEC_TAG to the end of the final build queue array
+function compile_manifest(intent, global_payload) = 
+    let(raw_q = get_raw_queue(intent, global_payload), grid_q = auto_spawn_grids(raw_q, global_payload)) 
+    concat([ for (part = grid_q) process_part(part) ], [ process_part(make_part(SPEC_TAG, global_payload)) ]);
 
 final_build_queue = compile_manifest(Part_To_Build, ui_payload);
 build_platter(final_build_queue);

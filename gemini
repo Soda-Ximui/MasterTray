@@ -1,0 +1,589 @@
+// ==============================================================================
+// FILE: MasterBuilder.scad [v4.9.1]
+// ARCHITECTURE: Layer 3 (The UI & Controller)
+// DEPENDENCIES: MasterEnum v4.5, MasterUtility v4.7, MasterRender v4.8, MasterEngine v4.9
+// ==============================================================================
+
+/* [Build Selection] */
+Part_To_Build = "14-Day AM/PM Box"; // ["Box", "Standalone Box", "Flip Box", "7-Day Pill Box", "14-Day AM/PM Box", "Lid", "Simple Tray", "Nesting Tray (Short)", "Modular Peg Tray (Long)", "Standalone Box Grid", "Standalone Jar Grid", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Center Jar", "S4 Wedge Box", "S4 Set", "Plaque"]
+
+/* [Dimensions] */
+dimension_mode = "Total"; // ["Total", "Usable"]
+part_width = 30;  // [10 : 1 : 250]
+part_length = 40; // [10 : 1 : 250]
+part_height = 30; // [5 : 1 : 250]
+
+/* [High-Peg Mod] */
+stackable_peg_height = 80; // [20 : 10 : 200]
+
+/* [Printer / Slicer Setting] */
+Layer_Height = "Standard (0.20mm)"; 
+Wall_Loops = "Standard (3 loops)"; 
+Nozzle_Diameter = 0.4; 
+
+/* [Mesh Aesthetics] */
+mesh_pattern = "Teardrop"; // ["Honeycomb", "Teardrop", "Slotted", "Circle", "Square", "Diamond", "None"]
+mesh_hole_size = 0.0; // [0.0 : 0.1 : 5.0]
+strut_wall_perc = 100;  // [0 : 5 : 100]
+strut_floor_perc = 100; // [0 : 5 : 100]
+strut_lid_perc = 100;   // [0 : 5 : 100]
+
+/* [Wall Modifications] */
+modify_wall = "None"; // ["None", "Dropped", "50%", "25%"]
+target_wall = "All Walls"; // ["All Walls", "Front", "Back", "Left", "Right"]
+
+/* [Grid System] */
+grid_type = "Built-in"; // ["Built-in", "Drop-in", "None"]
+grid_layout = "7x2"; 
+grid_has_base = true;
+
+/* [Plaque / Labels] */
+plaque_style = "None"; // ["None", "Embedded", "Standalone"]
+plaque_text = "";
+plaque_text_size = 6; // [4:1:20]
+
+/* [Core Engineering (R&D Exposed)] */
+floor_thickness = 2.0; 
+lid_thickness = 2.0;   
+wall_thickness = 2.4;  
+divider_thickness = 1.2; 
+min_solid_edge_for_lid = 10;
+peg_thickness_multiplier = 2.0; 
+snap_tolerance_gap = 0.1; 
+clip_tolerance = 0.1; 
+platter_gap = 15; 
+thread_pitch = 2.0; 
+
+include <MasterRender.scad>
+
+actual_w = (dimension_mode == "Usable") ? part_width + (wall_thickness * 2) : part_width;
+actual_l = (dimension_mode == "Usable") ? part_length + (wall_thickness * 2) : part_length;
+actual_h = (dimension_mode == "Usable") ? part_height + floor_thickness + lid_thickness : part_height;
+
+ui_payload = [
+    [BUILDER_VERSION,    "v4.9.1"], // [V4.9.1] Universal Spec Tag Injection
+    [DIMENSION_MODE,     dimension_mode], 
+    [WIDTH,              actual_w], 
+    [LENGTH,             actual_l], 
+    [HEIGHT,             actual_h],
+    [PEG_HEIGHT,         stackable_peg_height], 
+    [LAYER_HEIGHT,       Layer_Height], 
+    [WALL_LOOPS,         Wall_Loops], 
+    [NOZZLE_DIAMETER,    Nozzle_Diameter],
+    [PATTERN,            mesh_pattern], 
+    [HOLE_WALL,          mesh_hole_size], 
+    [HOLE_FLOOR,         mesh_hole_size], 
+    [HOLE_LID,           mesh_hole_size],
+    [STRUT_WALL,         strut_wall_perc], 
+    [STRUT_FLOOR,        strut_floor_perc], 
+    [STRUT_LID,          strut_lid_perc],
+    [WALL_MODIFY,        modify_wall], 
+    [WALL_TARGET,        target_wall], 
+    [GRID_LAYOUT,        grid_layout], 
+    [GRID_TYPE,          grid_type], 
+    [GRID_HAS_BASE,      grid_has_base], 
+    [HAS_BUILTIN_GRID,   (grid_type == "Built-in")],
+    [PLAQUE_STYLE,       plaque_style], 
+    [PLAQUE_TEXT,        plaque_text], 
+    [PLAQUE_TEXT_SIZE,   plaque_text_size],
+    [THICK_FLOOR,        floor_thickness], 
+    [THICK_LID,          lid_thickness], 
+    [THICK_WALL,         wall_thickness], 
+    [THICK_DIVIDER,      divider_thickness],
+    [LID_MIN_SOLID,      min_solid_edge_for_lid], 
+    [THICK_PEG_MULT,     peg_thickness_multiplier], 
+    [TOL_SNAP_GAP,       snap_tolerance_gap], 
+    [TOL_CLIP,           clip_tolerance],
+    [PLATTER_GAP,        platter_gap], 
+    [THREAD_PITCH,       thread_pitch]
+];
+
+function make_assembly(intents, global_payload, idx=0) = (idx >= len(intents)) ? [] : concat(get_raw_queue(intents[idx], global_payload), make_assembly(intents, global_payload, idx + 1));
+
+function get_raw_queue(intent, global_payload) =
+    (intent == "Box") ? [ make_part(TRAY_STACK_NEST, global_payload), make_part(LID, global_payload) ] :
+    (intent == "Standalone Box") ? [ make_part(BOX, concat([[WALL_MODIFY, "Dropped"], [WALL_TARGET, "Front"], [NEEDS_GROOVE, true]], global_payload)), make_part(LID_GLIDE, global_payload) ] :
+    (intent == "Flip Box") ? [ make_part(FLIP_BOX, global_payload), make_part(FLIP_LID, global_payload) ] :
+    (intent == "7-Day Pill Box") ? concat([ make_part(FLIP_BOX, concat([[WIDTH, actual_w * 7], [GRID_LAYOUT, "7x1"]], global_payload)) ], [ for (i=[0:6]) make_part(FLIP_LID, concat([[WIDTH, actual_w - 0.6], [PLAQUE_TEXT, ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"][i]]], global_payload)) ]) :
+    (intent == "14-Day AM/PM Box") ? concat([ make_part(DOUBLE_FLIP_BOX, concat([[WIDTH, actual_w * 7], [LENGTH, actual_l * 2 + 10], [GRID_LAYOUT, "7x2"]], global_payload)) ], [ for (i=[0:6]) make_part(FLIP_LID, concat([[WIDTH, actual_w - 0.6], [LENGTH, actual_l], [PLAQUE_TEXT, str(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"][i], " AM")]], global_payload)) ], [ for (i=[0:6]) make_part(FLIP_LID, concat([[WIDTH, actual_w - 0.6], [LENGTH, actual_l], [PLAQUE_TEXT, str(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"][i], " PM")]], global_payload)) ]) :
+    (intent == "Nesting Tray (Short)") ? [ make_part(TRAY_STACK_NEST, global_payload) ] : 
+    (intent == "Modular Peg Tray (Long)") ? [ make_part(TRAY_STACK_PEG, global_payload), make_part(PEG, global_payload), make_part(PEG, global_payload), make_part(PEG, global_payload), make_part(PEG, global_payload) ] :
+    (intent == "Standalone Box Grid") ? [ make_part(BOX_GRID, global_payload) ] :
+    (intent == "Standalone Jar Grid") ? [ make_part(JAR_GRID, global_payload) ] :
+    (intent == "Lid") ? [ make_part(LID, global_payload) ] : 
+    (intent == "Simple Tray") ? [ make_part(TRAY_SIMPLE, global_payload) ] : 
+    (intent == "Plaque") ? [ make_part(PLAQUE, global_payload) ] :
+    (intent == "Open Jar") ? [ make_part(JAR, concat([[WIDTH, actual_l], [HAS_THREADS, false]], global_payload)), make_part(JAR, concat([[WIDTH, actual_w], [HAS_THREADS, false]], global_payload)) ] :
+    (intent == "Threaded Jar") ? [ make_part(JAR, concat([[HAS_THREADS, true]], global_payload)) ] :
+    (intent == "Jar with Lid") ? [ make_part(JAR, concat([[HAS_THREADS, true]], global_payload)), make_part(JAR_LID, global_payload) ] :
+    (intent == "S4 Center Jar") ? [ make_part(JAR, concat([[HAS_THREADS, true]], global_payload)), make_part(JAR_LID, global_payload) ] :
+    (intent == "S4 Wedge Box") ? [ make_part(BOX, concat([[HEIGHT, 90]], global_payload)), make_part(LID, global_payload) ] :
+    (intent == "S4 Set") ? make_assembly(["S4 Center Jar", "S4 Wedge Box"], global_payload) : [ make_part(BOX, global_payload) ];
+
+function auto_spawn_grids(raw_queue, global_payload) =
+    let( g_str = get_val(GRID_LAYOUT, global_payload, ""), is_drop_in = get_val(GRID_TYPE, global_payload, "Built-in") == "Drop-in", tokens = str_split(g_str, " "), has_cart = len([for (tok=tokens) if (len(search("x", tok))>0 || len(search("X", tok))>0) tok]) > 0, has_rad = len([for (tok=tokens) if (tok[0]=="R" || tok[0]=="r") tok]) > 0 )
+    [ for (part = raw_queue) let(t = get_val(TYPE, part, BOX)) for (out = (((t == BOX || t == TRAY_SIMPLE || t == TRAY_STACK_NEST || t == TRAY_STACK_PEG || t == FLIP_BOX || t == DOUBLE_FLIP_BOX) && has_cart && is_drop_in) ? [part, make_part(BOX_GRID, global_payload)] : (t == JAR && has_rad && is_drop_in) ? [part, make_part(JAR_GRID, global_payload)] : [part]) ) out ];
+
+// [V4.9.1] Unconditionally append a single SPEC_TAG to the end of the final build queue array
+function compile_manifest(intent, global_payload) = 
+    let(raw_q = get_raw_queue(intent, global_payload), grid_q = auto_spawn_grids(raw_q, global_payload)) 
+    concat([ for (part = grid_q) process_part(part) ], [ process_part(make_part(SPEC_TAG, global_payload)) ]);
+
+final_build_queue = compile_manifest(Part_To_Build, ui_payload);
+build_platter(final_build_queue);// ==============================================================================
+// FILE: MasterChecks.scad [v4.0]
+// ARCHITECTURE: Layer 1.1 (Safety & Tolerance Validation)
+// ==============================================================================
+include <MasterEngine.scad>
+
+// --- Z-Axis Safety ---
+// Floors and lids must be strict multiples of the slicer's layer height to prevent micro-stepping errors.
+// They are also dynamically capped at 35% of the total object height to prevent an accidentally
+// thick floor from turning a small tray into a solid brick of plastic.
+function m_safe_floor(data) = max(m_lh(data), round(min(get_val(THICK_FLOOR, data, THICK_FLOOR0), m_bh(data) * 0.35) / m_lh(data)) * m_lh(data));
+function m_safe_lid(data) = max(m_lh(data), round(min(get_val(THICK_LID, data, THICK_LID0), m_bh(data) * 0.35) / m_lh(data)) * m_lh(data));
+
+// --- X/Y-Axis Safety ---
+// Forces requested wall thicknesses to snap to exact multiples of the nozzle diameter.
+// It strictly enforces the minimum physical thickness requirement: (Nozzle Size * Wall Loops).
+function m_safe_wall(data) = max(m_noz(data) * m_wloops(data), round(min(get_val(THICK_WALL, data, THICK_WALL0), min(m_bw(data), m_bl(data)) * 0.45) / m_noz(data)) * m_noz(data));
+
+// --- Geometric Hardware Bounds ---
+// Automatically derives a safe inner bounding box corner radius based on the requested wall thickness.
+// If the corner radius drops below the wall thickness, internal geometry breaks and inverts.
+function m_c_rad(data) = m_safe_wall(data) + ((m_noz(data) * m_wloops(data)) / 2) - 0.5; 
+
+// Ensures any generated chamfers do not exceed physical FDM overhang limits (capped around 2.5x nozzle).
+function m_chamf(data) = m_noz(data) * 2.5;
+
+// Safely parses string-based wall modification toggles ("50%", "Dropped") into a functional 0-100 decimal multiplier.
+function m_wall_mod_p(data) = let(s = str(get_val(WALL_MODIFY, data, WALL_MODIFY0))) (s == "None") ? 100 : (s == "Dropped") ? 0 : let(n = get_digits(s)) len(n)==1?n[0]:len(n)==2?n[0]*10+n[1]:len(n)==3?n[0]*100+n[1]*10+n[2]:100;// ==============================================================================
+// FILE: MasterEngine.scad [v4.9]
+// ARCHITECTURE: Layer 1 (The Math Kernel & Data Router)
+// ==============================================================================
+
+include <BOSL2/std.scad>
+include <BOSL2/threading.scad>
+include <MasterEnum.scad>
+
+WIDTH0=50; LENGTH0=50; HEIGHT0=50; LAYER_HEIGHT0="Standard (0.20mm)"; WALL_LOOPS0="Standard (3 loops)"; NOZZLE_DIAMETER0=0.4;
+MIN_HOLE_SPACING0=1.2; PATTERN0=TEARDROP; STRUT_WALL0=25; STRUT_FLOOR0=25; STRUT_LID0=25;
+PLAQUE_STYLE0="None"; PLAQUE_TEXT0=""; PLAQUE_TEXT_SIZE0=8; WALL_MODIFY0="None"; WALL_TARGET0="All Walls";
+THICK_FLOOR0=2.0; THICK_LID0=2.0; THICK_WALL0=2.4; THICK_DIVIDER0=1.2; LID_MIN_SOLID0=10; TOL_SNAP_GAP0=0.1; TOL_CLIP0=0.1;
+PLATTER_GAP0=15; THREAD_PITCH0=2.0; MAX_BUILD_PLATE_WIDTH0=250; GRID_LAYOUT0=""; GRID_HAS_BASE0=false;
+
+function make_part(type, local_data=[]) = concat([[TYPE, type]], local_data);
+function get_val(key, data, fallback) = let (idx = search([key], data)[0]) (idx == []) ? fallback : data[idx][1];
+
+function get_footprint(data) =
+    let(type = get_val(TYPE, data, BOX), w = max(10, get_val(WIDTH, data, WIDTH0)), l = max(10, get_val(LENGTH, data, LENGTH0)))
+    (type == JAR || type == JAR_LID || type == JAR_GRID || type == PLAQUE_JAR) ? [w, w] : [w, l];
+
+function get_xy(manifest, target_idx, curr_idx=0, edge_x=0, edge_y=0, row_max_y=0) =
+    let(
+        data = manifest[curr_idx], footprint = get_footprint(data), w = footprint[0], l = footprint[1],
+        wrap = (edge_x > 0) && ((edge_x + w) > MAX_BUILD_PLATE_WIDTH0),
+        actual_edge_x = wrap ? 0 : edge_x, actual_edge_y = wrap ? edge_y + row_max_y : edge_y,
+        center_x = actual_edge_x + (w / 2), center_y = actual_edge_y + (l / 2),
+        next_edge_x = actual_edge_x + w + PLATTER_GAP0, next_row_max = wrap ? l + PLATTER_GAP0 : max(row_max_y, l + PLATTER_GAP0)
+    )
+    (curr_idx == target_idx) ? [center_x, center_y] : get_xy(manifest, target_idx, curr_idx + 1, next_edge_x, actual_edge_y, next_row_max);
+
+function m_bw(data) = max(10, get_val(WIDTH, data, WIDTH0)); function m_bl(data) = max(10, get_val(LENGTH, data, LENGTH0));
+function m_bh(data) = max(5, get_val(HEIGHT, data, HEIGHT0)); function m_noz(data) = get_val(NOZZLE_DIAMETER, data, NOZZLE_DIAMETER0);
+function m_lh(data) = let(s = get_val(LAYER_HEIGHT, data, LAYER_HEIGHT0)) (s=="Detailed (0.12mm)")?0.12:0.20; function m_wloops(data) = 3;
+
+function get_digits(s) = [ for (i = [0 : len(s)-1]) let(o = ord(s[i])) if (o >= 48 && o <= 57) o - 48 ];
+function to_num(d) = len(d)==0 ? 0 : len(d)==1 ? d[0] : len(d)==2 ? d[0]*10 + d[1] : len(d)==3 ? d[0]*100 + d[1]*10 + d[2] : 0;
+
+// [V4.9: Surgical Syntax Fix] Explicitly grouped the ternary result to satisfy the parser.
+function get_mesh_cfg(data, h_key, s_key, needs_margin=false) = 
+    let(pat = get_val(PATTERN, data, PATTERN0), hole = get_val(h_key, data, 1.6), strut = get_val(s_key, data, 25), req_s = (200 * get_val(LID_MIN_SOLID, data, LID_MIN_SOLID0)) / min(m_bw(data), m_bl(data)), final_s = needs_margin ? max(max(2, strut), req_s) : max(2, strut)) 
+    ((pat == NONE || hole <= 0.05 || final_s >= 99) ? undef : [hole, final_s]); 
+
+function get_grid_step(hole, min_sp, noz) = hole + max(min_sp, max(noz, round(max(noz * 2, hole * 0.25) / noz) * noz));
+function get_mesh_dim(dim, perc) = max(0.1, dim * (1 - (perc / 100)));
+function get_n_steps(dim, perc, step) = ceil((get_mesh_dim(dim, perc)) / step) + 2;// ==============================================================================
+// FILE: MasterEnum.scad [v4.0]
+// ARCHITECTURE: Layer 0 (The Lexicon & Dictionary)
+// ==============================================================================
+
+TYPE          = "TYPE"; WIDTH = "WIDTH"; LENGTH = "LENGTH"; HEIGHT = "HEIGHT";
+DIMENSION_MODE= "DIMENSION_MODE"; 
+BUILDER_VERSION = "BUILDER_VERSION"; 
+LAYER_HEIGHT  = "LAYER_HEIGHT"; WALL_LOOPS = "WALL_LOOPS"; NOZZLE_DIAMETER = "NOZZLE_DIAMETER";
+PATTERN       = "PATTERN"; HOLE_WALL = "HOLE_WALL"; HOLE_FLOOR = "HOLE_FLOOR"; HOLE_LID = "HOLE_LID";
+STRUT_WALL    = "STRUT_WALL"; STRUT_FLOOR = "STRUT_FLOOR"; STRUT_LID = "STRUT_LID";      
+GRID_LAYOUT   = "GRID_LAYOUT"; GRID_HAS_BASE = "GRID_HAS_BASE"; 
+GRID_TYPE     = "GRID_TYPE"; 
+PLAQUE_STYLE  = "PLAQUE_STYLE"; PLAQUE_TEXT = "PLAQUE_TEXT"; PLAQUE_TEXT_SIZE = "PLAQUE_TEXT_SIZE";
+WALL_MODIFY   = "WALL_MODIFY"; WALL_TARGET = "WALL_TARGET";    
+THICK_FLOOR   = "THICK_FLOOR"; THICK_LID = "THICK_LID"; THICK_WALL = "THICK_WALL"; THICK_DIVIDER = "THICK_DIVIDER";
+LID_MIN_SOLID = "LID_MIN_SOLID"; THICK_PEG_MULT = "THICK_PEG_MULT"; 
+TOL_SNAP_GAP  = "TOL_SNAP_GAP"; TOL_CLIP = "TOL_CLIP"; PLATTER_GAP = "PLATTER_GAP"; THREAD_PITCH = "THREAD_PITCH";
+PEG_HEIGHT    = "PEG_HEIGHT"; 
+
+HONEYCOMB = "Honeycomb"; TEARDROP = "Teardrop"; SLOTTED = "Slotted";
+CIRCLE = "Circle"; SQUARE = "Square"; DIAMOND = "Diamond"; NONE = "None";
+
+NEEDS_GROOVE = "NEEDS_GROOVE"; HAS_THREADS = "HAS_THREADS"; HAS_BUILTIN_GRID = "HAS_BUILTIN_GRID"; 
+
+BOX = "BOX"; LID = "LID"; LID_GLIDE = "LID_GLIDE";     
+TRAY_SIMPLE = "TRAY_SIMPLE"; 
+TRAY_STACK_NEST = "TRAY_STACK_NEST"; 
+TRAY_STACK_PEG = "TRAY_STACK_PEG";   
+PEG = "PEG"; 
+
+BOX_GRID = "BOX_GRID"; JAR_GRID = "JAR_GRID";
+JAR = "JAR"; JAR_LID = "JAR_LID";
+PLAQUE = "PLAQUE"; PLAQUE_JAR = "PLAQUE_JAR";
+DESICCANT_BOX = "DESICCANT_BOX"; DESICCANT_LID = "DESICCANT_LID";
+
+FLIP_BOX = "FLIP_BOX"; FLIP_LID = "FLIP_LID"; DOUBLE_FLIP_BOX = "DOUBLE_FLIP_BOX";// ==============================================================================
+// FILE: MasterRender.scad [v4.8]
+// ARCHITECTURE: Layer 2 (The Render Pipeline & Geometry Modules)
+// ==============================================================================
+
+include <MasterUtility.scad> 
+
+function apply_inductions(data) = let(type = get_val(TYPE, data, BOX), ui_pat = get_val(PATTERN, data, TEARDROP)) ((type == DESICCANT_BOX || type == DESICCANT_LID) && ui_pat != NONE) ? concat([[PATTERN, SLOTTED]], data) : data;
+function enforce_safety(data) = concat([ [THICK_WALL, m_safe_wall(data)], [THICK_FLOOR, m_safe_floor(data)] ], data);
+function process_part(part_data) = enforce_safety(apply_inductions(part_data));
+
+module apply_master_bounds(w, l, h, r, c) { c_r = max(0.1, min(r, (w/2) - 0.1, (l/2) - 0.1)); intersection() { children(); cuboid([w,l,h*3], rounding=c_r, edges="Z", anchor=BOTTOM); } }
+module native_teardrop(d) { union() { circle(d=d); polygon([[-d/2, 0], [d/2, 0], [0, d/2 * 1.5]]); } }
+
+module framed_mesh(data, w, l, h, is_cyl=false, cfg=undef) {
+    noz = m_noz(data); pat = get_val(PATTERN, data, PATTERN0); min_sp = 1.2;
+    if (cfg == undef) { linear_extrude(height=h, center=true) { if (is_cyl) circle(d=w); else rect([w, l]); } } 
+    else { hole = cfg[0]; solid = cfg[1]; step = get_grid_step(hole, min_sp, noz); nx = get_n_steps(w, solid, step); ny = get_n_steps(l, solid, step); pad = is_cyl ? 0 : (noz * 3) * 1.5; 
+        linear_extrude(height=h, center=true) { difference() { if (is_cyl) circle(d=w); else rect([w, l]); intersection() { if (is_cyl) circle(d=get_mesh_dim(w, solid)); else rect([max(0.1, get_mesh_dim(w, solid)-pad), max(0.1, get_mesh_dim(l, solid)-pad)]); if (pat == HONEYCOMB) { grid_copies(spacing=[step, step * sin(60)], n=[nx, ny], stagger=true) circle(d=hole / sin(60), $fn=6); } else if (pat == TEARDROP) { grid_copies(spacing=step, n=[nx, ny]) native_teardrop(hole); } else if (pat == SLOTTED) { grid_copies(spacing=[step*1.5, step], n=[nx, ny]) rect([hole * 2, hole], rounding=hole*0.2); } else if (pat == CIRCLE) { grid_copies(spacing=step, n=[nx, ny]) circle(d=hole); } else if (pat == SQUARE) { grid_copies(spacing=step, n=[nx, ny]) rect([hole, hole]); } else if (pat == DIAMOND) { grid_copies(spacing=step, n=[nx, ny]) rotate(45) rect([hole, hole]); } } } } }
+}
+
+module cylindrical_mesh_wall(data, d, h, wall_t, cfg=undef) {
+    pat = get_val(PATTERN, data, PATTERN0); min_sp = 1.2; noz = m_noz(data);
+    if (cfg == undef) { difference() { cyl(d=d, h=h, anchor=BOTTOM); down(1) cyl(d=d - wall_t * 2, h=h + 2, anchor=BOTTOM); } } 
+    else { hole = cfg[0]; solid = cfg[1]; h_active = h * (1 - (solid / 100)); step = get_grid_step(hole, min_sp, noz); nz = max(1, floor(h_active / step)); na = max(3, floor((PI * d) / step)); a_step = 360 / na; z_step = h_active / nz;
+        difference() { difference() { cyl(d=d, h=h, anchor=BOTTOM); down(1) cyl(d=d - wall_t * 2, h=h + 2, anchor=BOTTOM); } for (i = [0 : nz - 1]) { for (j = [0 : na - 1]) { z_pos = (h - h_active) / 2 + (i + 0.5) * z_step; zrot(j * a_step) translate([d / 2, 0, z_pos]) { yrot(90) { if (pat == HONEYCOMB) { cyl(d=hole / sin(60), h=wall_t * 4, $fn=6); } else if (pat == TEARDROP) { linear_extrude(wall_t * 4, center=true) native_teardrop(hole); } else if (pat == SLOTTED) { cuboid([hole*2, hole, wall_t * 4]); } else if (pat == CIRCLE) { cyl(d=hole, h=wall_t * 4); } else if (pat == SQUARE) { cuboid([hole, hole, wall_t * 4]); } else if (pat == DIAMOND) { zrot(45) cuboid([hole, hole, wall_t * 4]); } } } } } }
+    }
+}
+
+module render_internal_grid(data) {
+    if (get_val(HAS_BUILTIN_GRID, data, false)) {
+        type = get_val(TYPE, data, BOX); bw = m_bw(data); bl = m_bl(data); bh = m_bh(data); sf = m_safe_floor(data); sw = m_safe_wall(data); div_t = get_val(THICK_DIVIDER, data, 1.2);
+        g_str = get_val(GRID_LAYOUT, data, ""); tokens = str_split(g_str, " ");
+        
+        if (type == JAR) {
+            lip_h = 8.0; has_threads = get_val(HAS_THREADS, data, false);
+            int_h = has_threads ? bh - sf - lip_h - sw*1.5 : bh - sf; int_d = bw - sw*2;
+            tok_r = [for (tok=tokens) if (tok[0]=="R" || tok[0]=="r") tok]; rays = len(tok_r)>0 ? (len(get_digits(tok_r[0]))>0 ? to_num(get_digits(tok_r[0])) : 4) : 0; 
+            tok_c = [for (tok=tokens) if (tok[0]=="C" || tok[0]=="c") tok]; has_c = len(tok_c)>0; c_dia = has_c ? (len(get_digits(tok_c[0]))>0 ? to_num(get_digits(tok_c[0])) : 10.0) : 6.0; 
+            up(sf) {
+                inner_dia = c_dia - (div_t * 2); c_eff = (inner_dia >= 1.5) ? c_dia : max(4.0, c_dia); 
+                if (inner_dia >= 1.5) { difference() { cyl(d=c_eff, h=int_h, anchor=BOTTOM); down(1) cyl(d=inner_dia, h=int_h+2, anchor=BOTTOM); } } else { cyl(d=c_eff, h=int_h, anchor=BOTTOM); }
+                if (rays > 0) { for(i=[0:rays-1]) zrot(i * 360/rays) translate([c_eff/2 - 0.1, -div_t/2, 0]) cuboid([int_d/2 - c_eff/2 + 0.1, div_t, int_h], anchor=BOTTOM+LEFT); }
+            }
+        } else {
+            int_w = bw - sw*2; int_l = bl - sw*2; int_h = bh - sf;
+            tok_x = [for (tok=tokens) if (len(search("x", tok))>0 || len(search("X", tok))>0) tok];
+            if (len(tok_x) > 0) {
+                dims = str_split(tok_x[0], "xX"); cols = max(1, to_num(get_digits(dims[0]))); rows = max(1, to_num(get_digits(dims[1])));
+                up(sf) {
+                    for(i=[1:cols-1]) translate([-int_w/2 + i*(int_w/cols), 0, int_h/2]) cuboid([div_t, int_l, int_h], anchor=CENTER);
+                    for(j=[1:rows-1]) translate([0, -int_l/2 + j*(int_l/rows), int_h/2]) cuboid([int_w, div_t, int_h], anchor=CENTER);
+                }
+            }
+        }
+    }
+}
+
+module render_box_grid(data) {
+    bw = m_bw(data); bl = m_bl(data); bh = m_bh(data); sf = m_safe_floor(data); sw = m_safe_wall(data); div_t = get_val(THICK_DIVIDER, data, 1.2);
+    int_w = bw - sw*2 - 0.4; int_l = bl - sw*2 - 0.4; int_h = bh - sf - 0.5;   
+    g_str = get_val(GRID_LAYOUT, data, ""); tokens = str_split(g_str, " ");
+    tok_x = [for (tok=tokens) if (len(search("x", tok))>0 || len(search("X", tok))>0) tok][0]; dims = str_split(tok_x, "xX");
+    cols = max(1, to_num(get_digits(dims[0]))); rows = max(1, to_num(get_digits(dims[1])));
+    has_base = get_val(GRID_HAS_BASE, data, false); base_t = has_base ? m_lh(data)*4 : 0; 
+    apply_master_bounds(int_w, int_l, int_h, m_c_rad(data)-sw, m_chamf(data)/2) { 
+        if (has_base) cuboid([int_w, int_l, base_t], anchor=BOTTOM);
+        up(base_t) {
+            for(i=[1:cols-1]) translate([-int_w/2 + i*(int_w/cols), 0, int_h/2]) cuboid([div_t, int_l, int_h], anchor=CENTER);
+            for(j=[1:rows-1]) translate([0, -int_l/2 + j*(int_l/rows), int_h/2]) cuboid([int_w, div_t, int_h], anchor=CENTER);
+        }
+    }
+}
+
+module render_jar_grid(data) {
+    bw = m_bw(data); bh = m_bh(data); sf = m_safe_floor(data); sw = m_safe_wall(data); div_t = get_val(THICK_DIVIDER, data, 1.2);
+    has_threads = get_val(HAS_THREADS, data, false); lip_h = 8.0; int_h = has_threads ? bh - sf - lip_h - sw*1.5 - 0.5 : bh - sf - 0.5; int_d = bw - sw*2 - 0.4; 
+    g_str = get_val(GRID_LAYOUT, data, ""); tokens = str_split(g_str, " ");
+    tok_r = [for (tok=tokens) if (tok[0]=="R" || tok[0]=="r") tok]; rays = len(tok_r)>0 ? (len(get_digits(tok_r[0]))>0 ? to_num(get_digits(tok_r[0])) : 4) : 0; 
+    tok_c = [for (tok=tokens) if (tok[0]=="C" || tok[0]=="c") tok]; has_c = len(tok_c)>0; c_dia = has_c ? (len(get_digits(tok_c[0]))>0 ? to_num(get_digits(tok_c[0])) : 10.0) : 6.0; 
+    has_base = get_val(GRID_HAS_BASE, data, false); base_t = has_base ? m_lh(data)*4 : 0;
+    union() {
+        if (has_base) cyl(d=int_d, h=base_t, anchor=BOTTOM);
+        up(base_t) {
+            inner_dia = c_dia - (div_t * 2); c_eff = (inner_dia >= 1.5) ? c_dia : max(4.0, c_dia);
+            if (inner_dia >= 1.5) { difference() { cyl(d=c_eff, h=int_h, anchor=BOTTOM); down(1) cyl(d=inner_dia, h=int_h+2, anchor=BOTTOM); } } else { cyl(d=c_eff, h=int_h, anchor=BOTTOM); }
+            if (rays > 0) { for(i=[0:rays-1]) zrot(i * 360/rays) translate([c_eff/2 - 0.1, -div_t/2, 0]) cuboid([int_d/2 - c_eff/2 + 0.1, div_t, int_h], anchor=BOTTOM+LEFT); }
+        }
+    }
+}
+
+module core_tray_chassis(data) {
+    bw = m_bw(data); bl = m_bl(data); bh = m_bh(data); sf = m_safe_floor(data); sw = m_safe_wall(data); actual_wall_h = bh - sf; 
+    targ = get_val(WALL_TARGET, data, "All Walls"); mod_p = m_wall_mod_p(data) / 100;
+    h_front = (targ == "Front" || targ == "All Walls") ? max(0.1, actual_wall_h * mod_p) : actual_wall_h; h_back  = (targ == "Back" || targ == "All Walls") ? max(0.1, actual_wall_h * mod_p) : actual_wall_h;
+    h_left  = (targ == "Left" || targ == "All Walls") ? max(0.1, actual_wall_h * mod_p) : actual_wall_h; h_right = (targ == "Right" || targ == "All Walls") ? max(0.1, actual_wall_h * mod_p) : actual_wall_h;
+    union() {
+        up(sf / 2) framed_mesh(data, bw, bl, sf, false, get_mesh_cfg(data, HOLE_FLOOR, STRUT_FLOOR));
+        translate([0, -bl / 2 + sw / 2, (sf + h_front / 2)]) xrot(90) framed_mesh(data, bw, h_front, sw, false, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL)); 
+        translate([0, bl / 2 - sw / 2, (sf + h_back / 2)]) xrot(90) framed_mesh(data, bw, h_back, sw, false, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL)); 
+        translate([-bw / 2 + sw / 2, 0, (sf + h_left / 2)]) zrot(90) xrot(90) framed_mesh(data, bl, h_left, sw, false, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL)); 
+        translate([bw / 2 - sw / 2, 0, (sf + h_right / 2)]) zrot(90) xrot(90) framed_mesh(data, bl, h_right, sw, false, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL)); 
+        render_internal_grid(data); 
+    }
+}
+
+module render_box(data) { 
+    sw = m_safe_wall(data); apply_master_bounds(m_bw(data), m_bl(data), m_bh(data), m_c_rad(data), m_chamf(data)) { 
+        difference() { core_tray_chassis(data); if (get_val(NEEDS_GROOVE, data, false)) { up(m_bh(data) - m_safe_lid(data) - 1.0) cuboid([m_bw(data) - sw + 0.1, m_bl(data) + 0.1, m_safe_lid(data) + 0.4], anchor=BOTTOM); } }
+    } 
+}
+
+module render_flip_box(data) {
+    bw = m_bw(data); bl = m_bl(data); bh = m_bh(data); sw = m_safe_wall(data); sl = m_safe_lid(data); noz = m_noz(data);
+    hinge_d = 4.0; clearance = 0.2; clip_wall = noz * 4;
+    clip_outer_d = hinge_d + (clearance*2) + (clip_wall*2);
+    cc_z = clip_outer_d / 2; hinge_y_offset = clip_outer_d / 2;
+    
+    union() {
+        render_box(data); 
+        translate([-(bw - sw*2)/2 + sw/2, bl/2 - 0.5, bh - 1]) cuboid([sw*3, hinge_y_offset + 1, cc_z + 1], anchor=BOTTOM+FRONT);
+        translate([(bw - sw*2)/2 - sw/2, bl/2 - 0.5, bh - 1]) cuboid([sw*3, hinge_y_offset + 1, cc_z + 1], anchor=BOTTOM+FRONT);
+        translate([0, bl/2 + hinge_y_offset, bh + cc_z]) { yrot(90) cyl(d=hinge_d, h=bw - sw*2, chamfer=0.5, $fn=36); }
+        translate([0, -bl/2, bh - 3]) cuboid([bw - sw*2, 1.5, 1.5], rounding=0.5, edges="X", anchor=BACK);
+    }
+}
+
+module render_double_flip_box(data) {
+    bw = m_bw(data); bl = m_bl(data); bh = m_bh(data); sw = m_safe_wall(data); sl = m_safe_lid(data); noz = m_noz(data);
+    hinge_d = 4.0; clearance = 0.2; clip_wall = noz * 4;
+    clip_outer_d = hinge_d + (clearance*2) + (clip_wall*2);
+    cc_z = clip_outer_d / 2; hinge_y_offset = clip_outer_d / 2;
+    spine_w = hinge_y_offset * 2;
+    
+    union() {
+        render_box(data);
+        translate([0, 0, bh - hinge_d]) cuboid([bw - sw*2, spine_w, hinge_d], anchor=BOTTOM);
+        translate([-(bw - sw*2)/2 + sw/2, 0, bh - 1]) cuboid([sw*3, spine_w, cc_z + 1], anchor=BOTTOM);
+        translate([(bw - sw*2)/2 - sw/2, 0, bh - 1]) cuboid([sw*3, spine_w, cc_z + 1], anchor=BOTTOM);
+        translate([0, -hinge_y_offset, bh + cc_z]) yrot(90) cyl(d=hinge_d, h=bw - sw*2, chamfer=0.5, $fn=36);
+        translate([0, hinge_y_offset, bh + cc_z]) yrot(90) cyl(d=hinge_d, h=bw - sw*2, chamfer=0.5, $fn=36);
+        translate([0, -bl/2, bh - 3]) cuboid([bw - sw*2, 1.5, 1.5], rounding=0.5, edges="X", anchor=BACK);
+        translate([0, bl/2, bh - 3]) cuboid([bw - sw*2, 1.5, 1.5], rounding=0.5, edges="X", anchor=FRONT);
+    }
+}
+
+// [V4.10: Structural Bridge Patch] 
+// Deepened the connecting bridge geometry to force a manifold fusion 
+// between the C-clip cylinder and the main lid body.
+// [V4.11: True C-Clip Geometry Fix]
+// Re-oriented the clip gap to face UP (+Z). This removes all overhangs, 
+// prevents slicer bridging failures, and guarantees a pure snap-fit U-shape.
+module render_flip_lid(data) {
+    bw = m_bw(data); bl = m_bl(data); sl = m_safe_lid(data); sw = m_safe_wall(data); noz = m_noz(data);
+    hinge_d = 4.0; clearance = 0.2; clip_wall = noz * 4;
+    clip_outer_d = hinge_d + (clearance*2) + (clip_wall*2);
+    cc_z = clip_outer_d / 2; hinge_y_offset = clip_outer_d / 2;
+    
+    lid_w = bw; lid_l = bl; clip_len = lid_w - sw*6;
+    txt = get_val(PLAQUE_TEXT, data, ""); txt_size = get_val(PLAQUE_TEXT_SIZE, data, 8);
+
+    union() {
+        // Main Lid Body
+        apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data)) { 
+            up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false, get_mesh_cfg(data, HOLE_LID, STRUT_LID, true)); 
+        }
+        
+        // The True C-Clip
+        translate([0, lid_l/2 + hinge_y_offset, cc_z]) { 
+            difference() { 
+                yrot(90) cyl(d=clip_outer_d, h=clip_len, chamfer=0.5, $fn=36); 
+                yrot(90) cyl(d=hinge_d + clearance*2, h=clip_len + 2, $fn=36); 
+                
+                // Pure vertical cut facing UP (+Z). 
+                // Width is exactly 80% of the axle to create snap-fit jaws.
+                translate([0, 0, clip_outer_d/2])
+                    cuboid([clip_len + 2, hinge_d * 0.8, clip_outer_d], anchor=CENTER);
+            } 
+        }
+        
+        // The Manifold Bridge (Includes the v4.10 +2.0mm depth fix)
+        translate([0, lid_l/2 + hinge_y_offset/2, sl/2]) 
+            cuboid([clip_len, hinge_y_offset + 2.0, sl], anchor=CENTER);
+        
+        // The Front Clasp
+        translate([0, -lid_l/2 + sw, sl]) { 
+            difference() { 
+                cuboid([lid_w - sw*2, sw + 1.5, 4], anchor=BOTTOM+FRONT); 
+                up(1.5) cuboid([lid_w, 2, 1.5], rounding=0.5, edges="X", anchor=FRONT); 
+            } 
+        }
+    }
+}
+
+module render_tray_simple(data) { apply_master_bounds(m_bw(data), m_bl(data), m_bh(data), m_c_rad(data), m_chamf(data)) { core_tray_chassis(data); } }
+
+module render_tray_stack_nest(data) {
+    bw = m_bw(data); bl = m_bl(data); sw = m_safe_wall(data);
+    union() {
+        render_tray_simple(data);
+        down(2) apply_master_bounds(bw-sw*2, bl-sw*2, 2, m_c_rad(data)-sw, m_chamf(data)) cuboid([bw, bl, 2.1], anchor=BOTTOM);
+    }
+}
+
+module render_tray_stack_peg(data) { 
+    bw = m_bw(data); bl = m_bl(data); bh = m_bh(data); sw = m_safe_wall(data);
+    socket_d = 8.0; boss_d = socket_d + sw*2; cx = bw/2 - sw - boss_d/2 + 0.1; cy = bl/2 - sw - boss_d/2 + 0.1; 
+    max_total_z = bh + 2.1; safe_top_depth = min(12.0, max(3.0, (max_total_z / 2) - 1)); safe_bot_depth = min(12.0, max(3.0, (max_total_z / 2) - 1));
+    difference() {
+        union() { 
+            render_tray_simple(data); 
+            down(2) apply_master_bounds(bw-sw*2, bl-sw*2, 2, m_c_rad(data)-sw, m_chamf(data)) cuboid([bw, bl, 2.1], anchor=BOTTOM); 
+            for(x=[-1,1]) for(y=[-1,1]) translate([x*cx, y*cy, -2]) cyl(d=boss_d, h=bh + 2, anchor=BOTTOM);
+        }
+        for(x=[-1,1]) for(y=[-1,1]) {
+            translate([x*cx, y*cy, bh + 0.1]) cyl(d=socket_d, h=safe_top_depth + 0.1, anchor=TOP);
+            translate([x*cx, y*cy, -2.1]) cyl(d=socket_d, h=safe_bot_depth + 0.1, anchor=BOTTOM);
+        }
+    }
+}
+
+module render_peg(data) {
+    p_len = get_val(PEG_HEIGHT, data, 80); tol = get_val(TOL_CLIP, data, 0.1); p_dia = 8.0 - (tol * 2); 
+    difference() { yrot(90) cyl(d=p_dia, h=p_len, chamfer=0.5, anchor=CENTER); down(p_dia/2) cuboid([p_len + 2, p_dia + 2, 1], anchor=BOTTOM); }
+}
+
+module render_lid(data) { bw = m_bw(data); bl = m_bl(data); sl = m_safe_lid(data); sw = m_safe_wall(data); lid_w = bw - sw - 0.6; lid_l = bl - sw / 2 - 0.6; apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data)) { up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false, get_mesh_cfg(data, HOLE_LID, STRUT_LID, true)); } }
+module render_lid_glide(data) { bw = m_bw(data); bl = m_bl(data); sl = m_safe_lid(data); sw = m_safe_wall(data); lid_w = bw - sw + 0.2; lid_l = bl - sw / 2; apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data)) { up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false, get_mesh_cfg(data, HOLE_LID, STRUT_LID, true)); } }
+module render_jar(data) { has_threads = get_val(HAS_THREADS, data, false); bw = m_bw(data); sf = m_safe_floor(data); sw = m_safe_wall(data); lip_h = 8.0; actual_wall_h = m_bh(data) - sf; cyl_wall_h = max(0.1, has_threads ? (actual_wall_h - lip_h - sw * 1.5) : actual_wall_h); neck_od = bw - sw * 2 - 0.6; neck_id = neck_od - sw * 2; union() { up(sf / 2) framed_mesh(data, bw, bw, sf, true, get_mesh_cfg(data, HOLE_FLOOR, STRUT_FLOOR)); up(sf) cylindrical_mesh_wall(data, bw, cyl_wall_h, sw, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL)); render_internal_grid(data); if (has_threads) { up(sf + cyl_wall_h) { difference() { cyl(d1=bw, d2=neck_od, h=sw * 1.5, anchor=BOTTOM); down(1) cyl(d=neck_id, h=sw * 1.5 + 2, anchor=BOTTOM); } } up(sf + cyl_wall_h + sw * 1.5) { difference() { threaded_rod(d=neck_od, l=lip_h, pitch=get_val(THREAD_PITCH, data, 2.0), internal=false, anchor=BOTTOM, $fn=30); down(1) cyl(d=neck_id, h=lip_h + 2, anchor=BOTTOM); } } } } }
+module render_jar_lid(data) { bw = m_bw(data); sw = m_safe_wall(data); sl = m_safe_lid(data); lip_h = 8.0; cap_h = max(0.1, lip_h + sw * 1.5); neck_od = bw - sw * 2 - 0.6; difference() { union() { up(cap_h + sl / 2) framed_mesh(data, bw, bw, sl, true, get_mesh_cfg(data, HOLE_LID, STRUT_LID, true)); cyl(d=bw, h=cap_h, chamfer2=m_chamf(data), anchor=BOTTOM); } up(-0.1) threaded_rod(d=neck_od + 0.8, l=cap_h + 1, pitch=get_val(THREAD_PITCH, data, 2.0), internal=false, anchor=BOTTOM, $fn=30); } }
+
+module render_plaque(data) { 
+    txt = get_val(PLAQUE_TEXT, data, ""); txt_size = get_val(PLAQUE_TEXT_SIZE, data, 8); p_w = get_val(WIDTH, data, get_text_plaque_width(txt, txt_size)); 
+    difference() { cuboid([p_w, 20, 1.0], rounding=1.5, edges="Z", anchor=BOTTOM); up(0.4) render_embossed_text(txt, txt_size, 1.0); } 
+}
+
+module build_part(data) {
+    generate_preflight_report(data); type = get_val(TYPE, data, BOX);
+    if (type == BOX || type == DESICCANT_BOX) render_box(data); 
+    else if (type == TRAY_SIMPLE) render_tray_simple(data); 
+    else if (type == TRAY_STACK_NEST) render_tray_stack_nest(data); 
+    else if (type == TRAY_STACK_PEG) render_tray_stack_peg(data); 
+    else if (type == PEG) render_peg(data); 
+    else if (type == FLIP_BOX) render_flip_box(data); 
+    else if (type == DOUBLE_FLIP_BOX) render_double_flip_box(data); 
+    else if (type == FLIP_LID) render_flip_lid(data); 
+    else if (type == LID || type == DESICCANT_LID) render_lid(data); 
+    else if (type == LID_GLIDE) render_lid_glide(data); 
+    else if (type == PLAQUE) render_plaque(data); 
+    else if (type == JAR) render_jar(data); 
+    else if (type == JAR_LID) render_jar_lid(data); 
+    else if (type == BOX_GRID) render_box_grid(data); 
+    else if (type == JAR_GRID) render_jar_grid(data);
+    else if (type == SPEC_TAG) render_spec_tag(data); 
+}
+
+module build_platter(manifest) { for (i = [0 : len(manifest) - 1]) { pos = get_xy(manifest, i); translate([pos[0], pos[1], 0]) build_part(manifest[i]); } }// ==============================================================================
+// FILE: MasterText.scad [v4.0]
+// ARCHITECTURE: Layer 1.2 (Text & Font Geometry Engine)
+// ==============================================================================
+include <MasterEnum.scad>
+
+// --- Dynamic Plaque Sizing ---
+// Approximates the physical X-axis width of a text string based on font size and character count.
+// Uses a standard kerning multiplier (0.65) to ensure auto-generated backing plates are 
+// always large enough to frame the user's string without manual slider adjustments.
+function get_text_plaque_width(txt, size, min_w=25) = max(min_w, size * len(txt) * 0.65);
+
+// --- 3D Text Renderer ---
+// Standardized wrapper for generating embossed or debossed text.
+// Ensures consistent center/center origin alignment and handles empty string skips.
+module render_embossed_text(txt, size, depth=1.0, f="Arial Black") {
+    if (txt != "") {
+        linear_extrude(depth) text(txt, size=size, font=f, halign="center", valign="center");
+    }
+}// ==============================================================================
+// FILE: MasterUtility.scad [v4.7]
+// ARCHITECTURE: Layer 1.5 (Utilities & Output Pipelines)
+// ==============================================================================
+
+include <MasterChecks.scad>
+include <MasterText.scad>
+
+// [V4.7: Advanced Spec Tag Migration]
+// Moved from MasterRender to MasterUtility. This centralizes all metadata/reporting 
+// tools in Layer 1.5, keeping Layer 2 purely for physical part geometry.
+module render_spec_tag(data) {
+    noz = m_noz(data);
+    loops = m_wloops(data);
+    lh = m_lh(data);
+    ver = get_val(BUILDER_VERSION, data, "Unknown");
+    
+    // [V4.7: Expanded Baseplate] Increased to 120x60mm to accommodate 6 lines of text
+    difference() {
+        cuboid([120, 60, 0.6], rounding=1.5, edges="Z", anchor=BOTTOM);
+        up(0.2) linear_extrude(1) {
+            
+            // --- TOP SECTION ---
+            // [V4.7: Version Header] Largest font size (6.5), center aligned
+            translate([0, 18, 0]) 
+                text(str("Master Tray ", ver), size=6.5, font="Arial Black", halign="center", valign="center");
+            
+            // --- MIDDLE SECTION ---
+            // [V4.7: Split-Color Alignment Trick] 
+            // To color ONLY the numbers red, the string is split in half. 
+            // Labels are pushed slightly left (halign="right"), numbers are pushed slightly right (halign="left").
+            
+            // Nozzle
+            translate([-2, 6, 0]) 
+                text("Nozzle ", size=4.5, font="Arial Black", halign="right", valign="center");
+            color("red") translate([2, 6, 0]) 
+                text(str(noz), size=4.5, font="Arial Black", halign="left", valign="center");
+            
+            // Wall Loops
+            translate([-2, 0, 0]) 
+                text("Wall Loops ", size=4.5, font="Arial Black", halign="right", valign="center");
+            color("red") translate([2, 0, 0]) 
+                text(str(loops), size=4.5, font="Arial Black", halign="left", valign="center");
+            
+            // Layer Height
+            translate([-2, -6, 0]) 
+                text("Layer Height ", size=4.5, font="Arial Black", halign="right", valign="center");
+            color("red") translate([2, -6, 0]) 
+                text(str(lh), size=4.5, font="Arial Black", halign="left", valign="center");
+            
+            // --- BOTTOM SECTION ---
+            // [V4.7: Copyright & Licensing] Smallest font size (3), center aligned
+            translate([0, -18, 0]) 
+                text("For personal use only", size=3, font="Arial Black", halign="center", valign="center");
+            translate([0, -23, 0]) 
+                text("All rights reserved by ongchau3D@gmail.com", size=3, font="Arial Black", halign="center", valign="center");
+        }
+    }
+}
+
+module generate_preflight_report(data) {
+    type = get_val(TYPE, data, BOX);
+    echo(str("[FACTORY_REPORT] | --- Profiling Part: ", type, " ---"));
+    echo(str("[FACTORY_REPORT] | Builder_Version: ", get_val(BUILDER_VERSION, data, "Unknown")));
+    echo(str("[FACTORY_REPORT] | Dimension_Mode: ", get_val(DIMENSION_MODE, data, "Total")));
+    echo(str("[FACTORY_REPORT] | Nozzle_Diameter: ", m_noz(data)));
+    echo(str("[FACTORY_REPORT] | Wall_Loops_Calculated: ", m_wloops(data)));
+    echo(str("[FACTORY_REPORT] | Wall_Thickness_Actual: ", m_safe_wall(data)));
+    echo(str("[FACTORY_REPORT] | Floor_Thickness_Actual: ", m_safe_floor(data)));
+    echo(str("[FACTORY_REPORT] | Dimensions_Total_Payload: [", m_bw(data), ", ", m_bl(data), ", ", m_bh(data), "]"));
+    echo(str("[FACTORY_REPORT] | Clearance_Snap_Gap: ", get_val(TOL_SNAP_GAP, data, 0.1)));
+    echo(str("[FACTORY_REPORT] | Clearance_Clip: ", get_val(TOL_CLIP, data, 0.1)));
+}
