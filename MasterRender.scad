@@ -1,29 +1,71 @@
 // ==============================================================================
-// FILE: MasterRender.scad [v4.8]
+// FILE: MasterRender.scad [v4.9.1]
 // ARCHITECTURE: Layer 2 (The Render Pipeline & Geometry Modules)
 // ==============================================================================
 
 include <MasterUtility.scad> 
+include <MasterMeshPatterns.scad>
+include <MasterGridParser.scad>
 
 function apply_inductions(data) = let(type = get_val(TYPE, data, BOX), ui_pat = get_val(PATTERN, data, TEARDROP)) ((type == DESICCANT_BOX || type == DESICCANT_LID) && ui_pat != NONE) ? concat([[PATTERN, SLOTTED]], data) : data;
 function enforce_safety(data) = concat([ [THICK_WALL, m_safe_wall(data)], [THICK_FLOOR, m_safe_floor(data)] ], data);
 function process_part(part_data) = enforce_safety(apply_inductions(part_data));
 
 module apply_master_bounds(w, l, h, r, c) { c_r = max(0.1, min(r, (w/2) - 0.1, (l/2) - 0.1)); intersection() { children(); cuboid([w,l,h*3], rounding=c_r, edges="Z", anchor=BOTTOM); } }
-module native_teardrop(d) { union() { circle(d=d); polygon([[-d/2, 0], [d/2, 0], [0, d/2 * 1.5]]); } }
 
 module framed_mesh(data, w, l, h, is_cyl=false, cfg=undef) {
     noz = m_noz(data); pat = get_val(PATTERN, data, PATTERN0); min_sp = 1.2;
-    if (cfg == undef) { linear_extrude(height=h, center=true) { if (is_cyl) circle(d=w); else rect([w, l]); } } 
-    else { hole = cfg[0]; solid = cfg[1]; step = get_grid_step(hole, min_sp, noz); nx = get_n_steps(w, solid, step); ny = get_n_steps(l, solid, step); pad = is_cyl ? 0 : (noz * 3) * 1.5; 
-        linear_extrude(height=h, center=true) { difference() { if (is_cyl) circle(d=w); else rect([w, l]); intersection() { if (is_cyl) circle(d=get_mesh_dim(w, solid)); else rect([max(0.1, get_mesh_dim(w, solid)-pad), max(0.1, get_mesh_dim(l, solid)-pad)]); if (pat == HONEYCOMB) { grid_copies(spacing=[step, step * sin(60)], n=[nx, ny], stagger=true) circle(d=hole / sin(60), $fn=6); } else if (pat == TEARDROP) { grid_copies(spacing=step, n=[nx, ny]) native_teardrop(hole); } else if (pat == SLOTTED) { grid_copies(spacing=[step*1.5, step], n=[nx, ny]) rect([hole * 2, hole], rounding=hole*0.2); } else if (pat == CIRCLE) { grid_copies(spacing=step, n=[nx, ny]) circle(d=hole); } else if (pat == SQUARE) { grid_copies(spacing=step, n=[nx, ny]) rect([hole, hole]); } else if (pat == DIAMOND) { grid_copies(spacing=step, n=[nx, ny]) rotate(45) rect([hole, hole]); } } } } }
+    if (cfg == undef) { 
+        linear_extrude(height=h, center=true) { 
+            if (is_cyl) circle(d=w); else rect([w, l]); 
+        } 
+    } else { 
+        hole = cfg[0]; solid = cfg[1]; step = get_grid_step(hole, min_sp, noz); 
+        nx = get_n_steps(w, solid, step); ny = get_n_steps(l, solid, step); 
+        pad = is_cyl ? 0 : (noz * 3) * 1.5; 
+        linear_extrude(height=h, center=true) { 
+            difference() { 
+                if (is_cyl) circle(d=w); else rect([w, l]); 
+                intersection() { 
+                    if (is_cyl) circle(d=get_mesh_dim(w, solid)); 
+                    else rect([max(0.1, get_mesh_dim(w, solid)-pad), max(0.1, get_mesh_dim(l, solid)-pad)]); 
+                    
+                    // [V4.9.1] Delegated to MasterMeshPatterns for clarity
+                    render_rectangular_pattern(pat, hole, step, nx, ny);
+                } 
+            } 
+        } 
+    }
 }
 
 module cylindrical_mesh_wall(data, d, h, wall_t, cfg=undef) {
     pat = get_val(PATTERN, data, PATTERN0); min_sp = 1.2; noz = m_noz(data);
-    if (cfg == undef) { difference() { cyl(d=d, h=h, anchor=BOTTOM); down(1) cyl(d=d - wall_t * 2, h=h + 2, anchor=BOTTOM); } } 
-    else { hole = cfg[0]; solid = cfg[1]; h_active = h * (1 - (solid / 100)); step = get_grid_step(hole, min_sp, noz); nz = max(1, floor(h_active / step)); na = max(3, floor((PI * d) / step)); a_step = 360 / na; z_step = h_active / nz;
-        difference() { difference() { cyl(d=d, h=h, anchor=BOTTOM); down(1) cyl(d=d - wall_t * 2, h=h + 2, anchor=BOTTOM); } for (i = [0 : nz - 1]) { for (j = [0 : na - 1]) { z_pos = (h - h_active) / 2 + (i + 0.5) * z_step; zrot(j * a_step) translate([d / 2, 0, z_pos]) { yrot(90) { if (pat == HONEYCOMB) { cyl(d=hole / sin(60), h=wall_t * 4, $fn=6); } else if (pat == TEARDROP) { linear_extrude(wall_t * 4, center=true) native_teardrop(hole); } else if (pat == SLOTTED) { cuboid([hole*2, hole, wall_t * 4]); } else if (pat == CIRCLE) { cyl(d=hole, h=wall_t * 4); } else if (pat == SQUARE) { cuboid([hole, hole, wall_t * 4]); } else if (pat == DIAMOND) { zrot(45) cuboid([hole, hole, wall_t * 4]); } } } } } }
+    if (cfg == undef) { 
+        difference() { 
+            cyl(d=d, h=h, anchor=BOTTOM); 
+            down(1) cyl(d=d - wall_t * 2, h=h + 2, anchor=BOTTOM); 
+        } 
+    } else { 
+        hole = cfg[0]; solid = cfg[1]; h_active = h * (1 - (solid / 100)); 
+        step = get_grid_step(hole, min_sp, noz); nz = max(1, floor(h_active / step)); 
+        na = max(3, floor((PI * d) / step)); a_step = 360 / na; z_step = h_active / nz;
+        difference() { 
+            difference() { 
+                cyl(d=d, h=h, anchor=BOTTOM); 
+                down(1) cyl(d=d - wall_t * 2, h=h + 2, anchor=BOTTOM); 
+            } 
+            for (i = [0 : nz - 1]) { 
+                for (j = [0 : na - 1]) { 
+                    z_pos = (h - h_active) / 2 + (i + 0.5) * z_step; 
+                    zrot(j * a_step) translate([d / 2, 0, z_pos]) { 
+                        yrot(90) { 
+                            // [V4.9.1] Delegated to MasterMeshPatterns for clarity
+                            render_cylindrical_pattern(pat, hole, wall_t); 
+                        } 
+                    } 
+                } 
+            } 
+        }
     }
 }
 

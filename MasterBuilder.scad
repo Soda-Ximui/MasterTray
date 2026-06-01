@@ -1,7 +1,7 @@
 // ==============================================================================
-// FILE: MasterBuilder.scad [v4.9.1]
+// FILE: MasterBuilder.scad [v4.10]
 // ARCHITECTURE: Layer 3 (The UI & Controller)
-// DEPENDENCIES: MasterEnum v4.5, MasterUtility v4.7, MasterRender v4.8, MasterEngine v4.9
+// DEPENDENCIES: MasterEnum v4.5, MasterUtility v4.8, MasterRender v4.9.1, MasterEngine v4.10
 // ==============================================================================
 
 /* [Build Selection] */
@@ -61,7 +61,7 @@ actual_l = (dimension_mode == "Usable") ? part_length + (wall_thickness * 2) : p
 actual_h = (dimension_mode == "Usable") ? part_height + floor_thickness + lid_thickness : part_height;
 
 ui_payload = [
-    [BUILDER_VERSION,    "v4.9.1"], // [V4.9.1] Universal Spec Tag Injection
+    [BUILDER_VERSION,    "v4.10"], // [V4.10] Modular refactoring: MasterConstants, MasterGridParser, MasterValidation, MasterMeshPatterns
     [DIMENSION_MODE,     dimension_mode], 
     [WIDTH,              actual_w], 
     [LENGTH,             actual_l], 
