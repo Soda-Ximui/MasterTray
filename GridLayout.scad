@@ -1,12 +1,12 @@
 // ==============================================================================
-// FILE: GridLayout.scad [v2.2]
+// FILE: GridLayout.scad [v3.0.3]
 // ARCHITECTURE: Layer 1.3 (Grid Layout Parsing & Validation)
-// PURPOSE: Context-aware parsing for Cartesian, Radial, and Custom Spans
+// PURPOSE: Context-aware parsing for Cartesian, Radial, Custom Spans, and Vector Ribs
 // ==============================================================================
 
-include <BOSL2/std.scad>
-include <MasterEnum.scad>
 include <MasterEngine.scad>
+include <MasterBug.scad>
+include <MasterUtility.scad>
 
 // --- CORE PARSER UTILITIES ---
 function get_grid_tokens(g_str) = [for (t = str_split(g_str, " ")) if (t != "") t];
@@ -33,6 +33,7 @@ function parse_radial(g_str) =
         
         rays = len(tok_r) > 0 ? max(0, to_num(get_digits(tok_r[0]))) : 0,
         c_val = len(tok_c) > 0 ? to_num(get_digits(tok_c[0])) : 6.0,
+        
         is_perc = len(tok_c) > 0 && tok_c[0][len(tok_c[0])-1] == "%")
     [rays, c_val, is_perc];
 
@@ -61,7 +62,7 @@ function parse_single_span(span_str, default_h, max_h, is_closed) =
         h_val = len(raw_h_str) > 0 ? to_num(get_digits(raw_h_str)) : 100,
         
         req_h = len(raw_h_str) == 0 ? default_h : 
-                is_h_perc ? (default_h * (h_val / 100)) : h_val,
+              is_h_perc ? (default_h * (h_val / 100)) : h_val,
                 
         final_h = is_closed ? min(req_h, max_h) : req_h
     )
@@ -91,7 +92,6 @@ function get_grid_config(data) =
     )
     [cart_dims, rad_dims, spans, has_base, base_t, default_h];
 
-// --- DEBUGGER ---
 module debug_grid_parser(data) {
     cfg = get_grid_config(data);
     spans = cfg[2];
@@ -116,3 +116,39 @@ module debug_grid_parser(data) {
     echo("==================================");
     echo(" ");
 }
+
+// --- FRANKEN-PARSE (VECTOR/RIB TOPOLOGY) ---
+function parse_rib_node(token) = 
+    let(
+        parts = str_split(token, "-"),
+        beh_str = len(parts) > 1 ? parts[len(parts)-1] : "T",
+        cut_len = len(parts) > 1 ? len(beh_str) + 1 : 0,
+        traj_str = len(parts) > 1 ? substr(token, 0, len(token) - cut_len) : token
+    )
+    [traj_str, beh_str];
+
+function parse_offset(o_str) = 
+    let(
+        clean_str = substr(o_str, 1), 
+        parts = str_split(clean_str, ","),
+        x_val = to_num(get_digits(parts[0])) * (len(search("-", parts[0])) > 0 ? -1 : 1),
+        y_val = len(parts) > 1 ? to_num(get_digits(parts[1])) * (len(search("-", parts[1])) > 0 ? -1 : 1) : 0
+    )
+    [x_val, y_val];
+
+function parse_franken_config(g_str) =
+    let(
+        tokens = get_grid_tokens(g_str),
+        p_tok = [for (t = tokens) if (t[0] == "P" && len(search("/", t)) > 0) t],
+        o_tok = [for (t = tokens) if (t[0] == "O") t],
+        rib_toks = [for (t = tokens) if (t[0] != "P" && t[0] != "O" && len(search("-", t)) > 0) t]
+    )
+    (len(p_tok) == 0) ? undef :
+    let(
+        hub_data = str_split(p_tok[0], "/"),
+        rays = to_num(get_digits(hub_data[0])),
+        hub_d = len(hub_data) > 1 ? to_num(get_digits(hub_data[1])) : 10,
+        offset = len(o_tok) > 0 ? parse_offset(o_tok[0]) : [0, 0],
+        ribs = [for (rt = rib_toks) parse_rib_node(rt)]
+    )
+    [rays, hub_d, offset, ribs];

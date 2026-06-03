@@ -1,6 +1,7 @@
 // ==============================================================================
-// FILE: MasterEngine.scad [v4.13]
+// FILE: MasterEngine.scad [v4.14]
 // ARCHITECTURE: Layer 1 (The Math Kernel & Data Router)
+// PURPOSE: Root foundational macros, constants, and matrix packing layouts
 // ==============================================================================
 
 include <BOSL2/std.scad>
@@ -22,7 +23,6 @@ function get_footprint(data) =
     (type == JAR || type == JAR_LID || type == JAR_GRID || type == PLAQUE_JAR) ? [w, w] : [w, l];
 
 // --- PLATTER SHELF PACKING (v4.13) ---
-// Packs items tightly along the X-axis and wraps to a new Y-row when hitting the build plate limit.
 function get_xy(manifest, target_idx, curr_idx=0, edge_x=0, edge_y=0, row_max_y=0) =
     let(
         data = manifest[curr_idx], 
