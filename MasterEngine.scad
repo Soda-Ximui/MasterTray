@@ -22,7 +22,7 @@ include <MasterConstants.scad>
 // $fn: Fragment count controls smoothness of curves
 //   - Preview mode: 32 segments (fast screen refresh)
 //   - Render mode: 128 segments (export-quality STL smoothness)
-$fn = $preview ? 32 : 128;
+$fn = $preview ? 8 : 128;
 
 // ==============================================================================
 // SECTION 1: DEFAULT CONSTANTS
@@ -170,8 +170,8 @@ function get_mesh_cfg(data, h_key, s_key, needs_margin=false) =
     req_s = (200 * get_val(LID_MIN_SOLID, data, LID_MIN_SOLID0))
             / min(m_bw(data), m_bl(data)),
     final_s = needs_margin
-              ? max(max(2, strut), req_s)
-              : max(2, strut)
+              ? max(strut, req_s)
+              : strut
   )
   ((pat == NONE || hole <= 0.05 || final_s >= 99) ? undef : [hole, final_s]);
 

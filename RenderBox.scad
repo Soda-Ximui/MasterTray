@@ -6,6 +6,7 @@
 
 include <MasterEngine.scad>
 include <MasterTolerance.scad>
+include <RenderTray.scad>
 
 module render_box(data) { 
     sw = m_safe_wall(data);
@@ -135,5 +136,4 @@ module factory_render_flip_box(data, opts, phys) {
 
 module factory_render_double_flip_box(data, opts, phys) {
     render_double_flip_box(process_part(data));
-}
 }

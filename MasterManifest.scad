@@ -21,18 +21,40 @@ include <MasterProcessor.scad>
 
 function compile_manifest(intent, data) =
   (intent == "Threaded Jar") ? [
-    ["JAR", data, [["IS_THREADED", true]],         get_physics_profile(data)],
-    ["LID", data, [["LID_TYPE",   "Screw"]],        get_physics_profile(data)]
+    ["JAR", data, [["IS_THREADED", true]],            get_physics_profile(data)],
+    ["LID", data, [["LID_TYPE",   "Screw"]],          get_physics_profile(data)]
+  ] :
+  (intent == "Jar with Lid") ? [
+    ["JAR", data, [["IS_THREADED", true]],            get_physics_profile(data)],
+    ["LID", data, [["LID_TYPE",   "Screw"]],          get_physics_profile(data)]
+  ] :
+  (intent == "Simple Jar") ?
+    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0))
+    (w == l) ?
+      [["JAR", data, [],                              get_physics_profile(data)]]
+    :
+      [
+        ["JAR", concat([["WIDTH", l]], data), [],     get_physics_profile(data)],
+        ["JAR", concat([["WIDTH", w]], data), [],     get_physics_profile(data)]
+      ]
+  :
+  (intent == "Open Jar") ? [
+    ["JAR", data, [["IS_THREADED", false]],           get_physics_profile(data)]
   ] :
   (intent == "Flip Box") ? [
-    ["FLIP_BOX", data, [],                          get_physics_profile(data)],
+    ["FLIP_BOX", data, [],                            get_physics_profile(data)],
     ["LID",      data, [["LID_TYPE", "Flip_Single"]], get_physics_profile(data)]
   ] :
   (intent == "Double Flip Box") ? [
-    ["DOUBLE_FLIP_BOX", data, [],                   get_physics_profile(data)]
+    ["DOUBLE_FLIP_BOX", data, [],                     get_physics_profile(data)]
   ] :
   (intent == "Box") ? [
-    ["BOX", data, [],                               get_physics_profile(data)]
+    ["BOX", data, [],                                 get_physics_profile(data)]
   ] :
-  // default → Simple Tray
-  [["TRAY", data, [],                               get_physics_profile(data)]];
+  (intent == "Simple Tray") ? [
+    ["TRAY", data, [],                                get_physics_profile(data)]
+  ] :
+  // Unrecognised intent — fall back to a plain tray and warn in console.
+  // TODO: add manifest entries for remaining intents.
+  let(_ = echo(str("WARNING: Unknown intent '", intent, "' — rendering as Simple Tray")))
+  [["TRAY", data, [],                                 get_physics_profile(data)]];

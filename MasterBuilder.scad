@@ -57,13 +57,13 @@ Mechanical_Fit = "Standard"; // ["Tighter", "Tight", "Standard", "Loose", "Loose
 
 include <MasterManifest.scad>
 
-use <RenderTray.scad>
-use <RenderPeg.scad>
-use <RenderJar.scad>
-use <RenderLid.scad>
-use <RenderGrid.scad>
-use <RenderBox.scad>
-use <RenderPlaque.scad>
+include <RenderTray.scad>
+include <RenderPeg.scad>
+include <RenderJar.scad>
+include <RenderLid.scad>
+include <RenderGrid.scad>
+include <RenderBox.scad>
+include <RenderPlaque.scad>
 
 // --- AUTO-MATH ENGINE ---
 raw_w = (dimension_mode == "Usable") ? part_width + (wall_thickness * 2) : part_width;
@@ -83,8 +83,8 @@ ui_payload = [
     [WALL_LOOPS,         Wall_Loops], 
     [NOZZLE_DIAMETER,    Nozzle_Diameter],
     [PATTERN,            mesh_pattern], 
-    [HOLE_WALL,          mesh_hole_size], 
-    [HOLE_FLOOR,         mesh_hole_size], 
+    [HOLE_WALL,          mesh_hole_size],
+    [HOLE_FLOOR,         mesh_hole_size],
     [HOLE_LID,           mesh_hole_size],
     [STRUT_WALL,         strut_wall_perc], 
     [STRUT_FLOOR,        strut_floor_perc], 

@@ -1,62 +1,337 @@
-Version 3.1, I injected the render_internal_grid(data) module directly into the two lowest-level "chassis" functions:
+# MasterTray — Features & System Design
 
-core_tray_chassis: This is the geometric foundation for all square/rectangular objects.
+## Overview
 
-render_jar: This is the geometric foundation for all cylindrical objects.
+MasterTray is a parametric OpenSCAD system for generating 3D-printable storage
+containers. The user sets parameters in the OpenSCAD Customizer; the system
+computes safe geometry and outputs a printable STL.
 
-Because of this inheritance, the Built-in Grid option automatically cascaded to all of these intents without us having to write extra code for them:
+---
 
-The Trays: Simple Tray, Stackable Tray.
+## The Five Primitives
 
-The Boxes: Standard Box, Standalone Box, Flip Box, Double Flip Box.
+All geometry is assembled from five building blocks. Each primitive has one
+factory (`factory_render_*`) that knows only how to build that shape. Decisions
+about *what* to build are made upstream in the manifest; the factory just
+executes.
 
-The Jars: Open Jar, Threaded Jar.
+### 1. TRAY
+A rectangular open-top container: four walls + floor, no lid.
 
-If you set the UI to Grid Type = "Built-in" and select "Threaded Jar" with GRID_LAYOUT = "C10 R4", it will instantly print a threaded jar with a 10mm central column and 4 radial dividers physically fused to the inner walls. If you change the intent to "Simple Tray" and GRID_LAYOUT = "3x3", it prints a solid tray with a permanent tic-tac-toe grid fused inside.
+- Walls can be individually DROPPED (height reduced to zero) or height-modified
+  by percentage (`WALL_MODIFY`, `WALL_TARGET`)
+- Floor and walls independently support mesh patterns
+- Opts control stacking: `STACKABLE=true` cuts four cylindrical peg-socket holes
+  at the top corners, sized to accept RenderPeg connectors
 
-When building the central spine for the 14-day box in v3.1, I told the engine to place the two 4mm hinge bars 6mm apart. Then, to make it strong, I told it to build a solid block underneath them.
+### 2. JAR
+A cylindrical open-top container: circular wall + circular floor.
 
-The Bug: The math for that solid block was too wide. It engulfed the hinge bars entirely. The cylinders were physically there in the code, but they were 100% buried flush inside a giant rectangular prism, leaving zero undercut clearance for the C-clip to wrap around.
+- Wall and floor independently support mesh patterns
+- Opts control threading: `IS_THREADED=true` adds a tapered neck transition and
+  an external BOSL2 threaded section at the top for a screw-on lid
+- Width parameter is the diameter (length is ignored; footprint is square)
 
-The Fix: "The Pedestal Architecture" (v3.3)
-To fix this, we can't just attach the cylinders to a flat wall. The C-clip needs empty space underneath the "equator" of the cylinder so the plastic arms can snap around the bottom.
+### 3. LID
+A cap geometry that closes a TRAY or JAR. The fit type is set by `LID_TYPE` in
+opts:
 
-I rewrote the hinge math in MasterRender for both the FLIP_BOX and the DOUBLE_FLIP_BOX.
-Instead of a giant block, the cylinders now sit on top of 2mm wide pedestals. Because the cylinder is 4mm wide and the pedestal underneath it is only 2mm wide, the entire bottom half of the cylinder is exposed on the left and right sides. Your C-clips will now snap perfectly onto them!
+| LID_TYPE | Description | Used with |
+|----------|-------------|-----------|
+| `"Snap"` | Press-on friction fit | BOX |
+| `"Glide"` | Slides into a groove cut into the box top edge | BOX |
+| `"Hinge_Single"` | C-clip on one Y face, front latch diamond | BOX / pill box |
+| `"Hinge_Double"` | C-clips on both Y faces, opens from either end | Pill boxes |
+| `"Screw"` | Internally threaded cap | JAR |
 
-I also reset the grid_layout in MasterBuilder back to "7x2" so your AM/PM box works perfectly out of the gate.
+The BOX factory must read the same `LID_TYPE` to cooperate: a glide lid needs a
+groove in the box walls; a hinge lid needs hinge boss geometry on the box body.
 
-Here are the two updated files for Version 3.3. (You can keep MasterEnum and MasterEngine at v3.1/v3.2 as their logic didn't need to change).
+Lid surface supports mesh patterns independently from wall/floor mesh.
 
+### 4. GRID
+Internal dividers placed inside a TRAY or JAR. Two sub-types:
 
-ISSUES to ADDRESS
+**Rectangular grid** — cartesian dividers specified as `RxC` (rows × cols).
+Custom spans override individual cells:
 
-Text overflow
-Peg height and peg hole automation
+```
+S row/col/width/height/wall_h
+```
+- `row`, `col` — starting cell (1-based)
+- `width` — how many columns this span covers
+- `height` — how many rows this span covers
+- `wall_h` — divider wall height: absolute mm, or `%` of container interior height
 
+Multiple `S` tokens can appear in one layout string for multiple irregular spans.
 
-Act as an expert 3D design engineer and CAD specialist. Create a 3D model for a stackable household tray featuring 4 integrated corner pegs and matching bottom sockets. The entire design must print completely support-free on an FDM 3D printer without any overhangs exceeding 45 degrees.
+**Circular grid** — radial spokes + optional center hub, specified as `RaCb`:
+- `a` = number of spokes
+- `b` = center hub radius (mm)
+  - Below safety threshold → structural stub only (too small for storage)
+  - Above threshold → usable center storage compartment; spokes divide the outer
+    ring into `a` equal wedge compartments
 
-Apply the following geometric rules to the design:
+**Deployment mode** (set by opts `GRID_MODE`):
+- `"Built-in"` — unioned into the container render, no tolerance gap
+- `"Drop-in"` — rendered as a separate printable object with `GRID_DROP_IN_TOLERANCE`
+  (0.4mm) subtracted from outer dimensions so it slides in after printing
 
-1. Overall Constraints
-- Material: PLA.
-- Wall thickness of the tray body: 3.0 mm.
-- Base thickness of the tray floor: 2.5 mm.
+Rectangular grids also work inside jars (clipped to the cylindrical boundary).
 
-2. Integrated Corner Peg Design (Top of Tray)
-- At each of the four top corners of the tray, extend a square vertical column upward to serve as the peg.
-- Visible Peg Height (H_peg): 20 mm.
-- Peg Base Profile: 12 mm x 12 mm square.
-- To eliminate supports, do not create a flat 90-degree shelf where the peg meets the tray rim. Instead, create a 45-degree transitional chamfer (or bevel) that tapers outward from the 12mm peg base down into the top rim of the tray wall.
-- Apply a subtle 1-degree draft angle (taper) to the four vertical sides of the peg so it narrows slightly toward the top. This prevents binding when stacking.
+### 5. RIB
+FrankenTray vector-based dividers — free-form ribs defined by trajectory and
+behavior, not by a cartesian grid. Specified in the layout string using
+FrankenTray syntax:
 
-3. Matching Corner Socket Design (Bottom of Tray)
-- At each of the four bottom corners of the tray, create an internal square cavity (socket) extruded upward into the tray floor.
-- Socket Depth: 12 mm.
-- Socket Dimensions: The socket must mimic the peg profile but include a 0.2 mm global clearance (tolerance) on all sides to account for PLA printer extrusion swell (Final dimensions: 12.4 mm x 12.4 mm).
-- To make the internal cavity support-free, the ceiling of the socket must not be flat. Terminate the top of the socket cavity with a 45-degree pyramid point (pointed apex pointing upward). This allows the printer to bridge the ceiling cleanly without support material.
+```
+PX/Y  OA,B  TRAJ-BEH  ...
+```
+- `PX/Y` — hub: X spokes, Y mm hub diameter
+- `OA,B` — anchor offset from center: A mm in X, B mm in Y
+- `TRAJ` — trajectory: cardinal (`N/S/E/W/NE/SW`...), degrees, or `X,Y` vector
+- `BEH` — behavior: `T` (touch wall), `D` (displacement), `F50%` (50% of wall distance)
 
-4. Fillets and Reinforcement
-- Add a 2 mm radius fillet to all internal vertical corners inside the tray to prevent stress fractures from household items.
-- Ensure the outer corner walls of the tray smoothly wrap around the socket cavities, maintaining a minimum wall thickness of 3.0 mm at all points.
+Clipping: rectangular containers use `apply_master_bounds`; jars use cylindrical
+intersection.
+
+---
+
+## Pipeline: from User Input to Geometry
+
+```
+User (Customizer UI)
+  ↓
+ui_payload  — raw key-value array of all user settings
+  ↓
+validate    — FDM safety checks, dimension bounds, grid string validation
+              (warnings echoed to console; values clamped where needed)
+  ↓
+compute_phys(data)         — safe wall, floor, clearance, nozzle (from data)
+compute_opts(intent, data) — intent + data → build switches
+  ↓
+compile_manifest(intent, data)
+  — maps intent string to list of [type, data, opts, phys] tuples
+  — intents can be derived: "S4 Jar" delegates to "Jar with Lid"
+  — hardwired data overrides prepended inline (no intermediate variables)
+  ↓
+build_part(intent, data)
+  — loops manifest, dispatches each item to factory_render_*(data, opts, phys)
+  ↓
+factory_render_*(data, opts, phys)
+  — dumb primitive builder, reads opts for behaviour switches
+  — all decisions already made upstream
+```
+
+---
+
+## Data, Opts, Phys — the Three Arrays
+
+### `data` (ui_payload)
+The full user configuration as `[["KEY", value], ...]`. Values are read with
+`get_val(KEY, data, fallback)` which returns the first match, enabling
+prepend-to-override without mutation.
+
+Key parameters:
+
+| Key | Description |
+|-----|-------------|
+| `WIDTH`, `LENGTH`, `HEIGHT` | Outer (Total) or inner (Usable) dimensions |
+| `DIMENSION_MODE` | `"Total"` or `"Usable"` |
+| `PATTERN` | Mesh pattern type |
+| `HOLE_WALL`, `HOLE_FLOOR`, `HOLE_LID` | Hole diameter per surface (0 = no mesh) |
+| `STRUT_WALL`, `STRUT_FLOOR`, `STRUT_LID` | Solid border % per surface (100 = no mesh) |
+| `GRID_LAYOUT` | Layout specification string |
+| `THICK_WALL`, `THICK_FLOOR`, `THICK_LID` | Target thicknesses (safety-snapped) |
+| `WALL_MODIFY`, `WALL_TARGET` | Wall height modification |
+| `FILAMENT_TYPE` | PLA / PETG / TPU / ABS (affects tolerances) |
+| `FIT_PROFILE` | Tighter / Tight / Standard / Loose / Looser |
+
+### `opts` (build options)
+Computed from intent + data. Tells the factory how to behave differently from
+default. Examples:
+
+- `IS_THREADED=true` → JAR adds neck + threads; LID makes internal thread cap
+- `STACKABLE=true` → TRAY cuts corner peg sockets
+- `LID_TYPE="Hinge_Single"` → hinge boss + C-clip on one face
+- `LID_TYPE="Hinge_Double"` → hinge bosses + C-clips on both faces
+- `GRID_MODE="Drop-in"` → GRID adds tolerance gap, renders standalone
+
+### `phys` (physics profile)
+Computed from data via `get_physics_profile(data)`:
+
+```
+[["SAFE_WALL",  m_safe_wall(data)],   // wall snapped to nozzle multiples
+ ["SAFE_FLOOR", m_safe_floor(data)],  // floor snapped to layer-height multiples
+ ["CLEARANCE",  0.2 (PETG) / 0.1],   // filament-aware fit gap
+ ["NOZZLE",     m_noz(data)]]
+```
+
+---
+
+## Mesh Control
+
+Three independent knobs, one set per surface (wall, floor, lid):
+
+| Knob | Key | Disables mesh when |
+|------|-----|--------------------|
+| Pattern | `PATTERN` | Set to `"None"` |
+| Hole size | `HOLE_WALL` / `HOLE_FLOOR` / `HOLE_LID` | Set to `0` |
+| Strut % | `STRUT_WALL` / `STRUT_FLOOR` / `STRUT_LID` | Set to `100` |
+
+Any one knob being "off" kills the mesh on that surface. `get_mesh_cfg` returns
+`undef` when mesh should be skipped; the factory renders solid instead.
+
+**Flat mesh** (`framed_mesh`) — used on box/tray floor and lid. Pattern tiles
+are `linear_extrude`d through a flat slab. `is_cyl=true` uses a circular
+boundary (jar floors).
+
+**Cylindrical mesh** (`cylindrical_mesh_wall`) — used on jar walls. Pattern
+primitives are placed radially through the wall shell, distributed evenly around
+the circumference and up the height. `n_cols` (around) and `n_rows` (up) are
+derived from the strut percentage and hole step size.
+
+---
+
+## FDM Safety Constraints
+
+Applied automatically before any factory sees the data (via `enforce_safety`).
+
+**Floor / Lid thickness** — rounded to nearest multiple of `layer_height`.
+Prevents slicer micro-stepping (tiny Z-movements that cause surface roughness
+and warping on flat surfaces).
+
+**Wall thickness** — rounded to nearest multiple of `nozzle_diameter`.
+Prevents partial extrusion loops. Minimum = `nozzle × wall_loops`.
+
+**Corner radius** — derived from wall thickness to prevent inverted inner
+geometry when BOSL2 rounding is applied.
+
+**Chamfer** — capped at `nozzle × 2.5` to stay within FDM's 45° overhang limit.
+
+**Floor/lid thickness cap** — 35% of total height (prevents solid bricks on
+small containers).
+
+**Wall thickness cap** — 45% of smallest XY dimension.
+
+---
+
+## Dimension Modes
+
+| Mode | Meaning |
+|------|---------|
+| `"Total"` | Width/Length/Height are the outside dimensions of the container |
+| `"Usable"` | Width/Length/Height are the interior space; walls/floor added automatically |
+
+Auto-math in MasterBuilder converts Usable to Total before packaging into
+`ui_payload`:
+
+```
+raw_w = (mode == "Usable") ? part_width  + wall_thickness*2 : part_width
+raw_l = (mode == "Usable") ? part_length + wall_thickness*2 : part_length
+raw_h = (mode == "Usable") ? part_height + floor_thickness + lid_thickness : part_height
+```
+
+---
+
+## Wall Modifications
+
+`WALL_MODIFY` + `WALL_TARGET` allow per-wall height reduction:
+
+| WALL_MODIFY | Effect |
+|-------------|--------|
+| `"None"` | Full height (100%) — default |
+| `"Dropped"` | Wall removed entirely (0%) |
+| `"50%"` | Wall at half height |
+| `"25%"` | Wall at quarter height |
+
+`WALL_TARGET` selects which wall(s): `"All Walls"`, `"Front"`, `"Back"`,
+`"Left"`, `"Right"`.
+
+---
+
+## Grid Layout String Format
+
+Full syntax (all tokens space-separated, all optional):
+
+```
+[RxC]  [S r/c/w/h/wall_h ...]  [Ra]  [Cb]
+```
+
+| Token | Meaning |
+|-------|---------|
+| `7x5` | 7 rows × 5 cols cartesian grid |
+| `S2/3/2/1/80%` | Span: row 2, col 3, 2 cols wide, 1 row tall, 80% wall height |
+| `S1/1/3/2/25` | Span: row 1, col 1, 3 wide, 2 tall, 25mm wall height |
+| `R6` | 6 radial spokes |
+| `C15%` | Center hub = 15% of container diameter |
+| `C20` | Center hub = 20mm radius |
+
+FrankenTray ribs use separate syntax triggered by a `P` token (see RIB above).
+
+---
+
+## Compound Intents
+
+Intents can delegate to other intents with hardwired data overrides:
+
+```
+"S4 Jar"
+  → override WIDTH=46, LENGTH=140, HEIGHT=140 (Total)
+  → delegate to "Jar with Lid"
+      → JAR  (IS_THREADED=true)
+      → LID  (LID_TYPE="Screw")
+```
+
+Overrides are prepended to `data` inline using `concat([overrides], data)`
+directly in the manifest expression — no intermediate variables, exploiting
+`get_val`'s first-match semantics.
+
+## Data-Conditional Intents
+
+The manifest can branch on user data, not just intent string. This allows one
+intent name to produce different primitive counts depending on inputs.
+
+**"Simple Jar"** — adapts to the user's dimensions:
+
+```
+WIDTH == LENGTH  →  one JAR (diameter = WIDTH)
+
+WIDTH != LENGTH  →  two JARs placed on the platter:
+                      JAR(diameter = LENGTH)
+                      JAR(diameter = WIDTH)
+```
+
+Each JAR overrides WIDTH with its own diameter by prepending to `data` inline.
+The platter layout (`get_xy`) places them side by side automatically.
+
+This is the "deduced from user intent + user data" principle: the user doesn't
+choose "one jar or two" — the geometry decision falls out of the dimensions they
+already provided.
+
+---
+
+## Tolerance & Fit Profiles
+
+`MasterTolerance.scad` provides per-joint, per-filament clearance:
+
+| Component | Joint |
+|-----------|-------|
+| `COMP_SPINE` | Hinge pin rotating in boss |
+| `COMP_CCLIP` | C-clip spring tab retention |
+| `COMP_CLASP` | Front snap latch engagement |
+| `COMP_GLIDE` | Sliding lid rail clearance |
+
+Fit profiles (`FIT_TIGHTER` → `FIT_LOOSER`) step clearance by ±0.05mm and
+engagement depth by ±0.20mm. PETG has wider baselines than PLA due to material
+flexibility and shrinkage differences.
+
+---
+
+## Known Gaps
+
+| Gap | Status |
+|-----|--------|
+| TRAY factory renders solid block, not hollow box | `core_tray_chassis` needs implementation |
+| GRID factory only handles FrankenTray ribs | Cartesian + radial divider code needs restoration |
+| Manifest covers 4 of 23 intent strings | Remaining intents fall through to default TRAY |

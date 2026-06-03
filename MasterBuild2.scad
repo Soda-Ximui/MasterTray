@@ -219,32 +219,31 @@ include <MasterEngine.scad>
 include <MasterManifest.scad>
 
 // ============================================================================
-// SECTION 7: FACTORY IMPORTS - USE (not INCLUDE) to prevent re-execution
+// SECTION 7: FACTORY IMPORTS
 // ============================================================================
-// "use" loads the module definitions but doesn't execute anything.
-// "include" loads AND executes, which causes errors with multiple includes.
-// We use "use" for factory modules to prevent syntax errors.
+// include (not use) so factory module definitions are available in this scope.
+// None of these files have top-level executable geometry, so include is safe.
 
 /// RenderTray.scad: Factory for simple tray geometries
-use <RenderTray.scad>
+include <RenderTray.scad>
 
 /// RenderPeg.scad: Factory for stacking pegs/connectors
-use <RenderPeg.scad>
+include <RenderPeg.scad>
 
 /// RenderJar.scad: Factory for cylindrical jar bodies with optional threading
-use <RenderJar.scad>
+include <RenderJar.scad>
 
 /// RenderLid.scad: Factory for various lid types (screw, hinged, sliding)
-use <RenderLid.scad>
+include <RenderLid.scad>
 
 /// RenderGrid.scad: Factory for internal divider grids
-use <RenderGrid.scad>
+include <RenderGrid.scad>
 
 /// RenderBox.scad: Factory for rectangular boxes and flip-lid boxes
-use <RenderBox.scad>
+include <RenderBox.scad>
 
 /// RenderPlaque.scad: Factory for labeled specification plaques
-use <RenderPlaque.scad>
+include <RenderPlaque.scad>
 
 // ==============================================================================
 // SECTION 8: BUILD CONFIGURATION - PACKAGE UI PARAMETERS
