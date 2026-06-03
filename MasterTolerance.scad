@@ -1,5 +1,5 @@
 // ==============================================================================
-// FILE: MasterTolerance.scad [v1.4]
+// FILE: MasterTolerance.scad
 // ARCHITECTURE: Layer 1.8 (The Physics & Materials Engine)
 // ==============================================================================
 

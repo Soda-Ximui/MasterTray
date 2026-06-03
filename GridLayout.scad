@@ -1,12 +1,12 @@
 // ==============================================================================
-// FILE: GridLayout.scad [v3.0.3]
+// FILE: GridLayout.scad
 // ARCHITECTURE: Layer 1.3 (Grid Layout Parsing & Validation)
-// PURPOSE: Context-aware parsing for Cartesian, Radial, Custom Spans, and Vector Ribs
+// PURPOSE: Context-aware parsing for Cartesian, Radial, and Custom Spans
 // ==============================================================================
 
+include <BOSL2/std.scad>
+include <MasterEnum.scad>
 include <MasterEngine.scad>
-include <MasterBug.scad>
-include <MasterUtility.scad>
 
 // --- CORE PARSER UTILITIES ---
 function get_grid_tokens(g_str) = [for (t = str_split(g_str, " ")) if (t != "") t];
@@ -33,7 +33,6 @@ function parse_radial(g_str) =
         
         rays = len(tok_r) > 0 ? max(0, to_num(get_digits(tok_r[0]))) : 0,
         c_val = len(tok_c) > 0 ? to_num(get_digits(tok_c[0])) : 6.0,
-        
         is_perc = len(tok_c) > 0 && tok_c[0][len(tok_c[0])-1] == "%")
     [rays, c_val, is_perc];
 
@@ -62,7 +61,7 @@ function parse_single_span(span_str, default_h, max_h, is_closed) =
         h_val = len(raw_h_str) > 0 ? to_num(get_digits(raw_h_str)) : 100,
         
         req_h = len(raw_h_str) == 0 ? default_h : 
-              is_h_perc ? (default_h * (h_val / 100)) : h_val,
+                is_h_perc ? (default_h * (h_val / 100)) : h_val,
                 
         final_h = is_closed ? min(req_h, max_h) : req_h
     )
@@ -92,6 +91,7 @@ function get_grid_config(data) =
     )
     [cart_dims, rad_dims, spans, has_base, base_t, default_h];
 
+// --- DEBUGGER ---
 module debug_grid_parser(data) {
     cfg = get_grid_config(data);
     spans = cfg[2];
@@ -117,8 +117,54 @@ module debug_grid_parser(data) {
     echo(" ");
 }
 
+// --- GRID STRING VALIDATION ---
+// Token classifiers used by is_valid_grid_layout and MasterValidation.
+function is_cartesian_token(tok) = len(search("x", tok)) > 0 || len(search("X", tok)) > 0;
+function is_radial_token(tok)    = len(tok) > 0 && (tok[0] == "R" || tok[0] == "r");
+function is_center_token(tok)    = len(tok) > 0 && (tok[0] == "C" || tok[0] == "c");
+function is_span_token(tok)      = len(tok) > 0 && (tok[0] == "S" || tok[0] == "s");
+
+function is_valid_grid_layout(g_str) =
+  (g_str == "") ? true :
+  let (tokens = [for (t = get_grid_tokens(g_str)) t])
+  (len(tokens) == 0) ? false :
+  len([for (t = tokens) if (
+    is_cartesian_token(t) || is_radial_token(t) ||
+    is_center_token(t)    || is_span_token(t)
+  ) t]) == len(tokens);
+
+// Flat accessors for callers that only need one value from parse_radial.
+function parse_radial_rays(g_str)      = parse_radial(g_str)[0];
+function parse_center_diameter(g_str)  =
+  let (r = parse_radial(g_str)) r[2] ? (r[1] / 100) : r[1];
+
+// Legacy compat wrappers (kept for any old callers).
+function get_cartesian_dims_legacy(g_str)  = parse_cartesian(g_str);
+function get_radial_rays_legacy(g_str)     = parse_radial_rays(g_str);
+function get_center_diameter_legacy(g_str) = parse_center_diameter(g_str);
+
+// --- FRANKENTRAY DIAGNOSTICS ---
+module log_franken_state(cfg, g_str) {
+    if (cfg != undef) {
+        echo(" ");
+        echo("=== FRANKENTRAY FLIGHT RECORDER ===");
+        echo(str("Raw_Input: '", g_str, "'"));
+        echo(str("Base Config: Rays: ", cfg[0], " | Hub Dia: ", cfg[1]));
+        echo(str("Global Anchor Offset: [", cfg[2][0], ", ", cfg[2][1], "]"));
+        echo("--- RIB TOPOLOGY ARRAY ---");
+        if (len(cfg[3]) > 0) {
+            for (i = [0 : len(cfg[3])-1])
+                echo(str("  Rib ", i+1, ": [", cfg[3][i][0], "] --> [", cfg[3][i][1], "]"));
+        } else {
+            echo("  (No vector ribs compiled)");
+        }
+        echo("====================================");
+        echo(" ");
+    }
+}
+
 // --- FRANKEN-PARSE (VECTOR/RIB TOPOLOGY) ---
-function parse_rib_node(token) = 
+function parse_rib_node(token) =
     let(
         parts = str_split(token, "-"),
         beh_str = len(parts) > 1 ? parts[len(parts)-1] : "T",
@@ -127,9 +173,9 @@ function parse_rib_node(token) =
     )
     [traj_str, beh_str];
 
-function parse_offset(o_str) = 
+function parse_offset(o_str) =
     let(
-        clean_str = substr(o_str, 1), 
+        clean_str = substr(o_str, 1),
         parts = str_split(clean_str, ","),
         x_val = to_num(get_digits(parts[0])) * (len(search("-", parts[0])) > 0 ? -1 : 1),
         y_val = len(parts) > 1 ? to_num(get_digits(parts[1])) * (len(search("-", parts[1])) > 0 ? -1 : 1) : 0

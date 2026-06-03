@@ -1,9 +1,11 @@
 // ==============================================================================
-// FILE: RenderBox.scad [v4.26]
-// ARCHITECTURE: Layer 2.1 (Domain Module)
+// FILE: RenderBox.scad
+// ARCHITECTURE: Layer 3 (Factory)
+// PURPOSE: Render factories for rectangular box and flip-lid geometries.
 // ==============================================================================
 
-include <MasterTolerance.scad> 
+include <MasterEngine.scad>
+include <MasterTolerance.scad>
 
 module render_box(data) { 
     sw = m_safe_wall(data);
@@ -109,10 +111,29 @@ module render_double_flip_box(data) {
         }
         translate([0, bl/2, bh - 4.0]) {
             hull() {
-                translate([0, 0, 0.8]) cuboid([bw - sw*4, 0.1, 0.1], anchor=CENTER); 
-                translate([0, 0.8, 0]) cuboid([bw - sw*4, 0.1, 0.1], anchor=CENTER); 
-                translate([0, 0, -0.8]) cuboid([bw - sw*4, 0.1, 0.1], anchor=CENTER); 
+                translate([0, 0, 0.8]) cuboid([bw - sw*4, 0.1, 0.1], anchor=CENTER);
+                translate([0, 0.8, 0]) cuboid([bw - sw*4, 0.1, 0.1], anchor=CENTER);
+                translate([0, 0, -0.8]) cuboid([bw - sw*4, 0.1, 0.1], anchor=CENTER);
             }
         }
     }
+}
+
+// ==============================================================================
+// FACTORY INTERFACE (Layer 3)
+// These wrappers adapt the domain render modules to the factory_render_*(data, opts, phys)
+// signature used by MasterBuilder's dispatcher, running data through process_part first.
+// ==============================================================================
+
+module factory_render_box(data, opts, phys) {
+    render_box(process_part(data));
+}
+
+module factory_render_flip_box(data, opts, phys) {
+    render_flip_box(process_part(data));
+}
+
+module factory_render_double_flip_box(data, opts, phys) {
+    render_double_flip_box(process_part(data));
+}
 }

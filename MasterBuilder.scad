@@ -1,6 +1,7 @@
 // ==============================================================================
-// FILE: MasterBuilder.scad [v4.26]
-// ARCHITECTURE: Layer 3 (The UI & Controller)
+// FILE: MasterBuilder.scad
+// ARCHITECTURE: Layer 4 (User Interface & Main Entry Point)
+// PURPOSE: Customizer-friendly UI + build dispatcher for MasterTray system
 // ==============================================================================
 /* [Printer / Slicer Setting] */
 Nozzle_Diameter = 0.4; // [0.2, 0.4, 0.6, 0.8]
@@ -56,6 +57,14 @@ Mechanical_Fit = "Standard"; // ["Tighter", "Tight", "Standard", "Loose", "Loose
 
 include <MasterManifest.scad>
 
+use <RenderTray.scad>
+use <RenderPeg.scad>
+use <RenderJar.scad>
+use <RenderLid.scad>
+use <RenderGrid.scad>
+use <RenderBox.scad>
+use <RenderPlaque.scad>
+
 // --- AUTO-MATH ENGINE ---
 raw_w = (dimension_mode == "Usable") ? part_width + (wall_thickness * 2) : part_width;
 raw_l = (dimension_mode == "Usable") ? part_length + (wall_thickness * 2) : part_length;
@@ -99,6 +108,28 @@ ui_payload = [
     [THREAD_PITCH,       thread_pitch]
 ];
 
+// --- FACTORY DISPATCHER ---
+module build_part(name, data) {
+    manifest = compile_manifest(name, data);
+    echo(str("Building: ", name, " (", len(manifest), " components)"));
+    for (i = [0 : len(manifest) - 1]) {
+        item    = manifest[i];
+        type    = item[0];
+        payload = item[1];
+        options = item[2];
+        physics = item[3];
+        if      (type == "TRAY")             { factory_render_tray(payload, options, physics); }
+        else if (type == "BOX")              { factory_render_box(payload, options, physics); }
+        else if (type == "FLIP_BOX")         { factory_render_flip_box(payload, options, physics); }
+        else if (type == "DOUBLE_FLIP_BOX")  { factory_render_double_flip_box(payload, options, physics); }
+        else if (type == "JAR")              { factory_render_jar(payload, options, physics); }
+        else if (type == "LID")              { factory_render_lid(payload, options, physics); }
+        else if (type == "GRID")             { factory_render_grid(payload, options, physics); }
+        else if (type == "PEG")              { factory_render_peg(payload, options, physics); }
+        else if (type == "PLAQUE")           { factory_render_plaque(payload, options, physics); }
+        else { echo(str("WARNING: Unknown component type: ", type)); }
+    }
+}
+
 // --- FINAL EXECUTION ---
-final_build_queue = compile_manifest(Part_To_Build, ui_payload);
-build_platter(final_build_queue);
+build_part(Part_To_Build, ui_payload);

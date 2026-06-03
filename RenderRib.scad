@@ -1,13 +1,12 @@
 // ==============================================================================
-// FILE: RenderRib.scad [v1.5]
+// FILE: RenderRib.scad
 // ARCHITECTURE: Layer 2.2 (FrankenTray Vector Generator)
 // PURPOSE: Dedicated geometry builder for radial/vector-based Rib topologies.
 // ==============================================================================
 
 include <BOSL2/std.scad>
 include <GridLayout.scad>
-include <MasterBug.scad>
-include <MasterUtility.scad> 
+include <MasterUtility.scad>
 
 module render_franken_ribs(data) {
     g_str = get_val(GRID_LAYOUT, data, "");
