@@ -57,7 +57,7 @@ module factory_render_lid(data, opts, phys) {
                 up(cap_h + sl / 2) framed_mesh(data, w, w, sl, true, get_mesh_cfg(data, "HOLE_LID", "STRUT_LID", true));
                 cyl(d=w, h=cap_h, chamfer2=m_chamf(data), anchor=BOTTOM); 
             } 
-            up(-0.1) threaded_rod(d=neck_od + 0.8, l=cap_h + 1, pitch=get_val("THREAD_PITCH", data, 2.0), internal=false, anchor=BOTTOM);
+            up(-0.1) threaded_rod(d=neck_od + 0.8, l=cap_h + 1, pitch=m_thread_pitch(data), internal=false, anchor=BOTTOM, $fn=30);
         }
     } else {
         lid_w = w - sw - 0.6; lid_l = bl - sw / 2 - 0.6; 
