@@ -2,27 +2,20 @@
 // FILE: MasterBuilder.scad [v4.26]
 // ARCHITECTURE: Layer 3 (The UI & Controller)
 // ==============================================================================
+/* [Printer / Slicer Setting] */
+Nozzle_Diameter = 0.4; // [0.2, 0.4, 0.6, 0.8]
+Wall_Loops = 2; // [1 : 1 : 10]
+Layer_Height = 0.28; // [0.12, 0.16, 0.20, 0.24, 0.28]
 
 /* [Build Selection] */
-Part_To_Build = "1-Day 2-Compartment (Single Lid)"; // ["Box", "Standalone Box", "Flip Box", "1-Day AM/PM Box", "1-Day 2-Compartment (Single Lid)", "7-Day Pill Box", "14-Day AM/PM Box", "Lid", "Simple Tray", "Nesting Tray (Short)", "Modular Peg Tray (Long)", "Standalone Box Grid", "Standalone Jar Grid", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Center Jar", "S4 Wedge Box", "S4 Set", "Plaque"]
+Part_To_Build = "1-Day 2-Compartment (Single Lid)"; // ["Box", "Standalone Box", "Flip Box", "1-Day AM/PM Box", "1-Day 2-Compartment (Single Lid)", "7-Day Pill Box", "14-Day AM/PM Box", "Pillbox Set (Double Lid)", "Pillbox Set (Single Lid)", "Pillbox Full Set", "Lid", "Simple Tray", "Nesting Tray (Short)", "Modular Peg Tray (Long)", "Standalone Box Grid", "Standalone Jar Grid", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Center Jar", "S4 Wedge Box", "S4 Set", "Plaque"]
 
 /* [Total Outer Dimensions] */
-dimension_mode = "Total"; // ["Total", "Usable"]
 part_width = 30; // [10 : 1 : 300]
 part_length = 40; // [10 : 1 : 300]
 part_height = 20; // [5 : 1 : 300]
+dimension_mode = "Total"; // ["Total", "Usable"]
 
-/* [High-Peg Mod] */
-stackable_peg_height = 80; // [20 : 10 : 200]
-
-/* [Printer / Slicer Setting] */
-Layer_Height = 0.28; // [0.12, 0.16, 0.20, 0.24, 0.28]
-Wall_Loops = 2; // [1 : 1 : 10]
-Nozzle_Diameter = 0.4; // [0.2, 0.4, 0.6, 0.8]
-
-/* [Advanced - Material & Tolerances] */
-Filament_Type = "PETG"; // ["PLA", "PETG", "TPU", "ABS"]
-Mechanical_Fit = "Standard"; // ["Tighter", "Tight", "Standard", "Loose", "Looser"]
 
 /* [Mesh Aesthetics] */
 mesh_pattern = "Teardrop"; // ["Honeycomb", "Teardrop", "Slotted", "Circle", "Square", "Diamond", "None"]
@@ -37,7 +30,7 @@ target_wall = "All Walls"; // ["All Walls", "Front", "Back", "Left", "Right"]
 
 /* [Grid System] */
 grid_type = "Built-in"; // ["Built-in", "Drop-in", "None"]
-grid_layout = "7x2"; 
+grid_layout = "7x5 S2/2/2/3/150% S5/1/1/2/80 R3 C15%";
 grid_has_base = true;
 
 /* [Plaque / Labels] */
@@ -54,6 +47,12 @@ min_solid_edge_for_lid = 10;
 peg_thickness_multiplier = 2.0; 
 platter_gap = 15; 
 thread_pitch = 2.0; 
+/* [High-Peg Mod] */
+stackable_peg_height = 80; // [20 : 10 : 200]
+
+/* [Advanced - Material & Tolerances] */
+Filament_Type = "PETG"; // ["PLA", "PETG", "TPU", "ABS"]
+Mechanical_Fit = "Standard"; // ["Tighter", "Tight", "Standard", "Loose", "Looser"]
 
 include <MasterManifest.scad>
 

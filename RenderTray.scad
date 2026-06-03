@@ -2,7 +2,7 @@
 // FILE: RenderTray.scad
 // ARCHITECTURE: Layer 2.1 (Domain Module)
 // ==============================================================================
-
+include <RenderGrid.scad>
 module core_tray_chassis(data) {
     bw = m_bw(data);
     bl = m_bl(data); bh = m_bh(data); sf = m_safe_floor(data); sw = m_safe_wall(data); actual_wall_h = bh - sf;

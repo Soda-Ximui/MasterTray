@@ -1,5 +1,5 @@
 // ==============================================================================
-// FILE: MasterEngine.scad [v4.11]
+// FILE: MasterEngine.scad [v4.13]
 // ARCHITECTURE: Layer 1 (The Math Kernel & Data Router)
 // ==============================================================================
 
@@ -16,26 +16,40 @@ PLATTER_GAP0=15; THREAD_PITCH0=2.0; MAX_BUILD_PLATE_WIDTH0=250; GRID_LAYOUT0="";
 
 function make_part(type, local_data=[]) = concat([[TYPE, type]], local_data);
 function get_val(key, data, fallback) = let (idx = search([key], data)[0]) (idx == []) ? fallback : data[idx][1];
+
 function get_footprint(data) =
     let(type = get_val(TYPE, data, BOX), w = max(10, get_val(WIDTH, data, WIDTH0)), l = max(10, get_val(LENGTH, data, LENGTH0)))
     (type == JAR || type == JAR_LID || type == JAR_GRID || type == PLAQUE_JAR) ? [w, w] : [w, l];
 
+// --- PLATTER SHELF PACKING (v4.13) ---
+// Packs items tightly along the X-axis and wraps to a new Y-row when hitting the build plate limit.
 function get_xy(manifest, target_idx, curr_idx=0, edge_x=0, edge_y=0, row_max_y=0) =
     let(
-        data = manifest[curr_idx], footprint = get_footprint(data), w = footprint[0], l = footprint[1],
+        data = manifest[curr_idx], 
+        footprint = get_footprint(data), 
+        w = footprint[0], 
+        l = footprint[1],
+        
+        gap = get_val(PLATTER_GAP, data, PLATTER_GAP0),
         wrap = (edge_x > 0) && ((edge_x + w) > MAX_BUILD_PLATE_WIDTH0),
-        actual_edge_x = wrap ? 0 : edge_x, actual_edge_y = wrap ? edge_y + row_max_y : edge_y,
-        center_x = actual_edge_x + (w / 2), center_y = actual_edge_y + (l / 2),
-        next_edge_x = actual_edge_x + w + PLATTER_GAP0, next_row_max = wrap ? l + PLATTER_GAP0 : max(row_max_y, l + PLATTER_GAP0)
+        
+        actual_edge_x = wrap ? 0 : edge_x, 
+        actual_edge_y = wrap ? edge_y + row_max_y : edge_y,
+        
+        center_x = actual_edge_x + (w / 2), 
+        center_y = actual_edge_y + (l / 2),
+        
+        next_edge_x = actual_edge_x + w + gap, 
+        next_row_max = wrap ? l + gap : max(row_max_y, l + gap)
     )
-    (curr_idx == target_idx) ? [center_x, center_y] : get_xy(manifest, target_idx, curr_idx + 1, next_edge_x, actual_edge_y, next_row_max);
+    (curr_idx == target_idx) ?
+    [center_x, center_y] : get_xy(manifest, target_idx, curr_idx + 1, next_edge_x, actual_edge_y, next_row_max);
 
 function m_bw(data) = max(10, get_val(WIDTH, data, WIDTH0));
 function m_bl(data) = max(10, get_val(LENGTH, data, LENGTH0));
 function m_bh(data) = max(5, get_val(HEIGHT, data, HEIGHT0)); 
 function m_noz(data) = get_val(NOZZLE_DIAMETER, data, NOZZLE_DIAMETER0);
 
-// [v4.11] Updated to parse raw numbers from Customizer, falling back to legacy string values
 function m_lh(data) = let(s = get_val(LAYER_HEIGHT, data, 0.20)) (is_num(s)) ? s : ((s=="Detailed (0.12mm)")?0.12:0.20); 
 function m_wloops(data) = let(w = get_val(WALL_LOOPS, data, 3)) (is_num(w)) ? w : 3;
 
@@ -45,7 +59,7 @@ function to_num(d) = len(d)==0 ? 0 : len(d)==1 ? d[0] : len(d)==2 ? d[0]*10 + d[
 function get_mesh_cfg(data, h_key, s_key, needs_margin=false) = 
     let(pat = get_val(PATTERN, data, PATTERN0), hole = get_val(h_key, data, 1.6), strut = get_val(s_key, data, 25), req_s = (200 * get_val(LID_MIN_SOLID, data, LID_MIN_SOLID0)) / min(m_bw(data), m_bl(data)), final_s = needs_margin ? max(max(2, strut), req_s) : max(2, strut)) 
     ((pat == NONE || hole <= 0.05 || final_s >= 99) ? undef : [hole, final_s]);
-
+    
 function get_grid_step(hole, min_sp, noz) = hole + max(min_sp, max(noz, round(max(noz * 2, hole * 0.25) / noz) * noz));
 function get_mesh_dim(dim, perc) = max(0.1, dim * (1 - (perc / 100)));
 function get_n_steps(dim, perc, step) = ceil((get_mesh_dim(dim, perc)) / step) + 2;
