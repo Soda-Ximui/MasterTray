@@ -116,6 +116,19 @@ function compile_manifest(intent, data) =
   (intent == "Simple Tray") ? [
     ["TRAY", data, [],                                get_physics_profile(data)]
   ] :
+  (intent == "Standalone Box Grid") ? [
+    ["GRID", data, [],                                get_physics_profile(data)]
+  ] :
+  (intent == "Standalone Jar Grid") ?
+    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0))
+    (w == l) ?
+      [["GRID", data, [],                             get_physics_profile(data)]]
+    :
+      [
+        ["GRID", concat([["WIDTH", w]], data), [],    get_physics_profile(data)],
+        ["GRID", concat([["WIDTH", l]], data), [],    get_physics_profile(data)]
+      ]
+  :
   (intent == "Nesting Tray (Short)") ? [
     ["TRAY", data, [[STACKABLE, true], [STACK_MODE, "Snap"]], get_physics_profile(data)]
   ] :

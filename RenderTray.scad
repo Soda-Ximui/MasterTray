@@ -19,6 +19,7 @@
 include <BOSL2/std.scad>
 include <MasterEngine.scad>
 include <RenderMesh.scad>
+include <RenderGrid.scad>
 
 // core_tray_chassis — hollow floor + four walls. No corner clipping.
 // Called by factory_render_tray and by RenderBox (which applies its own bounds).
@@ -43,6 +44,8 @@ module core_tray_chassis(data) {
             zrot(90) xrot(90) framed_mesh(data, l, h_left,  sw, false, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL));
         translate([ w/2 - sw/2, 0, sf + h_right/2])
             zrot(90) xrot(90) framed_mesh(data, l, h_right, sw, false, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL));
+        // Built-in grid — fused to chassis, height capped by GRID_WALL_H in data
+        render_internal_grid(data);
     }
 }
 
