@@ -154,7 +154,40 @@ settings.
 
 ---
 
-## 1. `use` vs `include` for factory modules
+## 1. Factory IS the implementation — opts drive all variants
+
+**Rule:** Each primitive shape has exactly ONE factory function. All behavioural
+variants are driven by opts, not by separate factory functions or wrapper chains.
+
+**Why:** Multiple render_*() wrappers around a single chassis create layered
+indirection. Every new derived intent requires fighting through all layers to inject
+behaviour — contorted, fragile, and hard to reason about.
+
+**The pattern:**
+```
+factory_render_box(data, opts, phys) {
+    lid_type = get_val("LID_TYPE", opts, "Snap");
+    if      (lid_type == "Glide")        { ... groove + ball dimples inline ... }
+    else if (lid_type == "Flip_Single")  { ... hinge boss + axle inline ... }
+    else if (lid_type == "Flip_Double")  { ... dual hinge inline ... }
+    else                                 { ... plain chassis ... }
+}
+```
+
+**What this eliminates:**
+- render_box() / render_flip_box() / render_double_flip_box() wrapper chain
+- NEEDS_GROOVE flag smuggled through data to cross layer boundaries
+- Separate factory_render_flip_box() that does nothing but call the real thing
+- Adding a new variant = add one `else if` branch in ONE file
+
+**Corollary:** The manifest is the only place that decides WHAT to build.
+The factory is the only place that decides HOW to build it.
+Never let behaviour bleed from manifest into data (via data overrides) just to
+cross a factory boundary.
+
+---
+
+## 2. `use` vs `include` for factory modules
 
 **Rule:** Use `include` for your own factory files. Use `use` only for
 third-party libraries (BOSL2).
