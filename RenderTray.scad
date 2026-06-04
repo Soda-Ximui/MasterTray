@@ -85,15 +85,18 @@ module factory_render_tray(data, opts, phys) {
             union() {
                 apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
                     core_tray_chassis(data);
-                // Nesting ledge — smaller than outer wall so it fits inside the tray below
+                // Nesting ledge — smaller than outer wall so it fits inside the tray below.
+                // chamfer1 on bottom edge (faces down, first contact when inserting).
                 down(ledge_h)
                     apply_master_bounds(w - sw*2, l - sw*2, ledge_h,
                                         m_c_rad(data) - sw, m_chamf(data))
-                    cuboid([w, l, ledge_h + 0.1], anchor=BOTTOM);
-                // 4 corner bosses
+                    cuboid([w, l, ledge_h + 0.1], anchor=BOTTOM,
+                           chamfer1=m_chamf(data));
+                // 4 corner bosses — chamfer2 on top for clean edge
                 for (x=[-1,1]) for (y=[-1,1])
                     translate([x*cx, y*cy, -ledge_h])
-                        cyl(d=boss_d, h=h + ledge_h, anchor=BOTTOM);
+                        cyl(d=boss_d, h=h + ledge_h, anchor=BOTTOM,
+                            chamfer2=m_chamf(data));
                 // Builtin mode: add protruding pegs from top corners
                 if (stack_mode == "Builtin")
                     for (x=[-1,1]) for (y=[-1,1])

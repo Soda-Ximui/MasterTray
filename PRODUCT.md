@@ -1,0 +1,146 @@
+# MasterTray — Product Features
+
+## What It Is
+
+Parametric OpenSCAD system for generating 3D-printable storage containers.
+The user sets parameters in the OpenSCAD Customizer; the system computes
+printer-aware geometry and outputs a print-ready STL — no CAD knowledge required.
+
+---
+
+## Core Design Principles
+
+- **Support-free** — every part prints without supports in its shipped orientation
+- **Printer-aware** — geometry adapts to Nozzle Diameter, Layer Height, Wall Loops
+- **Chamfered/filleted everywhere** — no sharp 90° overhangs; all edges ≤45°
+- **Structural integrity** — walls, floors, and struts sized for real storage use
+- **Platter-ready** — multi-part builds auto-arranged on the build plate
+
+---
+
+## Container Types
+
+### Open-top Tray
+Rectangular floor + four walls, no lid. Walls independently height-modifiable
+(`WALL_MODIFY`: None / Dropped / 50% / 25%, per-wall target). Mesh on all surfaces.
+
+### Box
+Same chassis as Tray, with lid. Lid type determined by build intent.
+
+### Jar
+Cylindrical container. Diameter = outer diameter (caliper measurement).
+- **Open** — no threading, no lid
+- **Threaded** — external BOSL2 thread on neck; screw-on lid
+- **Polygonal** — selectable shape: Circle / Quad / Hexa / Octa / Dodeca (`jar_shape`)
+- Width ≠ Length → two jars auto-spawned on platter (one per dimension)
+
+### Lid
+Printed face-down for best surface quality and bed adhesion.
+
+| Type | Description |
+|------|-------------|
+| Screw | Internally threaded cap for threaded jars |
+| Glide | Slides into grooves on box top edge |
+| Flip Single | C-clip hinge on one Y face, front latch |
+| Flip Double | C-clips both Y faces (pill boxes, AM/PM) |
+
+---
+
+## Stackable Trays
+
+All stackable modes add corner **bosses** (solid reinforcing pillars) that run the
+full tray height and below the floor, distributing stacking loads into the walls.
+
+| STACK_MODE | Description |
+|------------|-------------|
+| `"Peg"` | Top sockets + bottom sockets + 4 standalone peg rods on platter |
+| `"Builtin"` | Pegs protrude from top corners + bottom sockets (no separate pieces) |
+| `"Snap"` | Nesting ledge + diamond snap bead — click-together, no hardware |
+
+Peg socket diameter: 8mm. Peg rod: horizontal, flat-bottomed for printing.
+Snap mode: recommended PETG (flexes for click without fracturing like PLA).
+Future: `"Magnet"` — boss holes for press-fit 6/8mm disc magnets.
+
+---
+
+## Mesh System
+
+Three independent knobs per surface (wall, floor, lid):
+
+| Parameter | Controls |
+|-----------|---------|
+| `mesh_hole_size` | Hole diameter (0 = solid surface) |
+| `strut_*_perc` | Solid border surrounding mesh region (0% = edge-to-edge) |
+| `mesh_pattern` | Teardrop / Honeycomb / Slotted / Circle / Square / Diamond / None |
+
+- **Teardrop** is the default — self-bridging, support-free by shape
+- Hole spacing derived from `Wall_Loops × Nozzle_Diameter` (nozzle-snap rounded)
+- Per-surface control: wall, floor, and lid can each be solid or meshed independently
+
+---
+
+## Desiccant / S4 System
+
+Purpose-built containers for silica gel desiccant packets. Mesh settings locked
+regardless of Customizer — ensures consistent airflow geometry across all prints.
+
+| Intent | Shape | Dims | Mesh |
+|--------|-------|------|------|
+| S4 Jar | Threaded jar + lid | Ø49 × 140mm | Teardrop 1.8mm, strut 15/15/15 |
+| Spool Jar | Threaded jar + lid | Ø55 × 55mm | Teardrop 1.8mm, strut 15/15/15 |
+| S4 Wedge | Box + glide lid | 140×46×140mm | Teardrop 1.8mm, strut 25/20/10 |
+| S4 Set | All three above | — | Auto-arranged on platter |
+
+---
+
+## Pill / Medication Organizers
+
+| Intent | Description |
+|--------|-------------|
+| 1-Day AM/PM Box | Double flip box, 2-compartment |
+| 1-Day 2-Compartment (Single Lid) | Flip box, shared lid |
+| 7-Day Pill Box | 7-compartment flip box, day labels |
+| 14-Day AM/PM Box | 14-compartment double flip, AM/PM labels |
+| Pillbox Set (Single/Double Lid) | Composite sets |
+| Pillbox Full Set | Complete organizer system |
+
+---
+
+## Printer Optimisation
+
+All geometry derives from three printer parameters set in the Customizer:
+
+| Parameter | Drives |
+|-----------|--------|
+| `Nozzle_Diameter` | Wall thickness, strut width, corner radii, chamfer size |
+| `Layer_Height` | Floor and lid thickness (layer-aligned) |
+| `Wall_Loops` | Minimum strut width between mesh holes |
+
+Change your printer settings → geometry adapts automatically. No manual recalculation.
+
+---
+
+## Tolerances & Fit Profiles
+
+`Mechanical_Fit` dropdown: Tighter / Tight / Standard / Loose / Looser (±0.05mm/step).
+Material-aware baselines: PETG has wider clearances than PLA (shrinkage + flexibility).
+
+Tolerance components tracked separately:
+- Hinge spine (C-clip rotation)
+- C-clip retention
+- Front snap latch
+- Glide lid rail
+- Peg/socket engagement depth
+
+---
+
+## Print Orientations
+
+| Part | Orientation | Reason |
+|------|-------------|--------|
+| Tray / Box | Floor on bed | Layer lines horizontal through floor = maximum strength |
+| Jar | Upright | Accurate diameter; side-print needs supports (not allowed) |
+| Screw Lid | Face-down | Full-circle adhesion; interior thread on vertical walls |
+| Glide/Slip Lid | Face-down | Best surface finish on visible face |
+| Peg rod | Flat (underside on bed) | Flat cut prevents rolling; prints without supports |
+| Drop-in grid | Flat | Divider walls print vertically |
