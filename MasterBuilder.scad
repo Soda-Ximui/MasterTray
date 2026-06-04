@@ -26,6 +26,10 @@ strut_wall_perc = 100; // [0 : 5 : 100]
 strut_floor_perc = 100; // [0 : 5 : 100]
 strut_lid_perc = 100; // [0 : 5 : 100]
 
+/* [Lid Options] */
+lid_glide_direction = "H"; // ["H", "V"]
+lid_glide_snap = "Ball"; // ["Ball", "Tab"]
+
 /* [Wall Modifications] */
 modify_wall = "None"; // ["None", "Dropped", "50%", "25%"]
 target_wall = "All Walls"; // ["All Walls", "Front", "Back", "Left", "Right"]
@@ -116,6 +120,8 @@ ui_payload = [
     [PLATTER_GAP,        platter_gap], 
     [THREAD_PITCH,       thread_pitch],
     [JAR_SHAPE,          jar_shape],
+    [GLIDE_DIR,          lid_glide_direction],
+    [GLIDE_SNAP,         lid_glide_snap],
     [CHAMFER_SIZE,       chamfer_size],
     [CORNER_RADIUS,      corner_radius],
     [PEG_SOCKET_D,       peg_socket_diameter],

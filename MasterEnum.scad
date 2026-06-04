@@ -52,6 +52,8 @@ NEEDS_GROOVE = "NEEDS_GROOVE";
 HAS_THREADS  = "HAS_THREADS";
 JAR_SHAPE    = "JAR_SHAPE";
 JAR_SIDES    = "JAR_SIDES";
+GLIDE_DIR      = "GLIDE_DIR";   // "H" (horizontal) | "V" (vertical)
+GLIDE_SNAP     = "GLIDE_SNAP"; // "Ball" (default) | "Tab"
 STACKABLE      = "STACKABLE";
 STACK_MODE     = "STACK_MODE";     // "Peg" | "Builtin" | "Snap"
 CHAMFER_SIZE   = "CHAMFER_SIZE";   // mm — 0 = auto from nozzle

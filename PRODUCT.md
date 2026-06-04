@@ -34,15 +34,28 @@ Cylindrical container. Diameter = outer diameter (caliper measurement).
 - **Polygonal** — selectable shape: Circle / Quad / Hexa / Octa / Dodeca (`jar_shape`)
 - Width ≠ Length → two jars auto-spawned on platter (one per dimension)
 
+### Box = Tray + Lid
+
+A TRAY with any lid type becomes a BOX. The lid type determines what geometry the
+box body also needs (groove channels, hinge bosses, etc.) — the manifest pairs them.
+
 ### Lid
 Printed face-down for best surface quality and bed adhesion.
 
-| Type | Description |
-|------|-------------|
-| Screw | Internally threaded cap for threaded jars |
-| Glide | Slides into grooves on box top edge |
-| Flip Single | C-clip hinge on one Y face, front latch |
-| Flip Double | C-clips both Y faces (pill boxes, AM/PM) |
+| LID_TYPE | Variants | Snap mechanism | Notes |
+|----------|----------|---------------|-------|
+| `"Snap"` | — | Press-on friction | Simple, no hardware |
+| `"Glide"` | `H` (horizontal) or `V` (vertical) | **Ball catch** (default) or Tab | Ball catch: two hemisphere bumps on lid sides click into wall dimples. More reliable than tab — distributed force, no thin part to snap, smooth operation. Tab: classic single snap at open end. |
+| `"Hinge_Single"` | — | C-clip one Y face + front latch | Standard flip box |
+| `"Hinge_Double"` | — | C-clips both Y faces | Pill box / AM-PM organizer |
+| `"Screw"` | — | Threaded engagement | Jar lids only |
+
+**Glide lid direction:**
+- `"H"` (Horizontal) — lid slides along the length axis; grooves cut in left/right walls
+- `"V"` (Vertical) — lid slides straight down; grooves cut in front/back walls
+
+Ball catch geometry: small hemisphere protrusion on each lid side, matching concave
+dimple in the box wall groove. Sized to `nozzle × 3` diameter for reliable click.
 
 ---
 
