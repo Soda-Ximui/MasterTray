@@ -461,10 +461,13 @@ function span_h_clamped(req_h, max_h) = min(req_h, max_h);
 /// Two-pass intersection:
 ///   Pass 1 — rounds the four vertical (Z) corner edges.
 ///             h*3 oversize avoids inadvertently clipping tall children.
-///   Pass 2 — chamfers the four top horizontal edges at exactly h.
+///   Pass 2 — chamfers the top AND bottom horizontal edges at exactly h.
+///             TOP  chamfer: rounds the rim so it doesn't cut fingers.
+///             BOTTOM chamfer: gives first-layer squish a lead-in ramp,
+///             eliminating elephant foot at the base perimeter.
 ///             XY is oversized by EPS so it doesn't disturb the corner rounding.
 ///
-/// Result: vertical corners rounded, top rim chamfered, sides/bottom untouched.
+/// Result: vertical corners rounded, top and bottom rims chamfered, sides untouched.
 /// The `c` parameter was previously accepted but silently ignored — this wires it up.
 module apply_master_bounds(w, l, h, r, c) {
   c_r = max(0.1, min(r, (w / 2) - 0.1, (l / 2) - 0.1));
@@ -473,7 +476,7 @@ module apply_master_bounds(w, l, h, r, c) {
       children();
       cuboid([w, l, h * 3], rounding=c_r, edges="Z", anchor=BOTTOM);
     }
-    cuboid([w + EPS, l + EPS, h], chamfer=max(0, c), edges=TOP, anchor=BOTTOM);
+    cuboid([w + EPS, l + EPS, h], chamfer=max(0, c), edges=TOP+BOTTOM, anchor=BOTTOM);
   }
 }
 

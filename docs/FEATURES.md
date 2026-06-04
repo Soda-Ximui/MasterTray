@@ -214,6 +214,17 @@ small containers).
 
 **Wall thickness cap** — 45% of smallest XY dimension.
 
+**Edge chamfering (all primitives)** — every user-facing horizontal edge is automatically
+chamfered at `nozzle × 2.5` (1 mm at 0.4 mm nozzle) via `apply_master_bounds`:
+
+| Edge | Benefit |
+|------|---------|
+| Top rim | Removes knife edge — safe to handle straight off the printer |
+| Bottom perimeter | Lead-in ramp for the first layer — first-layer squish expands into the chamfer angle instead of bowing the base outward (elephant foot elimination) |
+
+Cylindrical primitives (jar wall, screw lid cap) use `nozzle × 4` (1.6 mm) for a more
+pronounced grip-safe rim. All chamfer values scale automatically with `Nozzle_Diameter`.
+
 ---
 
 ## Dimension Modes
