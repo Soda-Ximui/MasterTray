@@ -5,13 +5,13 @@ _Last updated: 2026-06-03 — CHECKPOINT_
 
 ## How to Resume
 
-Open Claude Code **from inside `C:\repos\3D\MasterTray`** — memory loads automatically.
-Do NOT start a generic Claude chat first. Run:
+Open Claude Code **from inside `C:\repos\3D\MasterTray`**:
 ```
 cd C:\repos\3D\MasterTray
 claude
 ```
 Claude executable: `C:\Users\hobbes\AppData\Roaming\Claude\claude-code\<version>\claude.exe`
+Do NOT start a generic Claude chat — it will have no context.
 
 ---
 
@@ -19,102 +19,26 @@ Claude executable: `C:\Users\hobbes\AppData\Roaming\Claude\claude-code\<version>
 
 **Branch:** `feature/architecture-revamp`
 **Base:** `refactor/code-clarity-and-safety`
-**Last commit:** `fe6bf7f` — GRID_WALL_H injected by factory_render_box
+**Last commit:** `e339dff` — grid_has_base defaults to false
 
 ---
 
-## Primitive Status
+## All 5 Primitives — Status
 
 | # | Primitive | Status | Notes |
 |---|-----------|--------|-------|
-| 1 | TRAY | ✅ Done | Hollow chassis, mesh, wall mods, stackable (Peg/Builtin/Snap), GRID_WALL_H injected |
-| 2 | JAR | ✅ Done | Circular floor + wall mesh, threaded neck, polygon shapes (jar_shape) |
-| 3 | LID | ✅ Done | Snap, Glide (H/V, Ball/Tab), Flip_Single (incl. diamond latch), Screw, Slip |
-| 3b | BOX | ✅ Done | Unified factory_render_box: all LID_TYPE variants inline, no wrappers |
-| 4 | GRID | 🔶 Next | Layout string parser exists in GridLayout.scad; render_box_grid_core in old code |
-| 5 | RIB | ⬜ Not started | FrankenTray ribs — in RenderRib.scad |
+| 1 | TRAY | ✅ Done | Hollow chassis, mesh, wall mods, stackable (Peg/Builtin/Snap), GRID_WALL_H |
+| 2 | JAR | ✅ Done | Circular floor + wall mesh, threaded neck, polygon shapes (jar_shape), built-in grid |
+| 3 | LID | ✅ Done | Snap, Glide (H/V, Ball/Tab), Flip_Single (diamond latch), Screw, Slip |
+| 3b | BOX | ✅ Done | Unified factory — all LID_TYPE variants inline, GRID_WALL_H injection |
+| 4 | GRID | ✅ Done | Cartesian + radial + spans, built-in (fused) + drop-in, jar circular clipping |
+| 5 | RIB | ⬜ Not started | FrankenTray vector ribs — code in RenderRib.scad, parser in GridLayout.scad |
 
 ---
 
-## GRID Architecture (ready to implement)
+## What's Working
 
-**Layout string format:** `RxC [S row/col/width/height/wall_h] ...`
-- `2x7` = 2 rows × 7 cols
-- `S1/1/2/3/150%` = span at (row 1, col 1), 2 wide, 3 tall, wall = 150% of grid_wall_h
-- `S1/1/2/3/25` = same but wall = 25mm absolute
-- Span that fills full height → divider omitted (open cell)
-
-**Built-in grid (HAS_BUILTIN_GRID=true):**
-- `core_tray_chassis(data_g)` → calls `render_internal_grid(data_g)` internally
-- Grid is fused to walls, no separate manifest item
-- `GRID_WALL_H` already injected into data_g by `factory_render_box`
-- Only makes sense with a container intent
-
-**Drop-in grid:**
-- Manifest emits separate GRID item(s) — printed separately with tolerance gap
-- 1 GRID normally; 2 if w≠l (dual-spawn, same logic as jars)
-- Sized with `GRID_DROP_IN_TOLERANCE` clearance on outer dims
-
-**What to salvage from old code:**
-- `git show d84fbcc:RenderGrid.scad` — WRONG FILE (contained internal grid content)
-- Actually search for `render_box_grid_core` and `render_cartesian_walls` in old commits
-- `GridLayout.scad` — layout string parser (already in repo, check if complete)
-- `git show 858dabc:RenderGrid.scad` — might have better content
-
-**GRID_WALL_H flow:**
-```
-factory_render_box computes:
-  Flip lids → axle_z  (dividers below hinge line)
-  Others    → bh-sf-sl (full interior)
-Injects as GRID_WALL_H into data_g → core_tray_chassis → render_internal_grid reads it
-```
-
----
-
-## Next Steps
-
-1. **GRID primitive** — salvage from old commits, implement render_internal_grid
-   - Read GRID_WALL_H for wall height cap
-   - Handle spans (S token) — open cells, variable wall heights
-   - Built-in: called from core_tray_chassis
-   - Drop-in: factory_render_grid produces standalone piece
-2. **RIB** — FrankenTray vector ribs (RenderRib.scad already has code)
-3. **Expand manifest** — remaining pill box intents, S4 set, etc.
-
----
-
-## Key Architecture Rules
-
-| Rule | Where documented |
-|------|----------------|
-| Factory IS the implementation, opts drive variants | LESSONS.md §1 |
-| Built-in grid height driven by LID_TYPE | LESSONS.md §2 |
-| All circle dims are diameters | LESSONS.md §0b |
-| Support-free always | LESSONS.md §0c |
-| All edges chamfered/filleted | LESSONS.md §0b |
-| Salvage from 858dabc and d84fbcc first | LESSONS.md §0 (feedback) |
-| No hardcoded values — Advanced section | MasterBuilder.scad |
-| `$fn = $preview ? 24 : 128` | MasterEngine.scad |
-
----
-
-## Factory API
-
-```
-factory_render_*(data, opts, phys)
-  data  — ui_payload [["KEY", val], ...]  — get_val(KEY, data, fallback)
-  opts  — switches: LID_TYPE, IS_THREADED, JAR_SIDES, STACKABLE, STACK_MODE, ...
-  phys  — [["SAFE_WALL",sw],["SAFE_FLOOR",sf],["CLEARANCE",c],["NOZZLE",n]]
-
-Key injected-data patterns:
-  factory_render_box → injects GRID_WALL_H, NEEDS_GROOVE (glide) into data_g
-  S4 intents → desiccant mesh params prepended to data
-  Dual-spawn → concat([[WIDTH, w]], data) to override diameter
-```
-
----
-
-## Intents Handled in Manifest
+**Intents fully handled in manifest:**
 
 | Intent | Produces |
 |--------|---------|
@@ -123,12 +47,97 @@ Key injected-data patterns:
 | Standalone Box | BOX(Glide) + LID(Glide) |
 | Flip Box | BOX(Flip_Single) + LID(Flip_Single) |
 | Double Flip Box | BOX(Flip_Double) + 2×LID(Flip_Single) |
-| Nesting Tray | TRAY(Snap stack) |
-| Modular Peg Tray | TRAY(Peg stack) + 4×PEG |
-| Open Jar | 1 or 2 JAR |
-| Threaded Jar | 1 or 2 JAR (threaded) |
+| Nesting Tray (Short) | TRAY(Snap stack) |
+| Modular Peg Tray (Long) | TRAY(Peg stack) + 4×PEG |
+| Open Jar | 1 or 2 JAR (dual-spawn w≠l) |
+| Threaded Jar | 1 or 2 JAR threaded |
 | Jar with Lid | JAR+LID pairs |
-| S4 Jar / Spool Jar | JAR+LID (desiccant mesh locked) |
-| S4 Wedge | BOX(Glide)+LID(Glide) (desiccant mesh) |
+| Simple Jar / S4 Jar / Spool Jar | JAR+LID (S4 = desiccant mesh locked) |
+| S4 Wedge | BOX(Glide)+LID(Glide) desiccant |
 | S4 Set | S4 Jar + Spool Jar + S4 Wedge |
-| ~15 others | → fallback TRAY + warning echo |
+| Standalone Box Grid | GRID (drop-in box) |
+| Standalone Jar Grid | GRID (drop-in, circular clip, dual-spawn w≠l) |
+| ~13 others | → fallback TRAY + warning echo (pill boxes, etc.) |
+
+---
+
+## Next Steps
+
+1. **Wire remaining pill box intents** — `1-Day AM/PM Box`, `7-Day Pill Box`,
+   `14-Day AM/PM Box`, `Pillbox Set (*)` — all need manifest entries.
+   Old manifest logic: `git show d84fbcc:MasterManifest.scad` — full routing there.
+   Key: pill boxes use `DOUBLE_FLIP_BOX` or `FLIP_BOX` with `HAS_BUILTIN_GRID=true`
+   and specific `GRID_LAYOUT` strings injected inline.
+
+2. **Test all primitives in OpenSCAD** — work through each intent systematically.
+
+3. **RIB primitive** (Primitive 5) — FrankenTray vector ribs.
+   Parser: `parse_franken_config` in GridLayout.scad.
+   Renderer: `RenderRib.scad` (already has code).
+
+4. **Plaque** — `render_plaque` in old code, wired in dispatcher but not tested.
+
+---
+
+## Architecture Rules (full list in LESSONS.md)
+
+| Rule | File |
+|------|------|
+| Factory IS the implementation — opts drive variants | LESSONS.md §1 |
+| Built-in grid height driven by LID_TYPE (GRID_WALL_H) | LESSONS.md §2 |
+| All circle dims are diameters | LESSONS.md §0b |
+| Support-free always | LESSONS.md §0c |
+| Chamfer/fillet all edges | LESSONS.md §0b |
+| 0=auto for geometry overrides (chamfer, corner radius, etc.) | MasterBuilder Advanced section |
+| Salvage from 858dabc and d84fbcc before writing | LESSONS.md feedback |
+| grid_has_base defaults false (drop-in opt-in) | MasterBuilder.scad |
+
+---
+
+## Key Data Flow
+
+```
+MasterBuilder.scad (Customizer)
+  → ui_payload [["KEY", val], ...]
+  → compile_manifest(intent, data)
+      → injects overrides inline: concat([[KEY, val]], data)
+      → returns [[type, data, opts, phys], ...]
+  → build_part() loops manifest
+      → get_xy() positions on platter
+      → dispatches factory_render_*(data, opts, phys)
+
+Key injections:
+  factory_render_box  → GRID_WALL_H (lid-aware height cap)
+  factory_render_jar  → IS_JAR_GRID, HAS_THREADS, GRID_WALL_H
+  S4 intents          → DESICCANT_MESH_RECT/CYL (locked airflow mesh)
+  Dual-spawn          → concat([[WIDTH, w]], data)
+```
+
+---
+
+## Important Files
+
+| File | Purpose |
+|------|---------|
+| `MasterBuilder.scad` | Customizer UI — USE THIS, not MasterBuild2 |
+| `MasterManifest.scad` | Intent routing + data injection |
+| `MasterEngine.scad` | Physics getters, get_xy platter packing |
+| `MasterEnum.scad` | All string constants |
+| `RenderMesh.scad` | framed_mesh + cylindrical_mesh_wall |
+| `RenderTray.scad` | core_tray_chassis + factory_render_tray |
+| `RenderBox.scad` | factory_render_box (all lid types) |
+| `RenderJar.scad` | factory_render_jar |
+| `RenderLid.scad` | factory_render_lid (all lid types) |
+| `RenderGrid.scad` | factory_render_grid + render_internal_grid |
+| `RenderRib.scad` | FrankenTray ribs (Primitive 5) |
+| `GridLayout.scad` | Layout string parser (cartesian/radial/span/franken) |
+| `LESSONS.md` | Hard-won rules — read before touching anything |
+| `PRODUCT.md` | Full product feature documentation |
+| `FUTURE.md` | Deferred ideas (wall slots, drop-in flip dividers) |
+
+---
+
+## FUTURE.md Items (do not implement now)
+
+1. Wall slots for 1-row/1-col grids (structural support for parallel dividers)
+2. Drop-in dividers for flip boxes (repurposable open box)
