@@ -2,7 +2,26 @@
 
 ---
 
-## 0. All circle dimensions are diameters, always
+## 0. All generated models must print support-free
+
+**Rule:** Every primitive and composite must be printable on FDM without supports.
+
+**How we achieve it:**
+- Overhangs: `m_chamf(data)` = nozzle × 2.5 caps all chamfers at 45° max
+- Mesh holes: Teardrop pattern is self-bridging (pointed tip closes without drooping)
+- Lids: printed **face-down** (flat visible surface on bed) so the interior cavity
+  prints upward from a solid base — no bridges, no supports
+- Threads: external threads (jar body) are on vertical walls ✓; internal thread
+  (lid) is subtracted from a vertical cylinder wall ✓
+- Grids/dividers: vertical walls, no overhangs ✓
+
+**Flag immediately** if any new geometry introduces: overhangs > 45°, horizontal
+bridges > ~60mm, or any surface that requires the model to be printed upside-down
+from the orientation it ships in.
+
+---
+
+## 0b. All circle dimensions are diameters, always
 
 **Rule:** Every circular dimension in the system (jar width, hole size, peg diameter) is
 an **outer diameter** — never a radius.

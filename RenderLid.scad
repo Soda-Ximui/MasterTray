@@ -51,13 +51,15 @@ module factory_render_lid(data, opts, phys) {
             translate([0, -lid_l/2 - 2.2, sl + (clasp_depth / 2)]) cuboid([lid_w - sw*4, 1.6, clasp_depth], anchor=CENTER);
         }
     } else if (lid_type == "Screw") {
-        lip_h = 8.0; cap_h = max(0.1, lip_h + sw * 1.5); neck_od = w - sw * 2 - 0.6; 
-        difference() { 
-            union() { 
-                up(cap_h + sl / 2) framed_mesh(data, w, w, sl, true, get_mesh_cfg(data, "HOLE_LID", "STRUT_LID", true));
-                cyl(d=w, h=cap_h, chamfer2=m_chamf(data), anchor=BOTTOM); 
-            } 
-            up(-0.1) threaded_rod(d=neck_od + 0.8, l=cap_h + 1, pitch=m_thread_pitch(data), internal=false, anchor=BOTTOM, $fn=30);
+        lip_h = 8.0; cap_h = max(0.1, lip_h + sw * 1.5); neck_od = w - sw * 2 - 0.6;
+        // Face-down: flat top on bed → best surface finish, full-circle adhesion,
+        // interior thread prints on vertical walls — zero supports needed.
+        difference() {
+            union() {
+                up(sl / 2) framed_mesh(data, w, w, sl, true, get_mesh_cfg(data, HOLE_LID, STRUT_LID, true));
+                up(sl) cyl(d=w, h=cap_h, anchor=BOTTOM);
+            }
+            up(sl - 0.1) threaded_rod(d=neck_od + 0.8, l=cap_h + 1, pitch=m_thread_pitch(data), internal=false, anchor=BOTTOM, $fn=30);
         }
     } else {
         lid_w = w - sw - 0.6; lid_l = bl - sw / 2 - 0.6; 
