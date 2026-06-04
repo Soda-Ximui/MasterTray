@@ -88,7 +88,7 @@ function compile_manifest(intent, data) =
   ] :
   // --- S4 SYSTEM ---
   (intent == "S4 Jar") ?
-    let(d = concat([["WIDTH", 98], ["LENGTH", 98], ["HEIGHT", 140]], data))
+    let(d = concat([["WIDTH", 49], ["LENGTH", 49], ["HEIGHT", 140]], data))
     [
       ["JAR", d, jar_opts([["IS_THREADED", true]], d), get_physics_profile(d)],
       ["LID", d, [["LID_TYPE", "Screw"]],              get_physics_profile(d)]
