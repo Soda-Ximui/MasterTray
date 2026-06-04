@@ -64,6 +64,41 @@ the include graph.
 
 ---
 
+## 0c. Mesh hole spacing snaps to nozzle-width multiples
+
+**Rule:** `get_grid_step` produces a step (hole + strut) that is always a whole-nozzle
+multiple. Never change this to a simpler formula without understanding why.
+
+**The formula:**
+```
+step = hole + max(min_sp,
+                  max(noz,
+                      round(max(noz*2, hole*0.25) / noz) * noz))
+```
+
+**What each layer does:**
+
+| Layer | Expression | Purpose |
+|-------|-----------|---------|
+| Raw strut | `max(noz*2, hole*0.25)` | Strut is at least 2 nozzle widths wide, OR 25% of the hole diameter — whichever is larger. Large holes get proportionally thicker struts. |
+| Nozzle snap | `round(.../noz) * noz` | Rounds the raw strut to the nearest nozzle-width multiple. This is the critical step — the slicer always lays complete extrusion passes. A strut of 0.6mm with a 0.4mm nozzle forces a partial pass (0.2mm leftover), which can delaminate or look ugly. Snapping to 0.8mm (2 passes) is mechanically correct. |
+| Floor | `max(noz, ...)` | Guards against rounding down below 1 nozzle width. |
+| Override | `max(min_sp, ...)` | Caller's physics minimum (e.g. `wall_loops × nozzle`) wins if it's larger. User-set hole spacing (`HOLE_SPACING`) flows in here. |
+
+**Why hole*0.25?** For a 4mm hole, a 0.8mm strut (2 nozzle widths) is structurally too
+thin. `hole*0.25 = 1.0mm` gives a more robust strut. For small holes (≤3.2mm with a
+0.4mm nozzle), `noz*2 = 0.8mm` dominates and the minimum printable strut is used.
+
+**The result:** Every mesh tile is a printable unit. Slicer never generates micro-moves
+or partial extrusions between holes. This is the difference between a mesh that looks
+right in preview and one that actually prints cleanly.
+
+**Desiccant containers** (S4 system) lock `HOLE_SPACING=1.2mm` explicitly — this
+overrides `min_sp` so airflow geometry is consistent regardless of printer wall-loop
+settings.
+
+---
+
 ## 1. `use` vs `include` for factory modules
 
 **Rule:** Use `include` for your own factory files. Use `use` only for
