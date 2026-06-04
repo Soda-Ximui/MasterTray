@@ -61,14 +61,15 @@ module factory_render_tray(data, opts, phys) {
              " | floor cfg=", cfg_floor, " wall cfg=", cfg_wall));
 
     // --- Boss/socket shared dimensions (Peg + Builtin modes) ---
-    socket_d   = 8.0;
+    socket_d   = get_val(PEG_SOCKET_D,   data, 8.0);
+    ledge_h    = get_val(LEDGE_DEPTH,    data, 2.0);
     boss_d     = socket_d + sw * 2;
-    cx         = w/2 - sw - boss_d/2 + 0.1;  // corner X offset from centre
-    cy         = l/2 - sw - boss_d/2 + 0.1;  // corner Y offset from centre
-    ledge_h    = 2.0;                          // nesting ledge depth below floor
+    cx         = w/2 - sw - boss_d/2 + 0.1;
+    cy         = l/2 - sw - boss_d/2 + 0.1;
     sock_depth = min(12.0, max(3.0, (h + ledge_h) / 2 - 1));
-    peg_d      = socket_d - clearance * 2;    // builtin peg dia with fit clearance
-    peg_protr  = max(6.0, sock_depth * 0.75); // how far builtin peg protrudes above top
+    peg_d      = socket_d - clearance * 2;
+    peg_protr  = let(v = get_val(PEG_PROTRUSION, data, 0))
+                 v > 0 ? v : max(6.0, sock_depth * 0.75);
 
     if (!stackable) {
         // --- Plain tray ---

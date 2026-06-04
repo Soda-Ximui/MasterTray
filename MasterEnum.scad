@@ -52,8 +52,13 @@ NEEDS_GROOVE = "NEEDS_GROOVE";
 HAS_THREADS  = "HAS_THREADS";
 JAR_SHAPE    = "JAR_SHAPE";
 JAR_SIDES    = "JAR_SIDES";
-STACKABLE    = "STACKABLE";
-STACK_MODE   = "STACK_MODE";   // "Peg" | "Builtin" | "Snap"
+STACKABLE      = "STACKABLE";
+STACK_MODE     = "STACK_MODE";     // "Peg" | "Builtin" | "Snap"
+CHAMFER_SIZE   = "CHAMFER_SIZE";   // mm — 0 = auto from nozzle
+CORNER_RADIUS  = "CORNER_RADIUS";  // mm — 0 = auto from wall thickness
+PEG_SOCKET_D   = "PEG_SOCKET_D";  // mm — peg/socket hole diameter
+LEDGE_DEPTH    = "LEDGE_DEPTH";   // mm — nesting ledge height below floor
+PEG_PROTRUSION = "PEG_PROTRUSION"; // mm — builtin peg height above tray top (0=auto)
 HAS_BUILTIN_GRID = "HAS_BUILTIN_GRID";
 
 BOX = "BOX";

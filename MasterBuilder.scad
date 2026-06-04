@@ -56,6 +56,14 @@ stackable_peg_height = 80; // [20 : 10 : 200]
 Filament_Type = "PETG"; // ["PLA", "PETG", "TPU", "ABS"]
 Mechanical_Fit = "Standard"; // ["Tighter", "Tight", "Standard", "Loose", "Looser"]
 
+/* [Advanced - Geometry Overrides] */
+// 0 = auto-computed from printer settings. Non-zero = explicit override.
+corner_radius       = 0.0; // [0 : 0.1 : 10.0]
+chamfer_size        = 0.0; // [0 : 0.1 : 3.0]
+peg_socket_diameter = 8.0; // [4 : 0.5 : 16.0]
+nesting_ledge_depth = 2.0; // [1 : 0.5 : 8.0]
+peg_protrusion      = 0.0; // [0 : 0.5 : 20.0] — builtin peg height above tray, 0=auto
+
 include <MasterManifest.scad>
 
 include <RenderTray.scad>
@@ -107,7 +115,12 @@ ui_payload = [
     [THICK_PEG_MULT,     peg_thickness_multiplier], 
     [PLATTER_GAP,        platter_gap], 
     [THREAD_PITCH,       thread_pitch],
-    [JAR_SHAPE,          jar_shape]
+    [JAR_SHAPE,          jar_shape],
+    [CHAMFER_SIZE,       chamfer_size],
+    [CORNER_RADIUS,      corner_radius],
+    [PEG_SOCKET_D,       peg_socket_diameter],
+    [LEDGE_DEPTH,        nesting_ledge_depth],
+    [PEG_PROTRUSION,     peg_protrusion]
 ];
 
 // --- FACTORY DISPATCHER ---

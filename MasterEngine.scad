@@ -337,7 +337,8 @@ function m_safe_wall(data) =
 ///   - Formula: wall_thickness + (nozzle × wall_loops) / 2 - 0.5mm margin
 ///   - 0.5mm margin prevents edge cases where rounding is exactly at boundary
 function m_c_rad(data) =
-  m_safe_wall(data) + ((m_noz(data) * m_wloops(data)) / 2) - 0.5;
+  let(v = get_val(CORNER_RADIUS, data, 0))
+  v > 0 ? v : m_safe_wall(data) + ((m_noz(data) * m_wloops(data)) / 2) - 0.5;
 
 /// m_chamf(data): Master Chamfer Distance
 /// Calculates maximum safe chamfer before FDM bridging failures.
@@ -350,7 +351,8 @@ function m_c_rad(data) =
 ///   - Excessive chamfers (e.g., 3mm) cause slicer to generate bridges
 ///     that collapse during printing or cool incorrectly
 function m_chamf(data) =
-  m_noz(data) * MAX_CHAMFER_MULT;
+  let(v = get_val(CHAMFER_SIZE, data, 0))
+  v > 0 ? v : m_noz(data) * MAX_CHAMFER_MULT;
 
 /// m_wall_mod_p(data): Wall Modification Percentage
 /// Parses the WALL_MODIFY string into a 0–100 numeric multiplier.
