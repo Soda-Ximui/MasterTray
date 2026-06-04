@@ -98,15 +98,22 @@ module factory_render_box(data, opts, phys) {
                      : 1;
         skip_p     = get_val(SKIP_PILLARS, data, false);
 
+        // clip_len guard — mirrors RenderLid: suppress hinge geometry rather than
+        // crashing BOSL2 with negative-dimension cuboids/cyls on narrow boxes.
+        if (clip_len <= 0)
+            echo(str("WARNING: Flip_Single hinge suppressed — box too narrow (w=", w,
+                     " sw=", sw, " clip_len=", clip_len, "). Increase width or reduce wall_loops."));
         union() {
             difference() {
                 apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
                     core_tray_chassis(data_g);
-                // Hinge bore recess on +Y face
-                translate([0, l/2 + hinge_y, axle_z])
-                    yrot(90) cyl(d=clip_od + clearance*4, h=clip_len+2, $fn=36);
+                // Hinge bore recess on +Y face — only cut when hinge will exist
+                if (clip_len > 0)
+                    translate([0, l/2 + hinge_y, axle_z])
+                        yrot(90) cyl(d=clip_od + clearance*4, h=clip_len+2, $fn=36);
             }
-            // Hinge pillars (corner + optional divider)
+            // Hinge pillars, axle pin — suppressed if box too narrow for mechanism
+            if (clip_len > 0) {
             translate([-(w-sw*2)/2 + sw/2, l/2 - 0.5, sf])
                 cuboid([sw*3, hinge_y+1, axle_z+cc_z-sf], anchor=BOTTOM+FRONT);
             translate([ (w-sw*2)/2 - sw/2, l/2 - 0.5, sf])
@@ -118,7 +125,8 @@ module factory_render_box(data, opts, phys) {
             // Axle pin
             translate([0, l/2 + hinge_y, axle_z])
                 yrot(90) cyl(d=hinge_d, h=w - sw*2, chamfer=0.5, $fn=36);
-            // Diamond latch recess (front face, −Y)
+            } // end clip_len > 0 guard
+            // Diamond latch recess always rendered — works regardless of hinge width
             translate([0, -l/2, latch_z])
                 hull() {
                     translate([0,  0,   0.8]) cuboid([w-sw*4, 0.1, 0.1], anchor=CENTER);

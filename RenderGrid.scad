@@ -109,6 +109,9 @@ module render_internal_grid(data) {
     cols  = cfg[0][0]; rows = cfg[0][1];
     spans = cfg[2];
     rays  = cfg[1][0];
+    if (rays > 0 && !is_jar)
+        echo(str("WARNING: layout contains radial tokens but IS_JAR_GRID is false",
+                 " — radial dividers ignored for this container type."));
     up(sf) {
         if (rays > 0 && is_jar)
             _render_radial_core(int_h, int_w / 2, div_t, cfg);
@@ -201,6 +204,10 @@ module factory_render_grid(data, opts, phys) {
     // Inject IS_JAR_GRID into data so render_box_grid_core can read it
     d = is_jar ? concat([[IS_JAR_GRID, true]], data) : data;
     echo(str("-> Factory [GRID] | layout='", g_str, "' rays=", rays, " jar=", is_jar));
+    if (rays > 0 && !is_jar)
+        echo(str("WARNING: layout '", g_str, "' contains radial tokens (R/C) but this is",
+                 " not a jar grid — radial dividers ignored. Add IS_JAR_GRID flag or",
+                 " remove R/C tokens for box/tray grids."));
     up(m_safe_floor(d)) {
         if (rays > 0 && is_jar)
             render_jar_grid_core(d, false);
