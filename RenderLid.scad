@@ -101,22 +101,29 @@ module factory_render_lid(data, opts, phys) {
                 difference() {
                     union() {
                         intersection() {
-                            yrot(90) cyl(d=clip_outer_d, h=clip_len, chamfer=0.5);
+                            yrot(90) cyl(d=clip_outer_d, h=clip_len, chamfer=0.5, $fn=36);
                             cuboid([clip_len+2, clip_outer_d,
                                     clip_outer_d - flat_belly*2], anchor=CENTER);
                         }
                         translate([0, -hinge_y_off/2, -(clip_z-sl)/2 - 0.5])
                             cuboid([clip_len, hinge_y_off+1.0, (clip_z-sl)+1.0], anchor=CENTER);
                     }
-                    yrot(90) cyl(d=hinge_d + clearance*2, h=clip_len+2);
+                    yrot(90) cyl(d=hinge_d + clearance*2, h=clip_len+2, $fn=36);
                     translate([0, 0, clip_outer_d/2])
                         cuboid([clip_len+2, hinge_d*0.8, clip_outer_d], anchor=CENTER);
                 }
-            // Diamond latch on −Y face
+            // Diamond latch tab on −Y face (clicks into box latch recess)
             translate([0, -lid_l/2 - 1.1, sl/2])
                 cuboid([lid_w - sw*4, 2.2, sl], anchor=CENTER);
             translate([0, -lid_l/2 - 2.2, sl + clasp_depth/2])
                 cuboid([lid_w - sw*4, 1.6, clasp_depth], anchor=CENTER);
+            // Diamond tip — the snap click point
+            translate([0, -lid_l/2 - 1.5, sl + clasp_depth])
+                hull() {
+                    translate([0, 0,  -0.8]) cuboid([lid_w-sw*4, 0.1, 0.1], anchor=CENTER);
+                    translate([0, 0.9, 0  ]) cuboid([lid_w-sw*4, 0.1, 0.1], anchor=CENTER);
+                    translate([0, 0,   0.8]) cuboid([lid_w-sw*4, 0.1, 0.1], anchor=CENTER);
+                }
         }
 
     } else if (lid_type == "Screw") {
