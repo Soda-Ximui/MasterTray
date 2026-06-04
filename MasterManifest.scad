@@ -31,14 +31,28 @@ function jar_sides(data) =
 function jar_opts(base, data) = concat(base, [["JAR_SIDES", jar_sides(data)]]);
 
 function compile_manifest(intent, data) =
-  (intent == "Threaded Jar") ? [
-    ["JAR", data, jar_opts([["IS_THREADED", true]],  data), get_physics_profile(data)],
-    ["LID", data, [["LID_TYPE", "Screw"]],                  get_physics_profile(data)]
-  ] :
-  (intent == "Jar with Lid") ? [
-    ["JAR", data, jar_opts([["IS_THREADED", true]],  data), get_physics_profile(data)],
-    ["LID", data, [["LID_TYPE", "Screw"]],                  get_physics_profile(data)]
-  ] :
+  (intent == "Threaded Jar") ?
+    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0))
+    (w == l) ? [
+      ["JAR", data,                       jar_opts([["IS_THREADED", true]], data), get_physics_profile(data)],
+      ["LID", data,                       [["LID_TYPE", "Screw"]],                 get_physics_profile(data)]
+    ] : [
+      ["JAR", concat([["WIDTH", w]], data), jar_opts([["IS_THREADED", true]], data), get_physics_profile(data)],
+      ["JAR", concat([["WIDTH", l]], data), jar_opts([["IS_THREADED", true]], data), get_physics_profile(data)]
+    ]
+  :
+  (intent == "Jar with Lid") ?
+    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0))
+    (w == l) ? [
+      ["JAR", data,                       jar_opts([["IS_THREADED", true]], data), get_physics_profile(data)],
+      ["LID", data,                       [["LID_TYPE", "Screw"]],                 get_physics_profile(data)]
+    ] : [
+      ["JAR", concat([["WIDTH", w]], data), jar_opts([["IS_THREADED", true]], data), get_physics_profile(data)],
+      ["LID", concat([["WIDTH", w]], data), [["LID_TYPE", "Screw"]],                get_physics_profile(data)],
+      ["JAR", concat([["WIDTH", l]], data), jar_opts([["IS_THREADED", true]], data), get_physics_profile(data)],
+      ["LID", concat([["WIDTH", l]], data), [["LID_TYPE", "Screw"]],                get_physics_profile(data)]
+    ]
+  :
   (intent == "Simple Jar") ?
     let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0))
     (w == l) ?
@@ -49,9 +63,16 @@ function compile_manifest(intent, data) =
         ["JAR", concat([["WIDTH", w]], data), jar_opts([], data), get_physics_profile(data)]
       ]
   :
-  (intent == "Open Jar") ? [
-    ["JAR", data, jar_opts([["IS_THREADED", false]], data), get_physics_profile(data)]
-  ] :
+  (intent == "Open Jar") ?
+    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0))
+    (w == l) ?
+      [["JAR", data, jar_opts([["IS_THREADED", false]], data), get_physics_profile(data)]]
+    :
+      [
+        ["JAR", concat([["WIDTH", w]], data), jar_opts([["IS_THREADED", false]], data), get_physics_profile(data)],
+        ["JAR", concat([["WIDTH", l]], data), jar_opts([["IS_THREADED", false]], data), get_physics_profile(data)]
+      ]
+  :
   (intent == "Flip Box") ? [
     ["FLIP_BOX", data, [],                            get_physics_profile(data)],
     ["LID",      data, [["LID_TYPE", "Flip_Single"]], get_physics_profile(data)]
