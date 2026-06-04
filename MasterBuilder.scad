@@ -9,7 +9,7 @@ Wall_Loops = 2; // [1 : 1 : 10]
 Layer_Height = 0.28; // [0.12, 0.16, 0.20, 0.24, 0.28]
 
 /* [Build Selection] */
-Part_To_Build = "Jar with Lid"; // ["Box", "Standalone Box", "Flip Box", "1-Day AM/PM Box", "1-Day 2-Compartment (Single Lid)", "7-Day Pill Box", "14-Day AM/PM Box", "Pillbox Set (Double Lid)", "Pillbox Set (Single Lid)", "Pillbox Full Set", "Lid", "Simple Tray", "Nesting Tray (Short)", "Modular Peg Tray (Long)", "Standalone Box Grid", "Standalone Jar Grid", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", "Plaque"]
+Part_To_Build = "Jar with Lid"; // ["Box", "Standalone Box", "Flip Box", "1-Day AM/PM Box", "1-Day 2-Compartment (Single Lid)", "7-Day Pill Box", "14-Day AM/PM Box", "Pillbox Set (Double Lid)", "Pillbox Set (Single Lid)", "Pillbox Full Set", "Lid", "Simple Tray", "Nesting Tray (Short)", "Modular Peg Tray (Long)", "Standalone Box Grid", "Standalone Jar Grid", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", "Plaque", "Grid Test"]
 jar_shape = "Circle"; // ["Circle", "Quad", "Hexa", "Octa", "Dodeca"]
 
 /* [Dimensions: W x L x H] */
@@ -68,7 +68,20 @@ peg_socket_diameter = 8.0; // [4 : 0.5 : 16.0]
 nesting_ledge_depth = 2.0; // [1 : 0.5 : 8.0]
 peg_protrusion      = 0.0; // [0 : 0.5 : 20.0] — builtin peg height above tray, 0=auto
 
+/* [Advanced - Debug] */
+// Human-readable report to the console (View → Console after F5).
+debug_report = false;
+// Pipe-delimited payload for Perl + Template Toolkit report generation.
+debug_payload = false;
+
+/* [Advanced - Boolean Epsilon] */
+// How far difference() cutters extend past the face they pierce (default 0.1mm).
+// Prevents Z-fighting in F5 preview and non-manifold edges on export.
+// Raise toward 0.2–0.3 if you see flickering cut faces. See LESSONS.md §EPS.
+bool_overlap_eps = 0.1; // [0.01 : 0.01 : 0.5]
+
 include <MasterManifest.scad>
+include <MasterDebug.scad>
 
 include <RenderTray.scad>
 include <RenderPeg.scad>
@@ -77,6 +90,10 @@ include <RenderLid.scad>
 include <RenderGrid.scad>
 include <RenderBox.scad>
 include <RenderPlaque.scad>
+
+// Override MasterEngine defaults with Customizer values (must follow all includes).
+EPS  = bool_overlap_eps;
+EPS2 = EPS * 2;
 
 // --- AUTO-MATH ENGINE ---
 raw_w = (dimension_mode == "Usable") ? part_width + (wall_thickness * 2) : part_width;
@@ -156,4 +173,6 @@ module build_part(name, data) {
 }
 
 // --- FINAL EXECUTION ---
+if (debug_report)  dump_build_options(Part_To_Build,  ui_payload);
+if (debug_payload) dump_build_payload(Part_To_Build, ui_payload);
 build_part(Part_To_Build, ui_payload);

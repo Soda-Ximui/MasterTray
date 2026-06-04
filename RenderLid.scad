@@ -28,10 +28,12 @@ module factory_render_lid(data, opts, phys) {
 
     echo(str("-> Factory [LID] | type=", lid_type, " glide_dir=", glide_dir, " snap=", glide_snap));
 
-    // Ball catch shared dims (Snap + Glide Ball modes)
-    ball_d    = max(2.0, noz * 5);
+    // Ball catch shared dims (Snap + Glide Ball modes).
+    // Scales with box footprint so large lids get proportionally stronger retention.
+    // Capped at sw*2 so the ball never exceeds the groove wall depth.
+    ball_d    = glide_ball_d(w, l, sw, noz);
     ball_r    = ball_d / 2;
-    ball_protr = max(0.3, breathing_room(COMP_GLIDE, data) * 0.6);
+    ball_protr = glide_ball_protr(ball_r, breathing_room(COMP_GLIDE, data), noz);
 
     if (lid_type == "Snap") {
         // Press-fit inside the box walls.
@@ -96,22 +98,24 @@ module factory_render_lid(data, opts, phys) {
             apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data))
                 up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false,
                                         get_mesh_cfg(data, HOLE_LID, STRUT_LID, true));
-            // C-clip hinge on +Y face
-            translate([0, lid_l/2 + hinge_y_off, clip_z])
-                difference() {
-                    union() {
-                        intersection() {
-                            yrot(90) cyl(d=clip_outer_d, h=clip_len, chamfer=0.5, $fn=36);
-                            cuboid([clip_len+2, clip_outer_d,
-                                    clip_outer_d - flat_belly*2], anchor=CENTER);
+            // C-clip hinge on +Y face — suppressed if lid is too narrow for mechanism
+            if (clip_len > 0) {
+                translate([0, lid_l/2 + hinge_y_off, clip_z])
+                    difference() {
+                        union() {
+                            intersection() {
+                                yrot(90) cyl(d=clip_outer_d, h=clip_len, chamfer=0.5, $fn=36);
+                                cuboid([clip_len+2, clip_outer_d,
+                                        clip_outer_d - flat_belly*2], anchor=CENTER);
+                            }
+                            translate([0, -hinge_y_off/2, -(clip_z-sl)/2 - 0.5])
+                                cuboid([clip_len, hinge_y_off+1.0, (clip_z-sl)+1.0], anchor=CENTER);
                         }
-                        translate([0, -hinge_y_off/2, -(clip_z-sl)/2 - 0.5])
-                            cuboid([clip_len, hinge_y_off+1.0, (clip_z-sl)+1.0], anchor=CENTER);
+                        yrot(90) cyl(d=hinge_d + clearance*2, h=clip_len+2, $fn=36);
+                        translate([0, 0, clip_outer_d/2])
+                            cuboid([clip_len+2, hinge_d*0.8, clip_outer_d], anchor=CENTER);
                     }
-                    yrot(90) cyl(d=hinge_d + clearance*2, h=clip_len+2, $fn=36);
-                    translate([0, 0, clip_outer_d/2])
-                        cuboid([clip_len+2, hinge_d*0.8, clip_outer_d], anchor=CENTER);
-                }
+            }
             // Diamond latch tab on −Y face (clicks into box latch recess)
             translate([0, -lid_l/2 - 1.1, sl/2])
                 cuboid([lid_w - sw*4, 2.2, sl], anchor=CENTER);

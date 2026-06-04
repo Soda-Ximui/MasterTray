@@ -81,13 +81,18 @@ function get_grid_config(data) =
         sl = m_safe_lid(data),
         
         is_closed = (type == BOX || type == FLIP_BOX || type == JAR_LID || type == DOUBLE_FLIP_BOX || type == DESICCANT_BOX),
-        
+
         max_internal_h = bh - sf - (is_closed ? sl : 0),
-        default_h = max_internal_h,
-        
+        // GRID_WALL_H injected by factories (e.g. factory_render_jar for neck clearance,
+        // factory_render_box for flip-lid axle clearance). When present it is the true
+        // ceiling — use it as both the default height and the clamp for spans.
+        grid_wall_h_cap = get_val(GRID_WALL_H, data, 0),
+        effective_max_h = (grid_wall_h_cap > 0) ? grid_wall_h_cap : max_internal_h,
+        default_h = effective_max_h,
+
         cart_dims = parse_cartesian(g_str),
         rad_dims = parse_radial(g_str),
-        spans = parse_spans(g_str, default_h, max_internal_h, is_closed)
+        spans = parse_spans(g_str, default_h, effective_max_h, is_closed || grid_wall_h_cap > 0)
     )
     [cart_dims, rad_dims, spans, has_base, base_t, default_h];
 

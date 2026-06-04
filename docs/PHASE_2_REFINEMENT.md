@@ -9,16 +9,19 @@
 ## What's New in Phase 2
 
 ### MasterSafety.scad [NEW]
+
 - **Purpose:** Consolidate FDM-specific safety constraints with detailed engineering rationale
 - **Layer:** 1.1 (replaces inline logic from v4.0 MasterChecks)
 - **Functions:** `m_safe_floor()`, `m_safe_lid()`, `m_safe_wall()`, `m_c_rad()`, `m_chamf()`, `m_wall_mod_p()`
 
 **Why separate from MasterChecks?**
+
 - Prepares for future split: Printer Profiles (layer heights, nozzle diameters) → separate module
-- Improves readability: Each function now has 5-10 line explanation of *why* it exists
+- Improves readability: Each function now has 5-10 line explanation of _why_ it exists
 - Enables testing: Safety constraints can be validated independently
 
 **Example Comment:**
+
 ```scad
 // === Z-AXIS SAFETY: Layer Height Alignment ===
 // Floors and lids must be strict multiples of the slicer's layer height to prevent micro-stepping.
@@ -29,6 +32,7 @@
 ```
 
 ### MasterChecks.scad [UPDATED]
+
 - **Version:** v4.0 → v4.1
 - **Status:** Deprecated (now a compatibility wrapper)
 - **Purpose:** Maintains backwards compatibility via delegation to MasterSafety
@@ -36,6 +40,7 @@
 Existing code that includes MasterChecks continues to work without modification.
 
 ### TEST_VALIDATION_SUITE.scad [NEW]
+
 - Comprehensive validation of all 18 part types
 - Checks for syntax/runtime errors
 - Confirms spec tag version = "v4.10"
@@ -65,19 +70,19 @@ Layer 0.5: MasterConstants [NEW]
 Layer 0: MasterEnum [v4.5]
 ```
 
-**Key Insight:** Layer 1.1 now explicitly separates *safety constraints* (MasterSafety) from future *printer profiles* module.
+**Key Insight:** Layer 1.1 now explicitly separates _safety constraints_ (MasterSafety) from future _printer profiles_ module.
 
 ---
 
 ## Benefits of Phase 2 Split
 
-| Aspect | Improvement |
-|--------|-------------|
-| **Readability** | Safety functions now have 100+ lines of engineering context |
-| **Maintainability** | Future changes to FDM limits only affect one module |
-| **Testability** | Safety functions can be unit-tested independently |
-| **Extensibility** | Printer profiles can now live in separate module without touching safety logic |
-| **Documentation** | Every safety constraint has "why" explanation (not just "what") |
+| Aspect              | Improvement                                                                    |
+| ------------------- | ------------------------------------------------------------------------------ |
+| **Readability**     | Safety functions now have 100+ lines of engineering context                    |
+| **Maintainability** | Future changes to FDM limits only affect one module                            |
+| **Testability**     | Safety functions can be unit-tested independently                              |
+| **Extensibility**   | Printer profiles can now live in separate module without touching safety logic |
+| **Documentation**   | Every safety constraint has "why" explanation (not just "what")                |
 
 ---
 
@@ -102,8 +107,9 @@ PRINTER_CREALITY_CR10 = [
 ```
 
 Then MasterSafety becomes:
+
 ```scad
-function m_safe_wall(data, printer_profile) = 
+function m_safe_wall(data, printer_profile) =
     let(noz = get_printer_nozzle(printer_profile), loops = ...)
     max(noz * loops, ...);
 ```
@@ -115,6 +121,7 @@ This design keeps safety logic independent of printer choice.
 ## Backwards Compatibility Check
 
 ✅ **All existing code continues to work**
+
 - MasterChecks v4.1 delegates to MasterSafety
 - Function signatures unchanged
 - No breaking API changes
@@ -177,18 +184,22 @@ No functional changes. Render output identical to v4.9.
 ## Summary: Phase 1 + Phase 2
 
 ### Phase 1 (Code Clarity)
+
 - Extracted magic numbers → MasterConstants
 - Built testable grid parser → MasterGridParser
 - Added validation pipeline → MasterValidation
 - Modularized mesh patterns → MasterMeshPatterns
 
 ### Phase 2 (Architectural Refinement)
+
 - Consolidated FDM safety with rationale → MasterSafety
 - Created compatibility wrapper → MasterChecks v4.1
 - Added validation test suite → TEST_VALIDATION_SUITE
 
 ### Result
+
 **A parametric design system that is:**
+
 - ✅ Production-grade and FDM-optimized
 - ✅ Well-documented with engineering rationale
 - ✅ Modular and independently testable

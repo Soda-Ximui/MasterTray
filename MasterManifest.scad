@@ -45,6 +45,14 @@ function jar_sides(data) =
 
 function jar_opts(base, data) = concat(base, [["JAR_SIDES", jar_sides(data)]]);
 
+// Shared hinge geometry for all double-flip / pill-box intents.
+function flip_hinge_y(data) =
+  let(clearance = breathing_room(COMP_CCLIP, data),
+      spine_gap  = breathing_room(COMP_SPINE, data))
+  (4.0 + clearance*2 + get_val(NOZZLE_DIAMETER, data, 0.4)*8) / 2 + spine_gap;
+
+function flip_lid_l(data) = get_val(LENGTH, data, LENGTH0) - flip_hinge_y(data);
+
 function compile_manifest(intent, data) =
   (intent == "Threaded Jar") ?
     let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0))
@@ -88,31 +96,93 @@ function compile_manifest(intent, data) =
         ["JAR", concat([["WIDTH", l]], data), jar_opts([["IS_THREADED", false]], data), get_physics_profile(data)]
       ]
   :
-  (intent == "Flip Box") ? [
-    ["BOX", data, [["LID_TYPE", "Flip_Single"]], get_physics_profile(data)],
-    ["LID", data, [["LID_TYPE", "Flip_Single"]], get_physics_profile(data)]
-  ] :
-  (intent == "Double Flip Box") ?
-    let(phys = get_physics_profile(data),
-        w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0),
-        clearance = breathing_room(COMP_CCLIP, data),
-        spine_gap = breathing_room(COMP_SPINE, data),
-        hinge_y = (4.0 + clearance*2 + get_val(NOZZLE_DIAMETER, data, 0.4)*8) / 2 + spine_gap,
-        lid_l = l - hinge_y)
+  (intent == "Flip Box") ?
+    let(phys = get_physics_profile(data))
     [
-      ["BOX", data,                          [["LID_TYPE", "Flip_Double"]],   phys],
-      ["LID", concat([["LENGTH", lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys],
-      ["LID", concat([["LENGTH", lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys]
+      ["BOX", data, [["LID_TYPE", "Flip_Single"]], phys],
+      ["LID", data, [["LID_TYPE", "Flip_Single"]], phys]
     ]
   :
-  (intent == "Box") ? [
-    ["BOX", data, [["LID_TYPE", "Snap"]],             get_physics_profile(data)],
-    ["LID", data, [["LID_TYPE", "Snap"]],             get_physics_profile(data)]
-  ] :
-  (intent == "Standalone Box") ? [
-    ["BOX", data, [["LID_TYPE", "Glide"]],            get_physics_profile(data)],
-    ["LID", data, [["LID_TYPE", "Glide"]],            get_physics_profile(data)]
-  ] :
+  (intent == "Double Flip Box") ?
+    let(phys  = get_physics_profile(data),
+        lid_l = flip_lid_l(data))
+    [
+      ["BOX", data,                              [["LID_TYPE", "Flip_Double"]],   phys],
+      ["LID", concat([[LENGTH, lid_l]], data),   [["LID_TYPE", "Flip_Single"]], phys],
+      ["LID", concat([[LENGTH, lid_l]], data),   [["LID_TYPE", "Flip_Single"]], phys]
+    ]
+  :
+  // --- PILL BOX INTENTS ---
+  (intent == "1-Day AM/PM Box") ?
+    let(phys  = get_physics_profile(data),
+        w     = get_val(WIDTH, data, WIDTH0),
+        lid_l = flip_lid_l(data),
+        box_d = concat([[GRID_LAYOUT, "1x2"], [HAS_BUILTIN_GRID, true]], data))
+    [
+      ["BOX", box_d,                                                           [["LID_TYPE", "Flip_Double"]],   phys],
+      ["LID", concat([[LENGTH, lid_l], [WIDTH, w - 0.6], [PLAQUE_TEXT, "AM"]], data), [["LID_TYPE", "Flip_Single"]], phys],
+      ["LID", concat([[LENGTH, lid_l], [WIDTH, w - 0.6], [PLAQUE_TEXT, "PM"]], data), [["LID_TYPE", "Flip_Single"]], phys]
+    ]
+  :
+  (intent == "1-Day 2-Compartment (Single Lid)") ?
+    let(phys = get_physics_profile(data),
+        w = get_val(WIDTH, data, WIDTH0),
+        box_d = concat([[GRID_LAYOUT, "2x1"], [HAS_BUILTIN_GRID, true], [SKIP_PILLARS, true]], data))
+    [
+      ["BOX", box_d,                                                     [["LID_TYPE", "Flip_Single"]], phys],
+      ["LID", concat([[WIDTH, w - 0.6], [PLAQUE_TEXT, "AM / PM"]], data), [["LID_TYPE", "Flip_Single"]], phys]
+    ]
+  :
+  (intent == "7-Day Pill Box") ?
+    let(phys = get_physics_profile(data),
+        w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0),
+        cw = w / 7,
+        days = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
+        box_d = concat([[GRID_LAYOUT, "7x1"], [HAS_BUILTIN_GRID, true]], data))
+    concat(
+      [["BOX", box_d, [["LID_TYPE", "Flip_Single"]], phys]],
+      [for (i = [0:6])
+        ["LID", concat([[WIDTH, cw - 0.6], [PLAQUE_TEXT, days[i]]], data), [["LID_TYPE", "Flip_Single"]], phys]]
+    )
+  :
+  (intent == "14-Day AM/PM Box") ?
+    let(phys  = get_physics_profile(data),
+        w     = get_val(WIDTH, data, WIDTH0),
+        lid_l = flip_lid_l(data),
+        cw    = w / 7,
+        days = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
+        box_d = concat([[GRID_LAYOUT, "7x2"], [HAS_BUILTIN_GRID, true]], data))
+    concat(
+      [["BOX", box_d, [["LID_TYPE", "Flip_Double"]], phys]],
+      [for (i = [0:6])
+        ["LID", concat([[WIDTH, cw - 0.6], [LENGTH, lid_l], [PLAQUE_TEXT, str(days[i], " AM")]], data), [["LID_TYPE", "Flip_Single"]], phys]],
+      [for (i = [0:6])
+        ["LID", concat([[WIDTH, cw - 0.6], [LENGTH, lid_l], [PLAQUE_TEXT, str(days[i], " PM")]], data), [["LID_TYPE", "Flip_Single"]], phys]]
+    )
+  :
+  (intent == "Pillbox Set (Double Lid)") ?
+    concat(compile_manifest("14-Day AM/PM Box", data), compile_manifest("1-Day AM/PM Box", data))
+  :
+  (intent == "Pillbox Set (Single Lid)") ?
+    concat(compile_manifest("7-Day Pill Box", data), compile_manifest("1-Day AM/PM Box", data))
+  :
+  (intent == "Pillbox Full Set") ?
+    concat(compile_manifest("14-Day AM/PM Box", data), compile_manifest("7-Day Pill Box", data), compile_manifest("1-Day AM/PM Box", data))
+  :
+  (intent == "Box") ?
+    let(phys = get_physics_profile(data))
+    [
+      ["BOX", data, [["LID_TYPE", "Snap"]],  phys],
+      ["LID", data, [["LID_TYPE", "Snap"]],  phys]
+    ]
+  :
+  (intent == "Standalone Box") ?
+    let(phys = get_physics_profile(data))
+    [
+      ["BOX", data, [["LID_TYPE", "Glide"]], phys],
+      ["LID", data, [["LID_TYPE", "Glide"]], phys]
+    ]
+  :
   (intent == "Simple Tray") ? [
     ["TRAY", data, [],                                get_physics_profile(data)]
   ] :
@@ -120,14 +190,16 @@ function compile_manifest(intent, data) =
     ["GRID", data, [],                                get_physics_profile(data)]
   ] :
   (intent == "Standalone Jar Grid") ?
-    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0),
-        jar_opts = [[IS_JAR_GRID, true]])
+    let(phys = get_physics_profile(data),
+        w    = get_val(WIDTH, data, WIDTH0),
+        l    = get_val(LENGTH, data, LENGTH0),
+        jo   = [[IS_JAR_GRID, true]])
     (w == l) ?
-      [["GRID", data,                        jar_opts, get_physics_profile(data)]]
+      [["GRID", data,                         jo, phys]]
     :
       [
-        ["GRID", concat([["WIDTH", w]], data), jar_opts, get_physics_profile(data)],
-        ["GRID", concat([["WIDTH", l]], data), jar_opts, get_physics_profile(data)]
+        ["GRID", concat([[WIDTH, w]], data),   jo, phys],
+        ["GRID", concat([[WIDTH, l]], data),   jo, phys]
       ]
   :
   (intent == "Nesting Tray (Short)") ? [
@@ -137,6 +209,123 @@ function compile_manifest(intent, data) =
     concat(
       [["TRAY", data, [[STACKABLE, true], [STACK_MODE, "Peg"]], get_physics_profile(data)]],
       [for (i = [0:3]) ["PEG", data, [], get_physics_profile(data)]]
+    )
+  :
+  // --- GRID TEST INTENTS ---
+  // Not exposed in the Customizer individually — exercised via "Grid Test".
+  // Uses the user's GRID_LAYOUT string from the Customizer unchanged.
+  //
+  // Drop-in variants: containers get HAS_BUILTIN_GRID=false (overrides Customizer
+  // default "Built-in") so the container is empty and the grid is a separate object.
+  // Built-in variants: HAS_BUILTIN_GRID=true prepended so it wins over Customizer.
+  // Jar variants dual-spawn when W≠L, matching real "Jar with Lid" behaviour.
+  (intent == "Tray with Grid Test") ?
+    let(phys  = get_physics_profile(data),
+        empty = concat([[HAS_BUILTIN_GRID, false]], data))
+    [
+      ["TRAY", empty, [],  phys],
+      ["GRID", data,  [],  phys]
+    ]
+  :
+  (intent == "Tray with Built-In Grid Test") ?
+    let(phys = get_physics_profile(data),
+        d    = concat([[HAS_BUILTIN_GRID, true]], data))
+    [["TRAY", d, [], phys]]
+  :
+  (intent == "Box with Grid Test") ?
+    let(phys  = get_physics_profile(data),
+        empty = concat([[HAS_BUILTIN_GRID, false]], data))
+    [
+      ["TRAY", empty, [],                     phys],
+      ["LID",  data,  [["LID_TYPE", "Snap"]], phys],
+      ["GRID", data,  [],                     phys]
+    ]
+  :
+  (intent == "Box with Built-in Grid Test") ?
+    let(phys = get_physics_profile(data),
+        d    = concat([[HAS_BUILTIN_GRID, true]], data))
+    [
+      ["TRAY", d,    [],                     phys],
+      ["LID",  data, [["LID_TYPE", "Snap"]], phys]
+    ]
+  :
+  (intent == "Jar with Grid Test") ?
+    let(phys  = get_physics_profile(data),
+        w     = get_val(WIDTH, data, WIDTH0),
+        l     = get_val(LENGTH, data, LENGTH0),
+        no_bi = [[HAS_BUILTIN_GRID, false]],
+        jo    = [[IS_JAR_GRID, true]])
+    (w == l) ? [
+      ["JAR",  concat(no_bi, data),               jar_opts([], data), phys],
+      ["GRID", data,                               jo,                 phys]
+    ] : [
+      ["JAR",  concat(no_bi, [[WIDTH, w]], data),  jar_opts([], data), phys],
+      ["GRID", concat([[WIDTH, w]], data),          jo,                 phys],
+      ["JAR",  concat(no_bi, [[WIDTH, l]], data),  jar_opts([], data), phys],
+      ["GRID", concat([[WIDTH, l]], data),          jo,                 phys]
+    ]
+  :
+  (intent == "Jar with Built-In Grid Test") ?
+    let(phys = get_physics_profile(data),
+        w    = get_val(WIDTH, data, WIDTH0),
+        l    = get_val(LENGTH, data, LENGTH0),
+        d    = concat([[HAS_BUILTIN_GRID, true]], data))
+    (w == l) ?
+      [["JAR", d, jar_opts([], d), phys]]
+    :
+      [
+        ["JAR", concat([[WIDTH, w]], d), jar_opts([], d), phys],
+        ["JAR", concat([[WIDTH, l]], d), jar_opts([], d), phys]
+      ]
+  :
+  (intent == "Jar with Lid and Grid Test") ?
+    let(phys  = get_physics_profile(data),
+        w     = get_val(WIDTH, data, WIDTH0),
+        l     = get_val(LENGTH, data, LENGTH0),
+        no_bi = [[HAS_BUILTIN_GRID, false]],
+        jo    = [[IS_JAR_GRID, true]],
+        thr   = [["IS_THREADED", true]],
+        screw = [["LID_TYPE", "Screw"]])
+    (w == l) ? [
+      ["JAR",  concat(no_bi, data),               jar_opts(thr, data), phys],
+      ["LID",  data,                               screw,               phys],
+      ["GRID", data,                               jo,                  phys]
+    ] : [
+      ["JAR",  concat(no_bi, [[WIDTH, w]], data),  jar_opts(thr, data), phys],
+      ["LID",  concat([[WIDTH, w]], data),          screw,               phys],
+      ["GRID", concat([[WIDTH, w]], data),          jo,                  phys],
+      ["JAR",  concat(no_bi, [[WIDTH, l]], data),  jar_opts(thr, data), phys],
+      ["LID",  concat([[WIDTH, l]], data),          screw,               phys],
+      ["GRID", concat([[WIDTH, l]], data),          jo,                  phys]
+    ]
+  :
+  (intent == "Jar with Lid and Built-In Grid Test") ?
+    let(phys  = get_physics_profile(data),
+        w     = get_val(WIDTH, data, WIDTH0),
+        l     = get_val(LENGTH, data, LENGTH0),
+        d     = concat([[HAS_BUILTIN_GRID, true]], data),
+        thr   = [["IS_THREADED", true]],
+        screw = [["LID_TYPE", "Screw"]])
+    (w == l) ? [
+      ["JAR",  d,    jar_opts(thr, d), phys],
+      ["LID",  data, screw,            phys]
+    ] : [
+      ["JAR",  concat([[WIDTH, w]], d), jar_opts(thr, d), phys],
+      ["LID",  concat([[WIDTH, w]], data), screw,          phys],
+      ["JAR",  concat([[WIDTH, l]], d), jar_opts(thr, d), phys],
+      ["LID",  concat([[WIDTH, l]], data), screw,          phys]
+    ]
+  :
+  (intent == "Grid Test") ?
+    concat(
+      compile_manifest("Tray with Grid Test",               data),
+      compile_manifest("Tray with Built-In Grid Test",      data),
+      compile_manifest("Box with Grid Test",                data),
+      compile_manifest("Box with Built-in Grid Test",       data),
+      compile_manifest("Jar with Grid Test",                data),
+      compile_manifest("Jar with Built-In Grid Test",       data),
+      compile_manifest("Jar with Lid and Grid Test",        data),
+      compile_manifest("Jar with Lid and Built-In Grid Test", data)
     )
   :
   // --- S4 SYSTEM ---

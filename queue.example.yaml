@@ -1,0 +1,92 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# MasterTray Build Queue
+# Run with:  perl mastertray_build.pl queue.yaml
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ── Tool configuration ────────────────────────────────────────────────────────
+tools:
+  # Path to OpenSCAD binary. "openscad" if it's in PATH.
+  openscad: "C:/Program Files/OpenSCAD/openscad.exe"
+  # Path to MasterBuilder.scad (relative to this file, or absolute)
+  scad_file: MasterBuilder.scad
+  # Template directory (leave blank to use built-in templates)
+  template_dir: templates
+
+# ── Output ────────────────────────────────────────────────────────────────────
+output:
+  dir: STL
+  format: 3mf            # stl | 3mf
+  generate_report: true  # create {name} - Report.md
+  generate_slicer: true  # create {name} - Slicer.md
+  save_payload: false    # keep {name}.psv (raw debug payload)
+
+# ── Global defaults ───────────────────────────────────────────────────────────
+# Any field set here is used for every build unless the build overrides it.
+defaults:
+  material:           PETG
+  fit_profile:        Standard   # Tighter | Tight | Standard | Loose | Looser
+  nozzle:             0.4
+  layer_height:       0.28
+  wall_loops:         2
+  dimension_mode:     Total      # Total | Usable
+  jar_shape:          Circle     # Circle | Quad | Hexa | Octa | Dodeca
+  mesh_pattern:       Teardrop   # Honeycomb | Teardrop | Slotted | Circle | Square | Diamond | None
+  mesh_hole_size:     0.0        # 0 = auto; >0 overrides all three surfaces
+  strut_wall:         100        # % mesh density on walls
+  strut_floor:        100
+  strut_lid:          100
+  wall_thickness:     2.4
+  floor_thickness:    2.0
+  lid_thickness:      2.0
+  divider_thickness:  1.2
+  grid_type:          None       # Built-in | Drop-in | None
+  grid_layout:        ""
+  grid_has_base:      false
+
+# ── Builds ────────────────────────────────────────────────────────────────────
+builds:
+
+  - intent:            "Jar with Lid"
+    width:             40
+    length:            120
+    height:            50
+    material:          PETG
+    nozzle:            0.6
+    layer_height:      0.28
+    mesh_pattern:      Teardrop
+    mesh_hole_size:    1.8
+    divider_thickness: 1.6
+    strut_wall:        20
+    strut_floor:       25
+    strut_lid:         10
+
+  - intent:            "7-Day Pill Box"
+    width:             140
+    length:            35
+    height:            25
+    fit_profile:       Tight
+    mesh_hole_size:    1.4
+    strut_wall:        30
+    strut_floor:       30
+    strut_lid:         20
+
+  - intent:            "14-Day AM/PM Box"
+    width:             140
+    length:            35
+    height:            25
+    fit_profile:       Tight
+    mesh_hole_size:    1.4
+    strut_wall:        30
+    strut_floor:       30
+    strut_lid:         20
+
+  - intent:            "Standalone Box"
+    width:             80
+    length:            50
+    height:            30
+    mesh_hole_size:    1.6
+    strut_wall:        25
+    strut_floor:       25
+    strut_lid:         15
+    grid_type:         Built-in
+    grid_layout:       "4x3"

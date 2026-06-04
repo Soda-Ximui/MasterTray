@@ -41,24 +41,42 @@ module render_cartesian_walls(cols, rows, spans, int_w, int_l, default_h, div_t)
         for (i = [1 : rows-1])
             translate([0, int_l/2 - i*(cl + div_t) + div_t/2, default_h/2])
                 cuboid([int_w, div_t, default_h], anchor=CENTER);
-    // Spans: merged cell regions rendered as a solid block at span height
+    // Spans: taller border walls around merged cell area.
+    // Format from parse_single_span: [row_start, col_start, row_span, col_span, h, ...]
+    // X axis = column direction (width), Y axis = row direction (length).
+    // h clamped to default_h — factory may inject a tighter GRID_WALL_H after parse_spans.
     for (s = spans) {
-        sc = s[0]; sr = s[1]; span_c = s[2]; span_r = s[3]; h = s[4];
-        s_w = cw * span_c + div_t * (span_c - 1);
-        s_l = cl * span_r + div_t * (span_r - 1);
-        pos_x = -int_w/2 + (sc - 1) * (cw + div_t) + s_w/2;
-        pos_y =  int_l/2 - (sr - 1) * (cl + div_t) - s_l/2;
-        translate([pos_x, pos_y, h/2])
-            cuboid([s_w, s_l, h], anchor=CENTER);
+        start_row = s[0]; start_col = s[1]; row_span = s[2]; col_span = s[3];
+        h = span_h_clamped(s[4], default_h);
+        s_w = cw * col_span + div_t * (col_span - 1);   // X extent = col_span cells
+        s_l = cl * row_span + div_t * (row_span - 1);   // Y extent = row_span cells
+        pos_x = -int_w/2 + (start_col - 1) * (cw + div_t) + s_w/2;
+        pos_y =  int_l/2 - (start_row - 1) * (cl + div_t) - s_l/2;
+        inner_w = s_w - div_t * 2;
+        inner_l = s_l - div_t * 2;
+        // Outer box extended by EPS on all sides to overlap adjacent regular dividers.
+        // Without this, the span outer faces are exactly flush with neighbouring divider
+        // faces → coincident geometry → Z-fighting (green preview artefact).
+        translate([pos_x, pos_y, 0])
+            if (inner_w > 0 && inner_l > 0)
+                difference() {
+                    cuboid([s_w + EPS2, s_l + EPS2, h], anchor=BOTTOM);
+                    up(-EPS) cuboid([inner_w, inner_l, h + EPS2], anchor=BOTTOM);
+                }
+            else
+                cuboid([s_w + EPS2, s_l + EPS2, h], anchor=BOTTOM);
     }
 }
 
 // _render_radial_core — shared radial spoke geometry for jar grids.
 module _render_radial_core(int_h, radius, div_t, cfg) {
-    rays  = cfg[1][0];
-    c_dia = cfg[1][1];
-    inner = c_dia - div_t * 2;
-    c_eff = (inner >= 1.5) ? c_dia : max(4.0, c_dia);
+    rays    = cfg[1][0];
+    c_raw   = cfg[1][1];
+    is_perc = cfg[1][2];
+    // Convert C percentage to actual diameter; absolute values used as-is.
+    c_dia   = is_perc ? radius * 2 * (c_raw / 100) : c_raw;
+    inner   = c_dia - div_t * 2;
+    c_eff   = (inner >= 1.5) ? c_dia : max(4.0, c_dia);
     if (inner >= 1.5)
         difference() {
             cyl(d=c_eff, h=int_h, anchor=BOTTOM);
@@ -69,15 +87,15 @@ module _render_radial_core(int_h, radius, div_t, cfg) {
     if (rays > 0)
         for (i = [0 : rays-1])
             zrot(i * 360/rays)
-                translate([c_eff/2 - 0.1, -div_t/2, 0])
-                    cuboid([radius - c_eff/2 + 0.1, div_t, int_h], anchor=BOTTOM+LEFT);
+                translate([c_eff/2 - EPS, -div_t/2, 0])
+                    cuboid([radius - c_eff/2 + EPS, div_t, int_h], anchor=BOTTOM+LEFT);
 }
 
 // render_internal_grid — called from core_tray_chassis (box) or factory_render_jar.
 // GRID_WALL_H was injected upstream — caps divider height for lid closure.
 // IS_JAR_GRID in data → clips cartesian walls to circular boundary.
 module render_internal_grid(data) {
-    if (!get_val(HAS_BUILTIN_GRID, data, false)) return;
+    if (get_val(HAS_BUILTIN_GRID, data, false)) {
     sf    = m_safe_floor(data);
     sw    = m_safe_wall(data);
     bh    = m_bh(data);
@@ -92,7 +110,7 @@ module render_internal_grid(data) {
     spans = cfg[2];
     rays  = cfg[1][0];
     up(sf) {
-        if (rays > 0)
+        if (rays > 0 && is_jar)
             _render_radial_core(int_h, int_w / 2, div_t, cfg);
         else if (is_jar) {
             // Rectangular grid clipped to jar cylinder
@@ -104,6 +122,7 @@ module render_internal_grid(data) {
             render_cartesian_walls(cols, rows, spans, int_w, int_l, int_h, div_t);
         render_franken_ribs(data);
     }
+    } // end HAS_BUILTIN_GRID guard
 }
 
 // render_box_grid_core — cartesian grid body, box or clipped-to-jar.
@@ -183,7 +202,7 @@ module factory_render_grid(data, opts, phys) {
     d = is_jar ? concat([[IS_JAR_GRID, true]], data) : data;
     echo(str("-> Factory [GRID] | layout='", g_str, "' rays=", rays, " jar=", is_jar));
     up(m_safe_floor(d)) {
-        if (rays > 0)
+        if (rays > 0 && is_jar)
             render_jar_grid_core(d, false);
         else
             render_box_grid_core(d, false);

@@ -57,6 +57,12 @@ LID_MIN_SOLID0 = 10;            // Default min solid lid area (%)
 TOL_SNAP_GAP0 = 0.1;            // Default snap clearance (mm)
 TOL_CLIP0 = 0.1;                // Default clip tolerance (mm)
 
+// Boolean operation epsilon — prevents Z-fighting and non-manifold edges in preview.
+// Extend one face of a difference() cutter by EPS so it clearly pierces the target.
+// Use EPS2 when both ends of a cutter need to extend (top + bottom).
+EPS  = 0.1;
+EPS2 = EPS * 2;
+
 PLATTER_GAP0 = 15;              // Default part spacing on bed (mm)
 THREAD_PITCH0 = 2.0;            // Default thread pitch (mm)
 MAX_BUILD_PLATE_WIDTH0 = 250;   // Default print bed width (mm)
@@ -398,6 +404,35 @@ function get_xy(manifest, target_idx, curr_idx=0, edge_x=0, edge_y=0, row_max_y=
   (curr_idx == target_idx)
     ? [cx, cy]
     : get_xy(manifest, target_idx, curr_idx + 1, next_x, ey, next_y);
+
+// ==============================================================================
+// TIER 6b: GEOMETRY CONSTRAINTS
+// Named functions for all derived geometry limits. Centralised here so that
+// render modules and MasterDebug use the same formula, and the formula is
+// findable by name rather than buried inline.
+// ==============================================================================
+
+/// Glide lid — ball catch diameter scaled with box footprint.
+/// Larger boxes need larger balls for proportional retention strength.
+/// Capped at sw×2 so the ball never exceeds the groove wall depth.
+function glide_ball_d(w, l, sw, noz) =
+    min(sw * 2, max(noz * 5, max(w, l) * 0.03));
+
+/// Glide lid — how deeply the ball center is recessed into the lid face.
+/// Positions ball center at noz/2 past the groove wall — gentle cam entry
+/// that allows insertion while providing positive snap retention.
+function glide_ball_protr(ball_r, glide_tol, noz) =
+    ball_r - (glide_tol + noz) / 2;
+
+/// Flip lid — Z height of the diamond latch recess on the box front face.
+/// Derived from axle height and lid latch geometry so tip aligns when closed.
+/// When closed: lid face at h − sl − 2·cc_z; latch tip at +clasp_depth above that.
+function flip_latch_z(h, cc_z, clasp_depth) =
+    h - 2 * cc_z + clasp_depth;
+
+/// Grid span — clamp span wall height to the container's permitted maximum.
+/// Prevents spans from exceeding flip-lid axle clearance or jar neck clearance.
+function span_h_clamped(req_h, max_h) = min(req_h, max_h);
 
 // ==============================================================================
 // TIER 7: GEOMETRY UTILITIES

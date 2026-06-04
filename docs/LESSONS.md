@@ -413,3 +413,163 @@ fell through — no mesh holes were ever cut, no warning issued.
 
 **Fix:** Use the enum constants in all dispatchers. Never use raw strings
 in comparisons.
+
+---
+
+## 9. Boolean Epsilon (`EPS` / `EPS2`) — what it is and when to change it
+
+### What the problem is
+
+When a `difference()` cutter's face sits exactly flush with the face it is supposed to
+pierce, OpenSCAD cannot determine which side of the boundary each floating-point point
+belongs to. The result is:
+
+- **F5 preview** — the face flickers or shimmers (Z-fighting). The renderer oscillates
+  between "inside" and "outside" on each redraw.
+- **F6 render / STL export** — the coincident face may produce a non-manifold edge.
+  Some slicers (Bambu Studio, PrusaSlicer) will warn "model has holes" or silently
+  mis-slice the affected region.
+
+### The fix
+
+Extend every cutter slightly past the face it needs to pierce.
+
+```
+Without EPS:                   With EPS = 0.1:
+┌──────────┐                   ┌──────────┐
+│  solid   │                   │  solid   │
+├──────────┤  ← ambiguous      │          │
+│  cutter  │                   ├──────────┤ 0.1mm past face
+└──────────┘                   │  cutter  │
+                                └──────────┘
+```
+
+`EPS = 0.1` extends one end of a cutter by 0.1mm.  
+`EPS2 = EPS * 2` extends both ends — used when a cutter must pierce through completely
+(e.g., a socket hole that starts above the solid and exits below).
+
+### Effect on printed geometry
+
+`EPS` is a **display and export artifact only**. The 0.1mm overlap on a socket cutter
+makes the hole 0.1mm deeper than the nominal dimension. At FDM tolerances (±0.1–0.2mm)
+this is invisible. The rule is:
+
+> If the cutter is subtracted from a face, add `EPS` on that end.  
+> If it must pierce both faces, use `EPS2` total (split as `up(-EPS)` + `h + EPS2`).
+
+### When to change the slider
+
+| Symptom | Action |
+|---------|--------|
+| Flickering face in F5 preview | Raise to 0.2 |
+| Slicer reports non-manifold on a flat cut surface | Raise to 0.2–0.3 |
+| Visible step or ridge at cut edge in physical print | Lower back toward 0.1 |
+| No symptoms | Leave at 0.1 — it has worked for every tested geometry |
+
+**Never set below 0.05.** Very small values lose the benefit and can reintroduce
+Z-fighting on high-$fn cylindrical geometry where floating-point rounding is aggressive.
+
+**0.5 is the practical ceiling.** Above that, the cutter overlap starts to visibly
+mis-dimension features like snap beads and hinge sockets.
+
+### Where it is used in code
+
+Every `difference()` cutter that cuts a face at a shared boundary uses `EPS` or `EPS2`.
+Defined in `MasterEngine.scad`; overridden by `bool_overlap_eps` from the Customizer
+(the MasterBuilder assignment runs after all includes, so it wins).
+
+Files that consume `EPS` / `EPS2`:
+
+| File | Use |
+|------|-----|
+| `RenderGrid.scad` | Hollow span cutter; radial spoke-to-hub fusion overlap |
+| `RenderTray.scad` | Nesting ledge, peg socket cutters, corner boss fusion nudge |
+| `RenderBox.scad` | Glide groove cutter length |
+
+---
+
+## 10. How to override user input and set flags from the manifest
+
+### How data lookup works
+
+`get_val(KEY, data, default)` scans `data` linearly and returns the **first** value
+whose key matches. The user's Customizer payload is the tail of the array. Prepend
+to win:
+
+```scad
+// User set GRID_LAYOUT = "2x3" in the Customizer.
+// Manifest injects a different value:
+d = concat([[GRID_LAYOUT, "7x1"]], data);
+// get_val(GRID_LAYOUT, d, "") → "7x1"  ← manifest wins
+```
+
+### Overriding one key
+
+```scad
+(intent == "7-Day Pill Box") ?
+    let(d = concat([[GRID_LAYOUT, "7x1"]], data))
+    [["BOX", d, [["LID_TYPE", "Flip_Single"]], get_physics_profile(data)], ...]
+```
+
+### Overriding multiple keys
+
+```scad
+let(d = concat([[GRID_LAYOUT, "7x1"], [HAS_BUILTIN_GRID, true]], data))
+```
+
+Order within the prepended block does not matter — they are all before any user key.
+
+### Named override block (S4 pattern)
+
+When many keys need overriding, build the block separately for readability:
+
+```scad
+let(d = concat([["WIDTH", 49], ["LENGTH", 49], ["HEIGHT", 140]], DESICCANT_MESH_CYL, data))
+```
+
+`DESICCANT_MESH_CYL` is itself an array of `[KEY, val]` pairs — `concat` flattens
+one level, so this works cleanly.
+
+---
+
+### `data` vs `opts` — what goes where
+
+| Channel | What it carries | Read by |
+|---------|----------------|---------|
+| `data`  | Geometry, physics, grid config, flags that affect the *container* shape | `factory_render_*`, `core_tray_chassis`, `render_internal_grid` |
+| `opts`  | Per-component dispatch flags that affect *which variant* is built | The factory's first `let` block — e.g. `lid_type = get_val("LID_TYPE", opts, "Snap")` |
+
+If a flag controls **how a container is shaped** (grid layout, built-in grid, thread neck, desiccant mesh) → put it in `data`.  
+If a flag controls **which factory branch to take** (lid type, thread on/off, jar grid mode) → put it in `opts`.
+
+---
+
+### Common flags
+
+| Flag | Where | Effect |
+|------|-------|--------|
+| `HAS_BUILTIN_GRID` | `data` | Activates `render_internal_grid` inside the chassis. Must also set `GRID_LAYOUT`. |
+| `GRID_LAYOUT` | `data` | Layout string parsed by `GridLayout.scad`. Format: `"NxM"` cartesian, `"RN"` radial rays, `"SR/C/RS/CS"` span, combinable with spaces. |
+| `GRID_WALL_H` | `data` | Max divider height (injected by `factory_render_box` — do not set from manifest). |
+| `IS_JAR_GRID` | `opts` | Tells `factory_render_grid` to clip cartesian walls to the jar's circular boundary. Set this on standalone `GRID` parts for jar contexts. |
+| `IS_THREADED` | `opts` | Adds threaded neck to a JAR. |
+| `SKIP_PILLARS` | `data` | Suppresses flip-box hinge pillars (used for single-lid multi-compartment boxes where the lid spans the full width). |
+| `GRID_HAS_BASE` | `data` | Adds a solid floor layer to a drop-in grid. Defaults `false` — opt-in only. |
+| `DESICCANT_MESH_RECT` / `DESICCANT_MESH_CYL` | prepended to `data` | Forces teardrop mesh with airflow-optimized hole/strut geometry. Overrides all user mesh settings. |
+
+---
+
+### Grid layout string reference
+
+```
+"3x4"              → 3 columns, 4 rows (cartesian)
+"R6"               → 6 radial dividers from centre (jar only)
+"C20%"             → radial core radius = 20% of jar radius (default 6mm absolute)
+"S2/3/2/2"        → span at row 2, col 3, spanning 2 rows × 2 cols, full height
+"S2/3/2/2/60%"    → same span, height capped at 60% of interior height
+"3x4 R6 C20%"     → cartesian + radial combined
+"3x4 S2/3/2/2 R6" → cartesian + span + radial
+```
+
+Tokens are space-separated and order-independent. `parse_cartesian`, `parse_radial`,
+and `parse_spans` each scan the full token list independently.

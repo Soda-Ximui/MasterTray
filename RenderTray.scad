@@ -67,8 +67,8 @@ module factory_render_tray(data, opts, phys) {
     socket_d   = get_val(PEG_SOCKET_D,   data, 8.0);
     ledge_h    = get_val(LEDGE_DEPTH,    data, 2.0);
     boss_d     = socket_d + sw * 2;
-    cx         = w/2 - sw - boss_d/2 + 0.1;
-    cy         = l/2 - sw - boss_d/2 + 0.1;
+    cx         = w/2 - sw - boss_d/2 + EPS;
+    cy         = l/2 - sw - boss_d/2 + EPS;
     sock_depth = min(12.0, max(3.0, (h + ledge_h) / 2 - 1));
     peg_d      = socket_d - clearance * 2;
     peg_protr  = let(v = get_val(PEG_PROTRUSION, data, 0))
@@ -94,8 +94,8 @@ module factory_render_tray(data, opts, phys) {
                 down(ledge_h)
                     apply_master_bounds(w - sw*2, l - sw*2, ledge_h,
                                         m_c_rad(data) - sw, m_chamf(data))
-                    cuboid([w, l, ledge_h + 0.1], anchor=BOTTOM,
-                           chamfer1=m_chamf(data));
+                    cuboid([w, l, ledge_h + EPS], anchor=BOTTOM,
+                           chamfer=m_chamf(data), edges=BOTTOM);
                 // 4 corner bosses — chamfer2 on top for clean edge
                 for (x=[-1,1]) for (y=[-1,1])
                     translate([x*cx, y*cy, -ledge_h])
@@ -110,12 +110,12 @@ module factory_render_tray(data, opts, phys) {
             // Top sockets (Peg mode only — Builtin has pegs instead)
             if (stack_mode == "Peg")
                 for (x=[-1,1]) for (y=[-1,1])
-                    translate([x*cx, y*cy, h + 0.1])
-                        cyl(d=socket_d, h=sock_depth + 0.1, anchor=TOP);
+                    translate([x*cx, y*cy, h + EPS])
+                        cyl(d=socket_d, h=sock_depth + EPS, anchor=TOP);
             // Bottom sockets (both modes — accept pegs from tray below)
             for (x=[-1,1]) for (y=[-1,1])
-                translate([x*cx, y*cy, -ledge_h - 0.1])
-                    cyl(d=socket_d, h=sock_depth + 0.1, anchor=BOTTOM);
+                translate([x*cx, y*cy, -ledge_h - EPS])
+                    cyl(d=socket_d, h=sock_depth + EPS, anchor=BOTTOM);
         }
 
     } else if (stack_mode == "Snap") {
@@ -123,7 +123,7 @@ module factory_render_tray(data, opts, phys) {
         // The ledge fits inside the tray below. The bead (diamond cross-section,
         // all faces ≤45°) cams past the lower tray's inner wall and retains.
         // Recommended: PETG — flexes enough for click, won't snap like PLA.
-        bead_r = nozzle_d = m_noz(data);
+        bead_r = m_noz(data);
         union() {
             apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
                 core_tray_chassis(data);
@@ -131,7 +131,7 @@ module factory_render_tray(data, opts, phys) {
             down(ledge_h)
                 apply_master_bounds(w - sw*2, l - sw*2, ledge_h,
                                     m_c_rad(data) - sw, m_chamf(data))
-                cuboid([w, l, ledge_h + 0.1], anchor=BOTTOM);
+                cuboid([w, l, ledge_h + EPS], anchor=BOTTOM);
             // Snap bead — diamond cross-section ring at bottom of ledge.
             // All faces at 45°: support-free in print orientation.
             down(ledge_h)

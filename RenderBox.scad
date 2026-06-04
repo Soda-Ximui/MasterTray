@@ -46,36 +46,45 @@ module factory_render_box(data, opts, phys) {
         // ── Glide box: groove channel + ball-catch dimples ─────────────────────
         glide_tol  = breathing_room(COMP_GLIDE, data);
         groove_w   = w - sw + 0.6;
-        groove_l   = l + 0.1;
+        groove_l   = l + EPS;
         groove_h   = sl + glide_tol;
-        // Ball dimple geometry — must match lid ball bumps exactly
-        ball_d     = max(2.0, noz * 5);
+        groove_z   = h - sl - 1.0;    // groove bottom Z — lid recessed 1mm below box top
+        // Ball dimple geometry — must match lid ball bumps exactly.
+        // ball_protr: how deeply the ball center is recessed into the lid face.
+        // Formula ensures ball center sits noz/2 past the groove wall — gentle cam entry.
+        ball_d     = glide_ball_d(w, l, sw, noz);
         ball_r     = ball_d / 2;
+        ball_protr = glide_ball_protr(ball_r, glide_tol, noz);
+        lid_w      = groove_w - glide_tol;       // must match RenderLid lid_w formula
         lid_l      = l - sw / 2;
         ball_y     = lid_l / 2 - ball_r * 2.5;  // same formula as in RenderLid
-        groove_x   = groove_w / 2;
+        ball_x     = lid_w / 2 + ball_r - ball_protr;  // = groove_w/2 + noz/2
 
         difference() {
             apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
                 core_tray_chassis(data_g);
             // Groove channel for lid to slide into
-            up(h - sl - 1.0)
+            up(groove_z)
                 cuboid([groove_w, groove_l, groove_h], anchor=BOTTOM);
-            // Ball-catch dimples in groove X walls (Ball mode only)
+            // Ball-catch dimples — X matches lid ball center; Z matches groove centre
             if (glide_snap == "Ball")
                 for (sx = [-1, 1])
-                    translate([sx * groove_x, ball_y, h - sl/2])
+                    translate([sx * ball_x, ball_y, groove_z + groove_h / 2])
                         sphere(d=ball_d + glide_tol);
         }
 
     } else if (lid_type == "Flip_Single") {
         // ── Single flip-hinge box: hinge boss on +Y, latch recess on −Y ────────
-        hinge_d    = 4.0;
-        clearance  = breathing_room(COMP_CCLIP, data);
-        clip_wall  = noz * 4;
-        clip_od    = hinge_d + clearance*2 + clip_wall*2;
-        cc_z       = clip_od / 2;
-        hinge_y    = clip_od / 2;
+        hinge_d     = 4.0;
+        clearance   = breathing_room(COMP_CCLIP, data);
+        clasp_depth = engagement_depth(COMP_CLASP, data);
+        clip_wall   = noz * 4;
+        clip_od     = hinge_d + clearance*2 + clip_wall*2;
+        cc_z        = clip_od / 2;
+        hinge_y     = clip_od / 2;
+        // latch_z: derived from axle height and lid latch geometry so they align.
+        // When closed: lid face sits at h − sl − 2·cc_z; latch tip at +clasp_depth above that.
+        latch_z     = flip_latch_z(h, cc_z, clasp_depth);
         axle_z     = h - cc_z;
         clip_len   = w - sw*6;
         int_w      = w - sw*2;
@@ -110,7 +119,7 @@ module factory_render_box(data, opts, phys) {
             translate([0, l/2 + hinge_y, axle_z])
                 yrot(90) cyl(d=hinge_d, h=w - sw*2, chamfer=0.5, $fn=36);
             // Diamond latch recess (front face, −Y)
-            translate([0, -l/2, h - 4.0])
+            translate([0, -l/2, latch_z])
                 hull() {
                     translate([0,  0,   0.8]) cuboid([w-sw*4, 0.1, 0.1], anchor=CENTER);
                     translate([0, -0.8, 0  ]) cuboid([w-sw*4, 0.1, 0.1], anchor=CENTER);
@@ -120,13 +129,15 @@ module factory_render_box(data, opts, phys) {
 
     } else if (lid_type == "Flip_Double") {
         // ── Double flip-hinge box: bosses on both Y faces ───────────────────────
-        hinge_d    = 4.0;
-        clearance  = breathing_room(COMP_CCLIP, data);
-        spine_gap  = breathing_room(COMP_SPINE, data);
-        clip_wall  = noz * 4;
-        clip_od    = hinge_d + clearance*2 + clip_wall*2;
-        cc_z       = clip_od / 2;
-        hinge_y    = clip_od/2 + spine_gap;
+        hinge_d     = 4.0;
+        clearance   = breathing_room(COMP_CCLIP, data);
+        clasp_depth = engagement_depth(COMP_CLASP, data);
+        spine_gap   = breathing_room(COMP_SPINE, data);
+        clip_wall   = noz * 4;
+        clip_od     = hinge_d + clearance*2 + clip_wall*2;
+        cc_z        = clip_od / 2;
+        hinge_y     = clip_od/2 + spine_gap;
+        latch_z     = flip_latch_z(h, cc_z, clasp_depth);
         spine_w    = hinge_y*2 + hinge_d;
         axle_z     = h - cc_z;
         clip_len   = w - sw*6;
@@ -168,7 +179,7 @@ module factory_render_box(data, opts, phys) {
                 yrot(90) cyl(d=hinge_d, h=w - sw*2, chamfer=0.5, $fn=36);
             // Diamond latch recesses on both Y faces
             for (sy = [-1, 1])
-                translate([0, sy * l/2, h - 4.0])
+                translate([0, sy * l/2, latch_z])
                     hull() {
                         translate([0, sy*0,    0.8]) cuboid([w-sw*4, 0.1, 0.1], anchor=CENTER);
                         translate([0, sy*0.8,  0  ]) cuboid([w-sw*4, 0.1, 0.1], anchor=CENTER);
