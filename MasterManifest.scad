@@ -96,7 +96,12 @@ function compile_manifest(intent, data) =
     ["DOUBLE_FLIP_BOX", data, [],                     get_physics_profile(data)]
   ] :
   (intent == "Box") ? [
-    ["BOX", data, [],                                 get_physics_profile(data)]
+    ["BOX", data, [["LID_TYPE", "Snap"]],             get_physics_profile(data)],
+    ["LID", data, [["LID_TYPE", "Snap"]],             get_physics_profile(data)]
+  ] :
+  (intent == "Standalone Box") ? [
+    ["BOX", data, [["LID_TYPE", "Glide"]],            get_physics_profile(data)],
+    ["LID", data, [["LID_TYPE", "Glide"]],            get_physics_profile(data)]
   ] :
   (intent == "Simple Tray") ? [
     ["TRAY", data, [],                                get_physics_profile(data)]
