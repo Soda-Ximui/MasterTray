@@ -163,17 +163,16 @@ function to_num(d) =
 /// If conditions are met (no pattern, holes too small, etc.), returns undef.
 /// This prevents invalid mesh geometries from being generated.
 function get_mesh_cfg(data, h_key, s_key, needs_margin=false) =
-  let(
-    pat = get_val(PATTERN, data, PATTERN0),
-    hole = get_val(h_key, data, 1.6),
-    strut = get_val(s_key, data, 25),
-    req_s = (200 * get_val(LID_MIN_SOLID, data, LID_MIN_SOLID0))
-            / min(m_bw(data), m_bl(data)),
-    final_s = needs_margin
-              ? max(strut, req_s)
-              : strut
-  )
-  ((pat == NONE || hole <= 0.05 || final_s >= 99) ? undef : [hole, final_s]);
+  let(pat = get_val(PATTERN, data, PATTERN0))
+  (pat == NONE) ? undef :
+  let(hole = get_val(h_key, data, 1.6))
+  (hole <= 0.05) ? undef :
+  let(strut = get_val(s_key, data, 25))
+  (strut >= 99) ? undef :
+  let(final_s = !needs_margin ? strut :
+                max(strut, (200 * get_val(LID_MIN_SOLID, data, LID_MIN_SOLID0))
+                           / min(m_bw(data), m_bl(data))))
+  (final_s >= 99) ? undef : [hole, final_s];
 
 /// get_grid_step(hole, min_sp, noz): Calculate spacing between mesh holes
 /// Ensures minimum spacing is maintained and aligns to nozzle multiples.

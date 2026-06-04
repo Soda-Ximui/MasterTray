@@ -20,8 +20,6 @@ include <MasterMeshPatterns.scad>
 // framed_mesh — flat mesh slab for floor and lid surfaces.
 // is_cyl=true uses a circular boundary (jar floors/lids).
 module framed_mesh(data, w, l, h, is_cyl=false, cfg=undef, fn=0) {
-    noz = m_noz(data);
-    pat = get_val(PATTERN, data, TEARDROP);
     cyl_fn = fn > 0 ? fn : $fn;
     if (cfg == undef) {
         linear_extrude(height=h, center=true) {
@@ -29,6 +27,8 @@ module framed_mesh(data, w, l, h, is_cyl=false, cfg=undef, fn=0) {
             else        rect([w, l]);
         }
     } else {
+        noz     = m_noz(data);
+        pat     = get_val(PATTERN, data, TEARDROP);
         hole    = cfg[0];
         strut   = cfg[1];
         spacing = m_wloops(data) * noz;
@@ -55,8 +55,6 @@ module framed_mesh(data, w, l, h, is_cyl=false, cfg=undef, fn=0) {
 
 // cylindrical_mesh_wall — hollow cylinder shell with optional radial pattern holes.
 module cylindrical_mesh_wall(data, d, h, wall_t, cfg=undef, fn=0) {
-    noz = m_noz(data);
-    pat = get_val(PATTERN, data, TEARDROP);
     cyl_fn = fn > 0 ? fn : $fn;
     if (cfg == undef) {
         difference() {
@@ -64,6 +62,8 @@ module cylindrical_mesh_wall(data, d, h, wall_t, cfg=undef, fn=0) {
             down(1) cyl(d=d - wall_t*2, h=h+2, anchor=BOTTOM, $fn=cyl_fn);
         }
     } else {
+        noz     = m_noz(data);
+        pat     = get_val(PATTERN, data, TEARDROP);
         hole    = cfg[0];
         strut   = cfg[1];
         spacing = m_wloops(data) * noz;
