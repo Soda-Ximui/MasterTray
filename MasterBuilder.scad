@@ -37,7 +37,7 @@ target_wall = "All Walls"; // ["All Walls", "Front", "Back", "Left", "Right"]
 /* [Grid System] */
 grid_type = "Built-in"; // ["Built-in", "Drop-in", "None"]
 grid_layout = "7x5 S2/2/2/3/150% S5/1/1/2/80 R3 C15%";
-grid_has_base = true;
+grid_has_base = false;
 
 /* [Plaque / Labels] */
 plaque_style = "None"; // ["None", "Embedded", "Standalone"]
