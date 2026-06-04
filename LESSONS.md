@@ -21,6 +21,30 @@ from the orientation it ships in.
 
 ---
 
+## 0a. Optimal print orientation — never lay on side for extreme ratios
+
+**Rule:** All primitives ship in their optimal FDM orientation. Users adjust in their
+slicer (brim, speed, enclosure temp) — we do not change orientation to compensate
+for extreme height/width ratios.
+
+| Primitive | Optimal orientation | Reason |
+|-----------|--------------------|----|
+| JAR | Upright (floor on bed) | Side needs supports under curved wall; diameter becomes oval |
+| TRAY / BOX | Flat (floor on bed) | Layer lines horizontal through floor = maximum strength |
+| LID (Screw) | Face-down (top surface on bed) | Full-circle adhesion; interior thread on vertical walls |
+| LID (Glide/Slip) | Face-down | Best surface finish on visible face |
+| GRID (built-in) | Part of tray — inherits tray orientation |
+| GRID (drop-in) | Flat (base on bed) | Flag if very long/thin — warp risk, slicer brim recommended |
+
+**Extreme ratios:** A 49×140mm jar prints upright regardless. A 300×200×8mm tray
+prints flat regardless. Extreme geometry is a slicer concern (brim, slow first layer,
+enclosure), not an orientation concern.
+
+**Never introduce supports** to enable a non-standard orientation. If a geometry
+requires supports in its natural orientation, fix the geometry.
+
+---
+
 ## 0b. All circle dimensions are diameters, always
 
 **Rule:** Every circular dimension in the system (jar width, hole size, peg diameter) is
