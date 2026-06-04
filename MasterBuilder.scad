@@ -9,10 +9,10 @@ Wall_Loops = 2; // [1 : 1 : 10]
 Layer_Height = 0.28; // [0.12, 0.16, 0.20, 0.24, 0.28]
 
 /* [Build Selection] */
-Part_To_Build = "1-Day 2-Compartment (Single Lid)"; // ["Box", "Standalone Box", "Flip Box", "1-Day AM/PM Box", "1-Day 2-Compartment (Single Lid)", "7-Day Pill Box", "14-Day AM/PM Box", "Pillbox Set (Double Lid)", "Pillbox Set (Single Lid)", "Pillbox Full Set", "Lid", "Simple Tray", "Nesting Tray (Short)", "Modular Peg Tray (Long)", "Standalone Box Grid", "Standalone Jar Grid", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Center Jar", "S4 Wedge Box", "S4 Set", "Plaque"]
+Part_To_Build = "Jar with Lid"; // ["Box", "Standalone Box", "Flip Box", "1-Day AM/PM Box", "1-Day 2-Compartment (Single Lid)", "7-Day Pill Box", "14-Day AM/PM Box", "Pillbox Set (Double Lid)", "Pillbox Set (Single Lid)", "Pillbox Full Set", "Lid", "Simple Tray", "Nesting Tray (Short)", "Modular Peg Tray (Long)", "Standalone Box Grid", "Standalone Jar Grid", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", "Plaque"]
 jar_shape = "Circle"; // ["Circle", "Quad", "Hexa", "Octa", "Dodeca"]
 
-/* [Total Outer Dimensions] */
+/* [Dimensions: W x L x H] */
 part_width = 30; // [10 : 1 : 300]
 part_length = 40; // [10 : 1 : 300]
 part_height = 20; // [5 : 1 : 300]

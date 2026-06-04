@@ -86,6 +86,35 @@ function compile_manifest(intent, data) =
   (intent == "Simple Tray") ? [
     ["TRAY", data, [],                                get_physics_profile(data)]
   ] :
+  // --- S4 SYSTEM ---
+  (intent == "S4 Jar") ?
+    let(d = concat([["WIDTH", 98], ["LENGTH", 98], ["HEIGHT", 140]], data))
+    [
+      ["JAR", d, jar_opts([["IS_THREADED", true]], d), get_physics_profile(d)],
+      ["LID", d, [["LID_TYPE", "Screw"]],              get_physics_profile(d)]
+    ]
+  :
+  (intent == "Spool Jar") ?
+    let(d = concat([["WIDTH", 55], ["LENGTH", 55], ["HEIGHT", 55]], data))
+    [
+      ["JAR", d, jar_opts([["IS_THREADED", true]], d), get_physics_profile(d)],
+      ["LID", d, [["LID_TYPE", "Screw"]],              get_physics_profile(d)]
+    ]
+  :
+  (intent == "S4 Wedge") ?
+    let(d = concat([["WIDTH", 140], ["LENGTH", 46], ["HEIGHT", 140]], data))
+    [
+      ["BOX", d, [["NEEDS_GROOVE", true]],  get_physics_profile(d)],
+      ["LID", d, [["LID_TYPE", "Glide"]],   get_physics_profile(d)]
+    ]
+  :
+  (intent == "S4 Set") ?
+    concat(
+      compile_manifest("S4 Jar",   data),
+      compile_manifest("Spool Jar", data),
+      compile_manifest("S4 Wedge", data)
+    )
+  :
   // Unrecognised intent — fall back to a plain tray and warn in console.
   // TODO: add manifest entries for remaining intents.
   let(_ = echo(str("WARNING: Unknown intent '", intent, "' — rendering as Simple Tray")))
