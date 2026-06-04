@@ -357,7 +357,39 @@ function m_wall_mod_p(data) =
   100;
 
 // ==============================================================================
-// TIER 6: GEOMETRY UTILITIES
+// TIER 6: PLATTER PACKING
+// ==============================================================================
+
+// Returns [w, l] footprint for a manifest item. Jars are always square (w×w).
+function get_footprint(item) =
+  let(type = item[0],
+      data = item[1],
+      w = m_bw(data),
+      l = m_bl(data))
+  (type == "JAR" || type == "JAR_LID" || type == "JAR_GRID") ? [w, w] : [w, l];
+
+// Shelf-packing: walks the manifest accumulating X/Y positions, returns [cx, cy]
+// for the part at target_idx. Wraps to a new row when exceeding bed width.
+function get_xy(manifest, target_idx, curr_idx=0, edge_x=0, edge_y=0, row_max_y=0) =
+  let(
+    fp      = get_footprint(manifest[curr_idx]),
+    w       = fp[0],
+    l       = fp[1],
+    gap     = get_val(PLATTER_GAP, manifest[curr_idx][1], PLATTER_GAP0),
+    wrap    = (edge_x > 0) && ((edge_x + w) > MAX_BUILD_PLATE_WIDTH0),
+    ex      = wrap ? 0           : edge_x,
+    ey      = wrap ? edge_y + row_max_y : edge_y,
+    cx      = ex + w / 2,
+    cy      = ey + l / 2,
+    next_x  = ex + w + gap,
+    next_y  = wrap ? l + gap : max(row_max_y, l + gap)
+  )
+  (curr_idx == target_idx)
+    ? [cx, cy]
+    : get_xy(manifest, target_idx, curr_idx + 1, next_x, ey, next_y);
+
+// ==============================================================================
+// TIER 7: GEOMETRY UTILITIES
 // ==============================================================================
 
 /// apply_master_bounds(w, l, h, r, c)

@@ -120,16 +120,19 @@ module build_part(name, data) {
         payload = item[1];
         options = item[2];
         physics = item[3];
-        if      (type == "TRAY")             { factory_render_tray(payload, options, physics); }
-        else if (type == "BOX")              { factory_render_box(payload, options, physics); }
-        else if (type == "FLIP_BOX")         { factory_render_flip_box(payload, options, physics); }
-        else if (type == "DOUBLE_FLIP_BOX")  { factory_render_double_flip_box(payload, options, physics); }
-        else if (type == "JAR")              { factory_render_jar(payload, options, physics); }
-        else if (type == "LID")              { factory_render_lid(payload, options, physics); }
-        else if (type == "GRID")             { factory_render_grid(payload, options, physics); }
-        else if (type == "PEG")              { factory_render_peg(payload, options, physics); }
-        else if (type == "PLAQUE")           { factory_render_plaque(payload, options, physics); }
-        else { echo(str("WARNING: Unknown component type: ", type)); }
+        pos     = get_xy(manifest, i);
+        translate([pos[0], pos[1], 0]) {
+            if      (type == "TRAY")             { factory_render_tray(payload, options, physics); }
+            else if (type == "BOX")              { factory_render_box(payload, options, physics); }
+            else if (type == "FLIP_BOX")         { factory_render_flip_box(payload, options, physics); }
+            else if (type == "DOUBLE_FLIP_BOX")  { factory_render_double_flip_box(payload, options, physics); }
+            else if (type == "JAR")              { factory_render_jar(payload, options, physics); }
+            else if (type == "LID")              { factory_render_lid(payload, options, physics); }
+            else if (type == "GRID")             { factory_render_grid(payload, options, physics); }
+            else if (type == "PEG")              { factory_render_peg(payload, options, physics); }
+            else if (type == "PLAQUE")           { factory_render_plaque(payload, options, physics); }
+            else { echo(str("WARNING: Unknown component type: ", type)); }
+        }
     }
 }
 
