@@ -46,6 +46,11 @@ MAX_CHAMFER_MULT = 2.5; // Chamfer capped at nozzle_diameter × 2.5 (FDM overhan
 // Parameters controlling pattern generation and spacing
 MIN_HOLE_SPACING = 1.2;      // Minimum gap between adjacent holes (prevents wall collapse)
 HEXAGON_HEIGHT_MULT = 0.866; // sin(60°) for honeycomb grid spacing
+// Minimum strut width as a fraction of hole diameter (for large holes).
+// 0.25 = empirical: struts stay structurally proportional as holes grow.
+// Floor = nozzle_d * 2 (2 extrusion passes minimum); this ratio only wins
+// when hole > nozzle_d * 8 (e.g. > 3.2mm at 0.4mm nozzle).
+STRUT_HOLE_RATIO = 0.25;
 
 // Corner rounding for square/slotted mesh holes, as a fraction of hole size.
 // 0.20 = empirical compromise: shape still reads as square, corners smooth enough

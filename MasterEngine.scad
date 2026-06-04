@@ -194,8 +194,8 @@ function get_mesh_cfg(data, h_key, s_key, needs_margin=false) =
 /// get_grid_step(hole, min_sp, noz): step = hole diameter + strut width
 ///
 /// Strut width (innermost → outermost):
-///   max(noz*2, hole*0.25)   — raw strut: min 2 nozzle widths, or 25% of hole
-///                              diameter for large holes (struts stay proportional)
+///   max(noz*2, hole*STRUT_HOLE_RATIO) — raw strut: min 2 nozzle widths, or 25% of
+///                              hole diameter for large holes (struts stay proportional)
 ///   round(.../noz) * noz    — snap to nearest nozzle-width multiple so the slicer
 ///                              lays complete extrusion passes (no partial lines)
 ///   max(noz, ...)           — floor at 1 nozzle width if rounding went down
@@ -203,7 +203,7 @@ function get_mesh_cfg(data, h_key, s_key, needs_margin=false) =
 ///
 /// Result: step is always a whole-nozzle multiple, never thinner than the physics floor.
 function get_grid_step(hole, min_sp, noz) =
-  hole + max(min_sp, max(noz, round(max(noz * 2, hole * 0.25) / noz) * noz));
+  hole + max(min_sp, max(noz, round(max(noz * 2, hole * STRUT_HOLE_RATIO) / noz) * noz));
 
 /// get_mesh_dim(dim, perc): Calculate effective mesh dimension from percentage
 /// If surface is 100mm and 80% solid, remaining mesh area is 20mm across.
