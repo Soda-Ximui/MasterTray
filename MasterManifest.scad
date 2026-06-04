@@ -101,6 +101,15 @@ function compile_manifest(intent, data) =
   (intent == "Simple Tray") ? [
     ["TRAY", data, [],                                get_physics_profile(data)]
   ] :
+  (intent == "Nesting Tray (Short)") ? [
+    ["TRAY", data, [[STACKABLE, true], [STACK_MODE, "Snap"]], get_physics_profile(data)]
+  ] :
+  (intent == "Modular Peg Tray (Long)") ?
+    concat(
+      [["TRAY", data, [[STACKABLE, true], [STACK_MODE, "Peg"]], get_physics_profile(data)]],
+      [for (i = [0:3]) ["PEG", data, [], get_physics_profile(data)]]
+    )
+  :
   // --- S4 SYSTEM ---
   (intent == "S4 Jar") ?
     let(d = concat([["WIDTH", 49], ["LENGTH", 49], ["HEIGHT", 140]], DESICCANT_MESH_CYL, data))
