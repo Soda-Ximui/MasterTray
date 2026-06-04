@@ -22,7 +22,7 @@ include <MasterEngine.scad>
 //
 //   Previous (wrong) approach started the triangle from [-d/2, 0] → [d/2, 0],
 //   producing ~56° sides — steeper than 45°, overhangs needed support.
-module native_teardrop(d, extrusion_w = nozzle_d * 1.05) {
+module native_teardrop(d, extrusion_w = line_width) {
   r  = d / 2;
   w  = max(extrusion_w, 0.01);     // guard: never truly zero
   bx = r * cos(45);                // x of 45° point on circle
@@ -45,9 +45,11 @@ module pattern_teardrop(hole, step, nx, ny) {
 }
 
 module pattern_slotted(hole, step, nx, ny) {
-  // rounding: proportional or extrusion-width, whichever is larger — never sharper than nozzle
-  grid_copies(spacing=[step * 1.5, step], n=[nx, ny])
-    rect([hole * 2, hole], rounding=max(hole * 0.2, nozzle_d * 1.05));
+  // x-step: slot is hole*2 wide, so center-to-center = hole*2 + pillar = hole + step.
+  // step*1.5 was wrong: gave 1.5*hole+1.5*pillar instead of 2*hole+pillar (pillars ~10% thin).
+  // rounding: proportional to hole for jerk relief, floored at line_width for Arachne.
+  grid_copies(spacing=[step + hole, step], n=[nx, ny])
+    rect([hole * 2, hole], rounding=max(hole * corner_round_ratio, line_width));
 }
 
 module pattern_circle(hole, step, nx, ny) {
@@ -55,8 +57,9 @@ module pattern_circle(hole, step, nx, ny) {
 }
 
 module pattern_square(hole, step, nx, ny) {
-  // rounding=nozzle_d: eliminates sharp 90° corners that cause Arachne pressure spikes
-  grid_copies(spacing=step, n=[nx, ny]) rect([hole, hole], rounding=nozzle_d);
+  // rounding: proportional to hole for jerk relief, floored at line_width for Arachne.
+  grid_copies(spacing=step, n=[nx, ny])
+    rect([hole, hole], rounding=max(hole * corner_round_ratio, line_width));
 }
 
 // Truncated rhombus: top and bottom points chopped to one extrusion width wide.
@@ -64,7 +67,7 @@ module pattern_square(hole, step, nx, ny) {
 // the vertical axis tips where Arachne pinches. Explicit polygon truncation does.
 //   r  = hole/2 (half-width of the diamond)
 //   top/bottom flat: y = ±(r - extrusion_w/2), x = ±extrusion_w/2
-module native_diamond(hole, extrusion_w = nozzle_d * 1.05) {
+module native_diamond(hole, extrusion_w = line_width) {
   r = hole / 2;
   w = max(extrusion_w, 0.01);
   ty = r - w / 2;                  // y-height where tip is truncated
@@ -94,9 +97,9 @@ module render_rectangular_pattern(pat, hole, step, nx, ny) {
 
 module pattern_cylindrical_honeycomb(hole, wall_t) { cyl(d=hole / sin(60), h=wall_t * 4, $fn=6); }
 module pattern_cylindrical_teardrop(hole, wall_t) { linear_extrude(wall_t * 4, center=true) native_teardrop(hole); }
-module pattern_cylindrical_slotted(hole, wall_t) { cuboid([hole * 2, hole, wall_t * 4], rounding=max(hole * 0.2, nozzle_d * 1.05), except=TOP+BOTTOM); }
+module pattern_cylindrical_slotted(hole, wall_t) { cuboid([hole * 2, hole, wall_t * 4], rounding=max(hole * corner_round_ratio, line_width), except=TOP+BOTTOM); }
 module pattern_cylindrical_circle(hole, wall_t) { cyl(d=hole, h=wall_t * 4); }
-module pattern_cylindrical_square(hole, wall_t) { cuboid([hole, hole, wall_t * 4], rounding=nozzle_d, except=TOP+BOTTOM); }
+module pattern_cylindrical_square(hole, wall_t) { cuboid([hole, hole, wall_t * 4], rounding=max(hole * corner_round_ratio, line_width), except=TOP+BOTTOM); }
 module pattern_cylindrical_diamond(hole, wall_t) { linear_extrude(wall_t * 4, center=true) native_diamond(hole); }
 
 module render_cylindrical_pattern(pat, hole, wall_t) {

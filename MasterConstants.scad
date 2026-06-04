@@ -44,8 +44,23 @@ MAX_CHAMFER_MULT = 2.5; // Chamfer capped at nozzle_diameter × 2.5 (FDM overhan
 
 // === MESH & GRID ===
 // Parameters controlling pattern generation and spacing
-MIN_HOLE_SPACING = 1.2; // Minimum gap between adjacent holes (prevents wall collapse)
+MIN_HOLE_SPACING = 1.2;      // Minimum gap between adjacent holes (prevents wall collapse)
 HEXAGON_HEIGHT_MULT = 0.866; // sin(60°) for honeycomb grid spacing
+
+// Corner rounding for square/slotted mesh holes, as a fraction of hole size.
+// 0.20 = empirical compromise: shape still reads as square, corners smooth enough
+// to reduce print-head deceleration at direction changes (partial jerk relief).
+// Physical floor = line_width (one extrusion width — Arachne minimum).
+// Ceiling = 0.5 (fully circular — shape identity lost).
+// No FDM formula derives this without knowing printer acceleration and outer-wall
+// speed — treat as a tuning knob. Exposed as Corner_Round_Ratio in MasterBuilder.
+RECT_HOLE_ROUND_RATIO = 0.20;
+
+// Bambu Studio default extrusion width: 105% of nozzle diameter.
+// This is the minimum printable feature width — any feature narrower triggers
+// Arachne to taper the bead to near-zero, causing a pressure-control slowdown.
+// Exposed as line_width global in MasterEngine.
+EXTRUSION_WIDTH_MULT = 1.05;
 
 // === PLAQUE & TEXT ===
 // Text rendering and sizing for embossed features

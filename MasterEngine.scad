@@ -28,7 +28,9 @@ include <MasterConstants.scad>
 //
 // nozzle_d must be set by MasterBuilder before this file is included so that
 // $fs matches the actual printer.  Falls back to NOZZLE_DIAMETER0 (0.4 mm).
-nozzle_d = is_undef(Nozzle_Diameter) ? NOZZLE_DIAMETER0 : Nozzle_Diameter;
+nozzle_d           = is_undef(Nozzle_Diameter)    ? NOZZLE_DIAMETER0      : Nozzle_Diameter;
+line_width         = nozzle_d * EXTRUSION_WIDTH_MULT;                   // one extrusion width (0.42mm at 0.4mm nozzle)
+corner_round_ratio = is_undef(Corner_Round_Ratio) ? RECT_HOLE_ROUND_RATIO : Corner_Round_Ratio;
 $fn = $preview ? 24 : 0;          // 0 = let $fs/$fa control facet count
 $fs = $preview ? 2  : nozzle_d;   // max chord length per facet
 $fa = $preview ? 10 : 1;          // max degrees per facet (secondary guard)
