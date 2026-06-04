@@ -120,7 +120,9 @@ module render_box_grid_core(data, is_builtin=false) {
     cfg       = get_grid_config(data);
     cols      = cfg[0][0]; rows = cfg[0][1];
     spans     = cfg[2];
-    has_base  = cfg[3]; base_t = cfg[4];
+    // Base only for drop-in — built-in grids sit on the tray floor already
+    has_base  = !is_builtin && cfg[3];
+    base_t    = has_base ? cfg[4] : 0;
     default_h = is_builtin ? get_val(GRID_WALL_H, data, bh - sf) : cfg[5];
 
     if (is_jar) {
@@ -157,7 +159,9 @@ module render_jar_grid_core(data, is_builtin=false) {
     int_h = bh - sf - (has_threads ? lip_h + sw*1.5 : 0) - (is_builtin ? 0 : 0.5);
     int_d = bw - sw*2 - tol;
     cfg      = get_grid_config(data);
-    has_base = cfg[3]; base_t = cfg[4];
+    // Base only for drop-in jar grids
+    has_base = !is_builtin && cfg[3];
+    base_t   = has_base ? cfg[4] : 0;
     union() {
         if (has_base) cyl(d=int_d, h=base_t, anchor=BOTTOM);
         up(base_t)
