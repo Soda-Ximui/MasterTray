@@ -19,6 +19,21 @@
 include <MasterEngine.scad>
 include <MasterProcessor.scad>
 
+// Desiccant mesh overrides — prepended to data so they take priority over Customizer.
+// rect: box/wedge surfaces.   cyl: jar surfaces.
+DESICCANT_MESH_RECT = [
+    [PATTERN,      TEARDROP],
+    [HOLE_WALL,    1.8], [HOLE_FLOOR,  1.8], [HOLE_LID,   1.8],
+    [HOLE_SPACING, 1.2],
+    [STRUT_WALL,   20],  [STRUT_FLOOR, 25],  [STRUT_LID,  10]
+];
+DESICCANT_MESH_CYL = [
+    [PATTERN,      TEARDROP],
+    [HOLE_WALL,    1.8], [HOLE_FLOOR,  1.8], [HOLE_LID,   1.8],
+    [HOLE_SPACING, 1.2],
+    [STRUT_WALL,   15],  [STRUT_FLOOR, 15],  [STRUT_LID,  15]
+];
+
 // Maps jar_shape string → polygon side count. 0 = full circle ($fn from global).
 function jar_sides(data) =
   let(s = get_val(JAR_SHAPE, data, "Circle"))
@@ -88,21 +103,21 @@ function compile_manifest(intent, data) =
   ] :
   // --- S4 SYSTEM ---
   (intent == "S4 Jar") ?
-    let(d = concat([["WIDTH", 49], ["LENGTH", 49], ["HEIGHT", 140]], data))
+    let(d = concat([["WIDTH", 49], ["LENGTH", 49], ["HEIGHT", 140]], DESICCANT_MESH_CYL, data))
     [
       ["JAR", d, jar_opts([["IS_THREADED", true]], d), get_physics_profile(d)],
       ["LID", d, [["LID_TYPE", "Screw"]],              get_physics_profile(d)]
     ]
   :
   (intent == "Spool Jar") ?
-    let(d = concat([["WIDTH", 55], ["LENGTH", 55], ["HEIGHT", 55]], data))
+    let(d = concat([["WIDTH", 55], ["LENGTH", 55], ["HEIGHT", 55]], DESICCANT_MESH_CYL, data))
     [
       ["JAR", d, jar_opts([["IS_THREADED", true]], d), get_physics_profile(d)],
       ["LID", d, [["LID_TYPE", "Screw"]],              get_physics_profile(d)]
     ]
   :
   (intent == "S4 Wedge") ?
-    let(d = concat([["WIDTH", 140], ["LENGTH", 46], ["HEIGHT", 140]], data))
+    let(d = concat([["WIDTH", 140], ["LENGTH", 46], ["HEIGHT", 140]], DESICCANT_MESH_RECT, data))
     [
       ["BOX", d, [["NEEDS_GROOVE", true]],  get_physics_profile(d)],
       ["LID", d, [["LID_TYPE", "Glide"]],   get_physics_profile(d)]

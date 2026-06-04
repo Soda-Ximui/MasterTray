@@ -31,7 +31,7 @@ module framed_mesh(data, w, l, h, is_cyl=false, cfg=undef, fn=0) {
         pat     = get_val(PATTERN, data, TEARDROP);
         hole    = cfg[0];
         strut   = cfg[1];
-        spacing = m_wloops(data) * noz;
+        spacing = get_val(HOLE_SPACING, data, m_wloops(data) * noz);
         base_step = get_grid_step(hole, spacing, noz);
         // F5 preview: 2× step → ~4× fewer tiles, full mesh region still covered.
         step = $preview ? base_step * 2 : base_step;
@@ -66,7 +66,7 @@ module cylindrical_mesh_wall(data, d, h, wall_t, cfg=undef, fn=0) {
         pat     = get_val(PATTERN, data, TEARDROP);
         hole    = cfg[0];
         strut   = cfg[1];
-        spacing = m_wloops(data) * noz;
+        spacing = get_val(HOLE_SPACING, data, m_wloops(data) * noz);
         base_step = get_grid_step(hole, spacing, noz);
         step     = $preview ? base_step * 2 : base_step;
         h_active = h * (1 - strut / 100);
