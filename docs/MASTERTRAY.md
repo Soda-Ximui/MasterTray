@@ -25,6 +25,76 @@ New here? Read these in order:
 
 ---
 
+## Architecture Diagram
+
+![MasterTray include architecture — 5 layers from MasterBuilder down to support modules](img/architecture.svg)
+
+*Each layer can only include files from its own layer or below.
+Dashed orange = compiler link (Manifest → MasterBuilder).
+Purple dotted = transitive engine dependency.*
+
+---
+
+## Codebase File Set
+
+### Layer 4 — User Interface
+
+| File | Role |
+|------|------|
+| `MasterBuilder.scad` | **Primary entry point.** Customizer UI, `ui_payload` assembly, `build_part` dispatcher. Use this file — not `MasterBuild2`. |
+
+### Layer 3 — Factories (Renderers)
+
+Each factory is a "dumb renderer": it only receives a clean data array and executes geometric math.
+
+| File | Renders |
+|------|---------|
+| `RenderTray.scad` | `factory_render_tray` — hollow chassis, mesh walls/floor, wall mods, stackable (Peg / Builtin / Snap) |
+| `RenderBox.scad` | `factory_render_box` — all LID_TYPE variants inline: Snap, Glide, Flip_Single, Flip_Double |
+| `RenderLid.scad` | `factory_render_lid` — Snap, Glide (H/V, Ball/Tab), Flip_Single (C-clip hinge + diamond latch), Screw |
+| `RenderJar.scad` | `factory_render_jar` — cylindrical body, mesh walls/floor, optional threaded neck, built-in grid |
+| `RenderGrid.scad` | `factory_render_grid` — drop-in and built-in cartesian + radial grids; `render_internal_grid` |
+| `RenderPeg.scad` | `factory_render_peg` — standalone peg rods for Peg-stack trays |
+| `RenderPlaque.scad` | `factory_render_plaque` — text label plate (Embedded / Standalone styles) |
+| `RenderRib.scad` | `factory_render_ribs` — FrankenTray vector rib dividers *(Primitive 5, not yet started)* |
+| `RenderMesh.scad` | `framed_mesh`, `cylindrical_mesh_wall` — mesh hole patterns for all surfaces |
+| `MasterDebug.scad` | `dump_build_options` (human report), `dump_build_payload` (PSV for Perl pipeline) |
+| `GridLayout.scad` | `get_grid_config`, `parse_cartesian`, `parse_radial`, `parse_spans` — layout string parser |
+
+### Layer 2 — Compiler
+
+| File | Role |
+|------|------|
+| `MasterManifest.scad` | `compile_manifest(intent, data)` — single source of truth for what gets built; all intent routing |
+| `MasterProcessor.scad` | Data transformation pipeline — processes raw ui_payload before manifest routing |
+
+### Layer 1 — Engine / Constants
+
+| File | Role |
+|------|------|
+| `MasterEngine.scad` | Physics getters (`m_safe_wall`, `m_safe_floor`, `m_bh` …), geometry constraints (`glide_ball_d`, `flip_latch_z` …), `get_xy` platter packer, `apply_master_bounds` |
+| `MasterEnum.scad` | All string key constants (`WIDTH`, `GRID_LAYOUT`, `HAS_BUILTIN_GRID` …). Never use raw strings in comparisons. |
+| `MasterTolerance.scad` | Material tolerance tables (`ROOM_GLIDE_PETG`, `ENG_CLASP_PLA` …), `breathing_room()`, `engagement_depth()` |
+| `MasterConstants.scad` | Numeric design constants (layer height presets, nozzle sizes) |
+
+### Support Modules
+
+| File | Used by |
+|------|---------|
+| `MasterMeshPatterns.scad` | `RenderMesh` — hole pattern geometry (Teardrop, Honeycomb, Slotted …) |
+| `MasterText.scad` | `RenderPlaque`, `MasterUtility` — text extrusion helpers |
+| `MasterUtility.scad` | `RenderRib` — general geometry utilities for rib rendering |
+| `MasterValidation.scad` | `MasterUtility` — grid layout string validation functions |
+
+### Deprecated (moved to `deprecated/`)
+
+| File | Reason |
+|------|--------|
+| `MasterBuild2.scad` | Old builder — superseded by `MasterBuilder.scad`. Not included by anything. |
+| `TEST_VALIDATION_SUITE.scad` | Standalone test file — not part of the production include graph. |
+
+---
+
 ## User Guides
 
 | Document | What it covers |
