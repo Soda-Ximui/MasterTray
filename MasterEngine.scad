@@ -19,10 +19,19 @@ include <MasterEnum.scad>
 include <MasterConstants.scad>
 
 // --- RENDERING QUALITY SETTINGS ---
-// $fn: Fragment count controls smoothness of curves
-//   - Preview mode: 32 segments (fast screen refresh)
-//   - Render mode: 128 segments (export-quality STL smoothness)
-$fn = $preview ? 24 : 128;
+// Use $fs (max chord length) + $fa (max angle) instead of a fixed $fn so that
+// every circle gets exactly as many facets as the nozzle can resolve — no more,
+// no less.  A 10 mm circle at 0.4 mm nozzle needs ~78 facets; an 80 mm circle
+// needs ~628.  A global $fn=128 is too coarse for large circles and wasteful for
+// small ones.  Hard-coded $fn overrides (6 = hexagon holes, 30 = threads,
+// 36 = hinge/clip cylinders) intentionally win over these defaults.
+//
+// nozzle_d must be set by MasterBuilder before this file is included so that
+// $fs matches the actual printer.  Falls back to NOZZLE_DIAMETER0 (0.4 mm).
+nozzle_d = is_undef(Nozzle_Diameter) ? NOZZLE_DIAMETER0 : Nozzle_Diameter;
+$fn = $preview ? 24 : 0;          // 0 = let $fs/$fa control facet count
+$fs = $preview ? 2  : nozzle_d;   // max chord length per facet
+$fa = $preview ? 10 : 1;          // max degrees per facet (secondary guard)
 
 // ==============================================================================
 // SECTION 1: DEFAULT CONSTANTS
@@ -412,11 +421,19 @@ function get_xy(manifest, target_idx, curr_idx=0, edge_x=0, edge_y=0, row_max_y=
 // findable by name rather than buried inline.
 // ==============================================================================
 
+/// layer_snap(z, lh): round z to the nearest layer-height multiple.
+/// Use on any Z position or height that will be printed as a surface.
+/// Fractional-layer Z forces the slicer to insert micro-moves between layers,
+/// causing surface roughness and reduced inter-layer adhesion.
+function layer_snap(z, lh) = round(z / lh) * lh;
+
 /// Glide lid — ball catch diameter scaled with box footprint.
 /// Larger boxes need larger balls for proportional retention strength.
 /// Capped at sw×2 so the ball never exceeds the groove wall depth.
+/// Minimum raised to noz*8 (3.2mm at 0.4mm nozzle) — keeps ball diameter above
+/// Arachne's small-perimeter speed clamp (~3mm), avoiding pressure-pinch slowdown.
 function glide_ball_d(w, l, sw, noz) =
-    min(sw * 2, max(noz * 5, max(w, l) * 0.03));
+    min(sw * 2, max(noz * 8, max(w, l) * 0.03));
 
 /// Glide lid — how deeply the ball center is recessed into the lid face.
 /// Positions ball center at noz/2 past the groove wall — gentle cam entry

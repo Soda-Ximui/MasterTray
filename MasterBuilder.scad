@@ -8,15 +8,22 @@ Nozzle_Diameter = 0.4; // [0.2, 0.4, 0.6, 0.8]
 Wall_Loops = 2; // [1 : 1 : 10]
 Layer_Height = 0.28; // [0.12, 0.16, 0.20, 0.24, 0.28]
 
+// 1.05 = Bambu Studio default extrusion width (105% of nozzle diameter)
+// e.g. 0.4mm nozzle → 0.42mm actual line width → slider snaps in 0.42mm steps
+//STEP_X = Nozzle_Diameter * 1.05;
+//STEP_Y = STEP_X;
+//STEP_Z = Layer_Height;
+
 /* [Build Selection] */
 Part_To_Build = "Jar with Lid"; // ["Box", "Standalone Box", "Flip Box", "1-Day AM/PM Box", "1-Day 2-Compartment (Single Lid)", "7-Day Pill Box", "14-Day AM/PM Box", "Pillbox Set (Double Lid)", "Pillbox Set (Single Lid)", "Pillbox Full Set", "Lid", "Simple Tray", "Nesting Tray (Short)", "Modular Peg Tray (Long)", "Standalone Box Grid", "Standalone Jar Grid", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", "Plaque", "Grid Test"]
 jar_shape = "Circle"; // ["Circle", "Quad", "Hexa", "Octa", "Dodeca"]
 
+
 /* [Dimensions: W x L x H] */
-part_width = 30; // [10 : 1 : 300]
-part_length = 40; // [10 : 1 : 300]
-part_height = 20; // [5 : 1 : 300]
-dimension_mode = "Total"; // ["Total", "Usable"]
+part_width = 30; // [10 : 0.42 : 300]
+part_length = 40; // [10 : 0.42 : 300]
+part_height = 20; // [5 : 0.28 : 300]
+dimension_mode = "Total"; // Total", "Usable"]
 
 
 /* [Mesh Aesthetics] */

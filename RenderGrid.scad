@@ -76,8 +76,14 @@ module _render_radial_core(int_h, radius, div_t, cfg) {
     // Convert C percentage to actual diameter; absolute values used as-is.
     c_dia   = is_perc ? radius * 2 * (c_raw / 100) : c_raw;
     inner   = c_dia - div_t * 2;
-    c_eff   = (inner >= 1.5) ? c_dia : max(4.0, c_dia);
-    if (inner >= 1.5)
+    // Thresholds scale with nozzle so the hub is always structurally sound.
+    // min_hollow: inner hole must span at least 6 extrusion passes — below this it's
+    //   so small the slicer will fill it solid anyway, creating a stress-riser void.
+    // min_solid:  if forced solid, ensure 10 passes across the full diameter.
+    min_hollow = nozzle_d * 6;
+    min_solid  = nozzle_d * 10;
+    c_eff   = (inner >= min_hollow) ? c_dia : max(min_solid, c_dia);
+    if (inner >= min_hollow)
         difference() {
             cyl(d=c_eff, h=int_h, anchor=BOTTOM);
             down(1) cyl(d=inner, h=int_h+2, anchor=BOTTOM);
@@ -177,8 +183,12 @@ module render_jar_grid_core(data, is_builtin=false) {
     div_t = get_val(THICK_DIVIDER, data, 1.2);
     tol   = is_builtin ? 0 : GRID_DROP_IN_TOL;
     has_threads = get_val(HAS_THREADS, data, false);
-    lip_h = 8.0;
-    int_h = bh - sf - (has_threads ? lip_h + sw*1.5 : 0) - (is_builtin ? 0 : 0.5);
+    lip_h = JAR_LIP_HEIGHT;   // centralized in MasterConstants
+    lh    = m_lh(data);
+    // Drop-in clearance snapped to nearest layer — preserves alignment of int_h.
+    drop_in_clr = is_builtin ? 0 : lh * ceil(0.5 / lh);
+    int_h_raw = bh - sf - (has_threads ? lip_h + sw*1.5 : 0) - drop_in_clr;
+    int_h = round(int_h_raw / lh) * lh;   // force layer alignment on the result
     int_d = bw - sw*2 - tol;
     cfg      = get_grid_config(data);
     // Base only for drop-in jar grids

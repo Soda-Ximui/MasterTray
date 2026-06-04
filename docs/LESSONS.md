@@ -573,3 +573,95 @@ If a flag controls **which factory branch to take** (lid type, thread on/off, ja
 
 Tokens are space-separated and order-independent. `parse_cartesian`, `parse_radial`,
 and `parse_spans` each scan the full token list independently.
+
+---
+
+## 7. Slicer-aware geometry — Arachne speed optimization
+
+These rules eliminate two distinct slicer slowdown mechanisms that cause visible print
+artifacts and wasted print time. Both are fixed by tying geometry thresholds to
+`nozzle_d` (available everywhere via `MasterEngine.scad`).
+
+**Extrusion width** = `nozzle_d * 1.05` — Bambu Studio's default line width at 105% of
+nozzle diameter. This is the minimum printable feature size. Any geometry smaller than
+this forces the slicer into a slow-path.
+
+---
+
+### 7a. Arachne pressure pinch — tip truncation
+
+**What it is:** Arachne (variable-width extrusion engine) must taper the bead to match
+the geometry. When a tip comes to a point narrower than the extrusion width, Arachne
+slows the head to near-zero to control pressure. Result: blobs, surface marks, wasted time.
+
+**Rule:** No printed geometry tip narrower than `nozzle_d * 1.05`.
+
+**Applied in this codebase:**
+
+| Geometry | File | Fix |
+|----------|------|-----|
+| Teardrop mesh hole | `MasterMeshPatterns.scad` | Triangle tip → trapezoid flat top of `nozzle_d * 1.05` width |
+| Diamond mesh hole | `MasterMeshPatterns.scad` | Pointed rhombus → vertical tips truncated to `nozzle_d * 1.05` |
+| Flip latch tab | `RenderLid.scad` | Hull Z-tips: `0.1mm` → `noz*1.05` |
+| Flip latch recess | `RenderBox.scad` | Cutter mirrors tab shape — same fix |
+
+**Teardrop geometry note:** The roof must also be exactly 45° from horizontal (the FDM
+critical overhang angle for PETG). The roof polygon starts at the 45° points on the
+circle — `[r·cos45, r·sin45]` — not from the base diameter. Starting from the base
+produces ~56° sides that need support.
+
+```scad
+// Correct: 45° roof + flat top
+bx = r * cos(45);  by = r * sin(45);  th = r + by;  w = nozzle_d * 1.05;
+polygon([[-bx, by], [bx, by], [w/2, th], [-w/2, th]]);
+```
+
+---
+
+### 7b. Motion planner jerk — corner rounding
+
+**What it is:** A sharp 90° corner forces the print head to dead-stop on one axis before
+accelerating on the other. The motion planner's jerk limit kicks in, causing a pressure
+spike that leaves a corner blob and wastes time.
+
+**Rule:** Round all sharp 90° corners on mesh holes to `rounding = nozzle_d`.
+
+**Applied in this codebase:**
+
+| Geometry | File | Fix |
+|----------|------|-----|
+| Square mesh holes | `MasterMeshPatterns.scad` | `rect([hole, hole], rounding=nozzle_d)` |
+| Diamond mesh holes | `MasterMeshPatterns.scad` | Side corners covered by truncated rhombus polygon |
+| Slotted mesh holes | `MasterMeshPatterns.scad` | `rounding=max(hole*0.2, nozzle_d*1.05)` |
+
+**Note:** Honeycomb (`$fn=6`) is intentionally left un-rounded. The straight hex sides
+bridge cleanly as long as struts are wide enough. Rounding would distort the shape.
+
+---
+
+### 7c. Circle quality — `$fs` / `$fa` over `$fn`
+
+**Rule:** Never use a global `$fn` for print quality. Use `$fs` (max chord length) and
+`$fa` (max angle) so each circle auto-computes the right facet count for its diameter.
+
+```scad
+$fn = $preview ? 24 : 0;        // 0 = let $fs/$fa control
+$fs = $preview ? 2  : nozzle_d; // chord ≤ nozzle diameter
+$fa = $preview ? 10 : 1;        // secondary angle guard
+```
+
+A global `$fn=128` is too coarse for circles > ~16mm diameter (visible faceting) and
+wasteful for small circles. `$fs = nozzle_d` scales correctly for every circle size.
+
+**Hard-coded `$fn` overrides are intentional and win over `$fs`:**
+- `$fn=6` → hexagon mesh holes (not a smooth circle)
+- `$fn=30` → threaded neck (thread pitch geometry)
+- `$fn=36` → hinge/clip cylinders (mechanical fit tolerance)
+
+---
+
+### 7d. What NOT to change
+
+The `0.6mm` offsets in Glide lid and Screw lid geometry are **mechanical clearance
+tolerances** — intentional fit values, not print-quality thresholds. Do not replace
+these with nozzle-parametric expressions.

@@ -19,7 +19,7 @@ module factory_render_jar(data, opts, phys) {
     sides    = get_val("JAR_SIDES", opts, 0);
     jar_fn   = sides > 0 ? sides : $fn;
 
-    lip_h      = 8.0;
+    lip_h      = JAR_LIP_HEIGHT;   // centralized in MasterConstants — not a local magic number
     wall_h     = h - sf;
     cyl_wall_h = max(0.1, is_threaded ? (wall_h - lip_h - sw * 1.5) : wall_h);
     neck_od    = w - sw * 2 - 0.6;
@@ -29,8 +29,11 @@ module factory_render_jar(data, opts, phys) {
              " threaded=", is_threaded, " sides=", sides > 0 ? sides : "circle"));
 
     // Built-in grid: inject jar context so grid clips to circle and
-    // lowers walls to clear the cylindrical wall height (not the full jar height)
-    grid_h   = cyl_wall_h - 0.5;
+    // lowers walls to clear the cylindrical wall height (not the full jar height).
+    // Clearance snapped up to nearest layer boundary — preserves layer alignment
+    // that cyl_wall_h achieved via m_safe_wall.
+    lh     = m_lh(data);
+    grid_h = cyl_wall_h - lh * ceil(0.5 / lh);
     jar_data = concat([[IS_JAR_GRID, true],
                        [HAS_THREADS, is_threaded],
                        [GRID_WALL_H, grid_h]], data);

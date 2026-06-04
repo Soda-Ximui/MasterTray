@@ -41,7 +41,10 @@ module factory_render_lid(data, opts, phys) {
         clearance = breathing_room(COMP_GLIDE, data);
         lid_w = w - sw * 2 - clearance;
         lid_l = l - sw * 2 - clearance;
-        bead_h = noz * 2;
+        // Round up to nearest layer boundary, minimum 3 layers.
+        // noz*2 = 0.8mm at 0.4mm nozzle = 2.857 layers — fractional, weak retention.
+        // 3 layers at 0.28mm lh = 0.84mm — clean boundary, reliable PETG click-force.
+        bead_h = m_lh(data) * max(3, ceil(noz * 2 / m_lh(data)));
         union() {
             apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data))
                 up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false,
@@ -121,17 +124,21 @@ module factory_render_lid(data, opts, phys) {
                 cuboid([lid_w - sw*4, 2.2, sl], anchor=CENTER);
             translate([0, -lid_l/2 - 2.2, sl + clasp_depth/2])
                 cuboid([lid_w - sw*4, 1.6, clasp_depth], anchor=CENTER);
-            // Diamond tip — the snap click point
+            // Diamond tip — the snap click point.
+            // Z-tips truncated to noz*1.05 (Arachne flat-top, no pressure pinch).
+            // Z-offsets snapped to layer boundaries via layer_snap() — no micro-stepping.
+            // Engagement Y-cuboid widened to noz*2 — was 0.1mm (sub-nozzle, unprintable).
+            lz = layer_snap(0.8, m_lh(data));
             translate([0, -lid_l/2 - 1.5, sl + clasp_depth])
                 hull() {
-                    translate([0, 0,  -0.8]) cuboid([lid_w-sw*4, 0.1, 0.1], anchor=CENTER);
-                    translate([0, 0.9, 0  ]) cuboid([lid_w-sw*4, 0.1, 0.1], anchor=CENTER);
-                    translate([0, 0,   0.8]) cuboid([lid_w-sw*4, 0.1, 0.1], anchor=CENTER);
+                    translate([0, 0,   -lz]) cuboid([lid_w-sw*4, 0.1,   noz*1.05], anchor=CENTER);
+                    translate([0, 0.9,   0]) cuboid([lid_w-sw*4, noz*2, 0.1     ], anchor=CENTER);
+                    translate([0, 0,    lz]) cuboid([lid_w-sw*4, 0.1,   noz*1.05], anchor=CENTER);
                 }
         }
 
     } else if (lid_type == "Screw") {
-        lip_h   = 8.0; cap_h = max(0.1, lip_h + sw * 1.5);
+        lip_h   = JAR_LIP_HEIGHT; cap_h = max(0.1, lip_h + sw * 1.5);
         neck_od = w - sw * 2 - 0.6;
         // Face-down: flat top on bed, interior thread on vertical walls.
         difference() {
@@ -140,7 +147,9 @@ module factory_render_lid(data, opts, phys) {
                                         get_mesh_cfg(data, HOLE_LID, STRUT_LID, true));
                 up(sl) cyl(d=w, h=cap_h, anchor=BOTTOM);
             }
-            up(sl - 0.1) threaded_rod(d=neck_od + 0.8, l=cap_h+1,
+            // EPS pullback: cutter starts one boolean-epsilon below lid surface so the
+            // thread is cleanly subtracted without a zero-thickness manifold edge.
+            up(sl - EPS) threaded_rod(d=neck_od + 0.8, l=cap_h+1,
                                        pitch=m_thread_pitch(data),
                                        internal=false, anchor=BOTTOM, $fn=30);
         }

@@ -32,7 +32,12 @@ module framed_mesh(data, w, l, h, is_cyl=false, cfg=undef, fn=0) {
         hole    = cfg[0];
         strut   = cfg[1];
         spacing = get_val(HOLE_SPACING, data, m_wloops(data) * noz);
-        base_step = get_grid_step(hole, spacing, noz);
+        // Slotted pillars are structural columns — the material between slits carries
+        // vertical load and needs 4 full extrusion passes (2 perimeters each side =
+        // line_width × 4). All other patterns use the standard physics minimum.
+        // line_width = noz * 1.05 (Bambu 105% extrusion width default).
+        min_sp = (pat == SLOTTED) ? noz * 1.05 * 4 : spacing;
+        base_step = get_grid_step(hole, min_sp, noz);
         // F5 preview: 2× step → ~4× fewer tiles, full mesh region still covered.
         step = $preview ? base_step * 2 : base_step;
         // Size tile grid to the mesh region only — tiles outside are clipped.
@@ -67,7 +72,8 @@ module cylindrical_mesh_wall(data, d, h, wall_t, cfg=undef, fn=0) {
         hole    = cfg[0];
         strut   = cfg[1];
         spacing = get_val(HOLE_SPACING, data, m_wloops(data) * noz);
-        base_step = get_grid_step(hole, spacing, noz);
+        min_sp  = (pat == SLOTTED) ? noz * 1.05 * 4 : spacing;
+        base_step = get_grid_step(hole, min_sp, noz);
         step     = $preview ? base_step * 2 : base_step;
         h_active = h * (1 - strut / 100);
         nz = max(1, floor(h_active / step));
