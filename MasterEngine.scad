@@ -174,8 +174,17 @@ function get_mesh_cfg(data, h_key, s_key, needs_margin=false) =
                            / min(m_bw(data), m_bl(data))))
   (final_s >= 99) ? undef : [hole, final_s];
 
-/// get_grid_step(hole, min_sp, noz): Calculate spacing between mesh holes
-/// Ensures minimum spacing is maintained and aligns to nozzle multiples.
+/// get_grid_step(hole, min_sp, noz): step = hole diameter + strut width
+///
+/// Strut width (innermost → outermost):
+///   max(noz*2, hole*0.25)   — raw strut: min 2 nozzle widths, or 25% of hole
+///                              diameter for large holes (struts stay proportional)
+///   round(.../noz) * noz    — snap to nearest nozzle-width multiple so the slicer
+///                              lays complete extrusion passes (no partial lines)
+///   max(noz, ...)           — floor at 1 nozzle width if rounding went down
+///   max(min_sp, ...)        — caller's minimum wins if larger (physics/user override)
+///
+/// Result: step is always a whole-nozzle multiple, never thinner than the physics floor.
 function get_grid_step(hole, min_sp, noz) =
   hole + max(min_sp, max(noz, round(max(noz * 2, hole * 0.25) / noz) * noz));
 
