@@ -6,6 +6,7 @@
 include <BOSL2/std.scad>
 include <MasterEngine.scad>
 include <RenderMesh.scad>
+include <RenderGrid.scad>
 
 module factory_render_jar(data, opts, phys) {
     w   = m_bw(data);
@@ -27,7 +28,16 @@ module factory_render_jar(data, opts, phys) {
     echo(str("-> Factory [JAR] | d=", w, " h=", h,
              " threaded=", is_threaded, " sides=", sides > 0 ? sides : "circle"));
 
+    // Built-in grid: inject jar context so grid clips to circle and
+    // lowers walls to clear the cylindrical wall height (not the full jar height)
+    grid_h   = cyl_wall_h - 0.5;
+    jar_data = concat([[IS_JAR_GRID, true],
+                       [HAS_THREADS, is_threaded],
+                       [GRID_WALL_H, grid_h]], data);
+
     union() {
+        // Built-in grid (fused to jar interior, raised to floor level)
+        up(sf) render_internal_grid(jar_data);
         // Floor (circular or polygonal)
         up(sf / 2)
             framed_mesh(data, w, w, sf, true,

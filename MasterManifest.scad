@@ -120,13 +120,14 @@ function compile_manifest(intent, data) =
     ["GRID", data, [],                                get_physics_profile(data)]
   ] :
   (intent == "Standalone Jar Grid") ?
-    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0))
+    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0),
+        jar_opts = [[IS_JAR_GRID, true]])
     (w == l) ?
-      [["GRID", data, [],                             get_physics_profile(data)]]
+      [["GRID", data,                        jar_opts, get_physics_profile(data)]]
     :
       [
-        ["GRID", concat([["WIDTH", w]], data), [],    get_physics_profile(data)],
-        ["GRID", concat([["WIDTH", l]], data), [],    get_physics_profile(data)]
+        ["GRID", concat([["WIDTH", w]], data), jar_opts, get_physics_profile(data)],
+        ["GRID", concat([["WIDTH", l]], data), jar_opts, get_physics_profile(data)]
       ]
   :
   (intent == "Nesting Tray (Short)") ? [

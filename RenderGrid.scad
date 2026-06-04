@@ -73,18 +73,20 @@ module _render_radial_core(int_h, radius, div_t, cfg) {
                     cuboid([radius - c_eff/2 + 0.1, div_t, int_h], anchor=BOTTOM+LEFT);
 }
 
-// render_internal_grid — called from core_tray_chassis for built-in grids.
-// GRID_WALL_H was injected by factory_render_box — used as the height cap.
+// render_internal_grid — called from core_tray_chassis (box) or factory_render_jar.
+// GRID_WALL_H was injected upstream — caps divider height for lid closure.
+// IS_JAR_GRID in data → clips cartesian walls to circular boundary.
 module render_internal_grid(data) {
     if (!get_val(HAS_BUILTIN_GRID, data, false)) return;
     sf    = m_safe_floor(data);
     sw    = m_safe_wall(data);
     bh    = m_bh(data);
     bw    = m_bw(data);
-    int_h = get_val(GRID_WALL_H, data, bh - sf);  // capped by lid type
+    int_h = get_val(GRID_WALL_H, data, bh - sf);
     div_t = get_val(THICK_DIVIDER, data, 1.2);
     int_w = bw - sw * 2;
     int_l = m_bl(data) - sw * 2;
+    is_jar = get_val(IS_JAR_GRID, data, false);
     cfg   = get_grid_config(data);
     cols  = cfg[0][0]; rows = cfg[0][1];
     spans = cfg[2];
@@ -92,31 +94,55 @@ module render_internal_grid(data) {
     up(sf) {
         if (rays > 0)
             _render_radial_core(int_h, int_w / 2, div_t, cfg);
-        else if (cols > 1 || rows > 1 || len(spans) > 0)
+        else if (is_jar) {
+            // Rectangular grid clipped to jar cylinder
+            intersection() {
+                cyl(d=int_w, h=int_h, anchor=BOTTOM);
+                render_cartesian_walls(cols, rows, spans, int_w, int_l, int_h, div_t);
+            }
+        } else if (cols > 1 || rows > 1 || len(spans) > 0)
             render_cartesian_walls(cols, rows, spans, int_w, int_l, int_h, div_t);
         render_franken_ribs(data);
     }
 }
 
-// render_box_grid_core — cartesian drop-in grid body.
+// render_box_grid_core — cartesian grid body, box or clipped-to-jar.
+// When IS_JAR_GRID=true in data, the grid is intersected with the jar cylinder.
 module render_box_grid_core(data, is_builtin=false) {
     bw  = m_bw(data); bl = m_bl(data); bh = m_bh(data);
     sf  = m_safe_floor(data); sw = m_safe_wall(data);
-    div_t = get_val(THICK_DIVIDER, data, 1.2);
-    tol   = is_builtin ? 0 : GRID_DROP_IN_TOL;
-    int_w = bw - sw*2 - tol;
-    int_l = bl - sw*2 - tol;
+    div_t   = get_val(THICK_DIVIDER, data, 1.2);
+    tol     = is_builtin ? 0 : GRID_DROP_IN_TOL;
+    int_w   = bw - sw*2 - tol;
+    int_l   = bl - sw*2 - tol;
+    int_d   = bw - sw*2 - tol;   // for jar clipping
+    is_jar  = get_val(IS_JAR_GRID, data, false);
     cfg       = get_grid_config(data);
     cols      = cfg[0][0]; rows = cfg[0][1];
     spans     = cfg[2];
     has_base  = cfg[3]; base_t = cfg[4];
     default_h = is_builtin ? get_val(GRID_WALL_H, data, bh - sf) : cfg[5];
-    apply_master_bounds(int_w, int_l, default_h + base_t,
-                        m_c_rad(data) - sw, m_chamf(data) / 2) {
-        if (has_base) cuboid([int_w, int_l, base_t], anchor=BOTTOM);
-        up(base_t)
-            if (cols > 1 || rows > 1 || len(spans) > 0)
-                render_cartesian_walls(cols, rows, spans, int_w, int_l, default_h, div_t);
+
+    if (is_jar) {
+        // Jar: clip rectangular walls to the circular container boundary
+        intersection() {
+            cyl(d=int_d, h=default_h + base_t, anchor=BOTTOM);
+            union() {
+                if (has_base) cuboid([int_d, int_d, base_t], anchor=BOTTOM);
+                up(base_t)
+                    if (cols > 1 || rows > 1 || len(spans) > 0)
+                        render_cartesian_walls(cols, rows, spans, int_w, int_l, default_h, div_t);
+            }
+        }
+    } else {
+        // Box: standard bounded rectangular walls
+        apply_master_bounds(int_w, int_l, default_h + base_t,
+                            m_c_rad(data) - sw, m_chamf(data) / 2) {
+            if (has_base) cuboid([int_w, int_l, base_t], anchor=BOTTOM);
+            up(base_t)
+                if (cols > 1 || rows > 1 || len(spans) > 0)
+                    render_cartesian_walls(cols, rows, spans, int_w, int_l, default_h, div_t);
+        }
     }
 }
 
@@ -144,16 +170,20 @@ module render_jar_grid_core(data, is_builtin=false) {
 
 // factory_render_grid — drop-in grid factory (called from manifest).
 // Standalone printable piece — outer dims shrunk by GRID_DROP_IN_TOL.
+// IS_JAR_GRID in opts → rectangular grid clipped to jar cylinder.
 module factory_render_grid(data, opts, phys) {
-    g_str = get_val(GRID_LAYOUT, data, "");
-    rays  = parse_radial_rays(g_str);
-    echo(str("-> Factory [GRID] | layout='", g_str, "' rays=", rays));
-    up(m_safe_floor(data)) {
+    g_str  = get_val(GRID_LAYOUT, data, "");
+    rays   = parse_radial_rays(g_str);
+    is_jar = get_val(IS_JAR_GRID, opts, false);
+    // Inject IS_JAR_GRID into data so render_box_grid_core can read it
+    d = is_jar ? concat([[IS_JAR_GRID, true]], data) : data;
+    echo(str("-> Factory [GRID] | layout='", g_str, "' rays=", rays, " jar=", is_jar));
+    up(m_safe_floor(d)) {
         if (rays > 0)
-            render_jar_grid_core(data, false);
+            render_jar_grid_core(d, false);
         else
-            render_box_grid_core(data, false);
-        cfg = get_grid_config(data);
-        up(cfg[4]) render_franken_ribs(data);
+            render_box_grid_core(d, false);
+        cfg = get_grid_config(d);
+        up(cfg[4]) render_franken_ribs(d);
     }
 }

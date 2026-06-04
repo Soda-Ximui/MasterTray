@@ -54,7 +54,8 @@ JAR_SHAPE    = "JAR_SHAPE";
 JAR_SIDES    = "JAR_SIDES";
 GLIDE_DIR      = "GLIDE_DIR";   // "H" (horizontal) | "V" (vertical)
 GLIDE_SNAP     = "GLIDE_SNAP"; // "Ball" (default) | "Tab"
-GRID_WALL_H    = "GRID_WALL_H";  // injected by factory_render_box — max divider height
+GRID_WALL_H    = "GRID_WALL_H";  // injected by factory — max divider height
+IS_JAR_GRID    = "IS_JAR_GRID"; // clip cartesian grid to circular jar boundary
 STACKABLE      = "STACKABLE";
 STACK_MODE     = "STACK_MODE";     // "Peg" | "Builtin" | "Snap"
 CHAMFER_SIZE   = "CHAMFER_SIZE";   // mm — 0 = auto from nozzle
