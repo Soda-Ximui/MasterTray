@@ -10,6 +10,7 @@ Layer_Height = 0.28; // [0.12, 0.16, 0.20, 0.24, 0.28]
 
 /* [Build Selection] */
 Part_To_Build = "1-Day 2-Compartment (Single Lid)"; // ["Box", "Standalone Box", "Flip Box", "1-Day AM/PM Box", "1-Day 2-Compartment (Single Lid)", "7-Day Pill Box", "14-Day AM/PM Box", "Pillbox Set (Double Lid)", "Pillbox Set (Single Lid)", "Pillbox Full Set", "Lid", "Simple Tray", "Nesting Tray (Short)", "Modular Peg Tray (Long)", "Standalone Box Grid", "Standalone Jar Grid", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Center Jar", "S4 Wedge Box", "S4 Set", "Plaque"]
+jar_shape = "Circle"; // ["Circle", "Quad", "Hexa", "Octa", "Dodeca"]
 
 /* [Total Outer Dimensions] */
 part_width = 30; // [10 : 1 : 300]
@@ -105,7 +106,8 @@ ui_payload = [
     [LID_MIN_SOLID,      min_solid_edge_for_lid], 
     [THICK_PEG_MULT,     peg_thickness_multiplier], 
     [PLATTER_GAP,        platter_gap], 
-    [THREAD_PITCH,       thread_pitch]
+    [THREAD_PITCH,       thread_pitch],
+    [JAR_SHAPE,          jar_shape]
 ];
 
 // --- FACTORY DISPATCHER ---

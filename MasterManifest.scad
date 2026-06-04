@@ -19,27 +19,38 @@
 include <MasterEngine.scad>
 include <MasterProcessor.scad>
 
+// Maps jar_shape string → polygon side count. 0 = full circle ($fn from global).
+function jar_sides(data) =
+  let(s = get_val(JAR_SHAPE, data, "Circle"))
+  (s == "Quad")   ? 4  :
+  (s == "Hexa")   ? 6  :
+  (s == "Octa")   ? 8  :
+  (s == "Dodeca") ? 12 :
+  0;
+
+function jar_opts(base, data) = concat(base, [["JAR_SIDES", jar_sides(data)]]);
+
 function compile_manifest(intent, data) =
   (intent == "Threaded Jar") ? [
-    ["JAR", data, [["IS_THREADED", true]],            get_physics_profile(data)],
-    ["LID", data, [["LID_TYPE",   "Screw"]],          get_physics_profile(data)]
+    ["JAR", data, jar_opts([["IS_THREADED", true]],  data), get_physics_profile(data)],
+    ["LID", data, [["LID_TYPE", "Screw"]],                  get_physics_profile(data)]
   ] :
   (intent == "Jar with Lid") ? [
-    ["JAR", data, [["IS_THREADED", true]],            get_physics_profile(data)],
-    ["LID", data, [["LID_TYPE",   "Screw"]],          get_physics_profile(data)]
+    ["JAR", data, jar_opts([["IS_THREADED", true]],  data), get_physics_profile(data)],
+    ["LID", data, [["LID_TYPE", "Screw"]],                  get_physics_profile(data)]
   ] :
   (intent == "Simple Jar") ?
     let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0))
     (w == l) ?
-      [["JAR", data, [],                              get_physics_profile(data)]]
+      [["JAR", data, jar_opts([], data),                    get_physics_profile(data)]]
     :
       [
-        ["JAR", concat([["WIDTH", l]], data), [],     get_physics_profile(data)],
-        ["JAR", concat([["WIDTH", w]], data), [],     get_physics_profile(data)]
+        ["JAR", concat([["WIDTH", l]], data), jar_opts([], data), get_physics_profile(data)],
+        ["JAR", concat([["WIDTH", w]], data), jar_opts([], data), get_physics_profile(data)]
       ]
   :
   (intent == "Open Jar") ? [
-    ["JAR", data, [["IS_THREADED", false]],           get_physics_profile(data)]
+    ["JAR", data, jar_opts([["IS_THREADED", false]], data), get_physics_profile(data)]
   ] :
   (intent == "Flip Box") ? [
     ["FLIP_BOX", data, [],                            get_physics_profile(data)],

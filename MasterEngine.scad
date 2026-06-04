@@ -22,7 +22,7 @@ include <MasterConstants.scad>
 // $fn: Fragment count controls smoothness of curves
 //   - Preview mode: 32 segments (fast screen refresh)
 //   - Render mode: 128 segments (export-quality STL smoothness)
-$fn = $preview ? 8 : 128;
+$fn = $preview ? 24 : 128;
 
 // ==============================================================================
 // SECTION 1: DEFAULT CONSTANTS

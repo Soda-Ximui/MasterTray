@@ -19,12 +19,13 @@ include <MasterMeshPatterns.scad>
 
 // framed_mesh — flat mesh slab for floor and lid surfaces.
 // is_cyl=true uses a circular boundary (jar floors/lids).
-module framed_mesh(data, w, l, h, is_cyl=false, cfg=undef) {
+module framed_mesh(data, w, l, h, is_cyl=false, cfg=undef, fn=0) {
     noz = m_noz(data);
     pat = get_val(PATTERN, data, TEARDROP);
+    cyl_fn = fn > 0 ? fn : $fn;
     if (cfg == undef) {
         linear_extrude(height=h, center=true) {
-            if (is_cyl) circle(d=w);
+            if (is_cyl) circle(d=w, $fn=cyl_fn);
             else        rect([w, l]);
         }
     } else {
@@ -40,10 +41,10 @@ module framed_mesh(data, w, l, h, is_cyl=false, cfg=undef) {
         // pad keeps holes slightly away from the mesh region boundary.
         pad = is_cyl ? 0 : noz * 4.5;
         linear_extrude(height=h, center=true) difference() {
-            if (is_cyl) circle(d=w);
+            if (is_cyl) circle(d=w, $fn=cyl_fn);
             else        rect([w, l]);
             intersection() {
-                if (is_cyl) circle(d=get_mesh_dim(w, strut));
+                if (is_cyl) circle(d=get_mesh_dim(w, strut), $fn=cyl_fn);
                 else        rect([max(0.1, get_mesh_dim(w, strut) - pad),
                                   max(0.1, get_mesh_dim(l, strut) - pad)]);
                 render_rectangular_pattern(pat, hole, step, nx, ny);
@@ -53,13 +54,14 @@ module framed_mesh(data, w, l, h, is_cyl=false, cfg=undef) {
 }
 
 // cylindrical_mesh_wall — hollow cylinder shell with optional radial pattern holes.
-module cylindrical_mesh_wall(data, d, h, wall_t, cfg=undef) {
+module cylindrical_mesh_wall(data, d, h, wall_t, cfg=undef, fn=0) {
     noz = m_noz(data);
     pat = get_val(PATTERN, data, TEARDROP);
+    cyl_fn = fn > 0 ? fn : $fn;
     if (cfg == undef) {
         difference() {
-            cyl(d=d, h=h, anchor=BOTTOM);
-            down(1) cyl(d=d - wall_t*2, h=h+2, anchor=BOTTOM);
+            cyl(d=d, h=h, anchor=BOTTOM, $fn=cyl_fn);
+            down(1) cyl(d=d - wall_t*2, h=h+2, anchor=BOTTOM, $fn=cyl_fn);
         }
     } else {
         hole    = cfg[0];
@@ -74,8 +76,8 @@ module cylindrical_mesh_wall(data, d, h, wall_t, cfg=undef) {
         z_step = h_active / nz;
         difference() {
             difference() {
-                cyl(d=d, h=h, anchor=BOTTOM);
-                down(1) cyl(d=d - wall_t*2, h=h+2, anchor=BOTTOM);
+                cyl(d=d, h=h, anchor=BOTTOM, $fn=cyl_fn);
+                down(1) cyl(d=d - wall_t*2, h=h+2, anchor=BOTTOM, $fn=cyl_fn);
             }
             for (i = [0 : nz-1])
                 for (j = [0 : na-1]) {
