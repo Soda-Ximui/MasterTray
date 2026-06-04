@@ -1,5 +1,21 @@
 # MasterTray — Optimization TODO
 _Generated from full codebase audit. Run `TODO.ps1` to check completion status._
+_Last updated: 2026-06-04_
+
+## Completed This Session
+
+- [x] **Sharp edge safety** — `apply_master_bounds` two-pass intersection now actually applies
+  chamfer (was dead code). Top rim + bottom elephant-foot relief on all box/tray primitives.
+  (`7224e8e` + `af0cec5`)
+- [x] **Cylindrical rim chamfer** — `cylindrical_mesh_wall`, screw lid cap: `nozzle×4` chamfer
+  on top/bottom rims. (`7224e8e`)
+- [x] **Slotted spacing bug** — `step*1.5` → `step+hole` in `pattern_slotted`. Pillars were
+  ~10% thinner than structural rule required. (`f92dd19`)
+- [x] **Magic numbers** — `0.2` → `RECT_HOLE_ROUND_RATIO`, `1.05` → `EXTRUSION_WIDTH_MULT`,
+  `0.25` → `STRUT_HOLE_RATIO`, all in `MasterConstants.scad`. (`f92dd19` + `0900f17`)
+- [x] **Corner rounding exposed** — `Corner_Round_Ratio` Customizer slider wired to
+  `corner_round_ratio` global; all square/slotted patterns use `max(hole*corner_round_ratio, line_width)`.
+  (`f92dd19`)
 
 ---
 
@@ -350,19 +366,30 @@ No print impact.
 
 ---
 
-## Checklist
+## Remaining Checklist
 
-- [ ] F15 — Flip-box hinge `assert()` (RenderBox.scad)
-- [ ] F18 — `lip_h` → `JAR_LIP_HEIGHT` (RenderJar, RenderLid, RenderGrid)
-- [ ] F6  — Diamond latch layer_snap (MasterEngine + RenderLid)
-- [ ] F14 — Snap bead height layer-align (RenderLid)
-- [ ] F1  — Glide ball min `noz*8` (MasterEngine)
-- [ ] F2  — Diamond hull middle cuboid Y=`noz*2` (RenderLid + RenderBox ×2)
-- [ ] F16 — Radial hub thresholds nozzle-parametric (RenderGrid)
-- [ ] F7  — Jar grid clearance layer-align (RenderJar)
-- [ ] F8  — Glide groove Z layer-align (RenderBox)
-- [ ] F9  — Thread rod Z-offset → `m_lh/2` (RenderLid)
-- [ ] F4  — Ledge lip chamfer Z-edges (RenderTray)
-- [ ] F5  — Hinge pillar top chamfer (RenderBox)
-- [ ] F17 — Jar grid height layer-align (RenderGrid)
-- [ ] F19 — Remove/wire dead constants (MasterConstants)
+### Priority 1 — Correctness / silent failures
+- [ ] F15 — Flip-box hinge `assert()` instead of `echo()` warning (RenderBox.scad ~L103 + L151)
+- [ ] F18 — `lip_h = 8.0` → `lip_h = JAR_LIP_HEIGHT` (RenderJar.scad L22, RenderLid.scad L136, RenderGrid.scad L180)
+- [ ] F6  — Diamond latch Z-offsets layer-snapped; add `layer_snap()` to MasterEngine (RenderLid.scad ~L120-131)
+- [ ] F14 — Snap bead height `noz*2` → layer-aligned minimum 3 layers (RenderLid.scad L44)
+
+### Priority 2 — Print quality improvements
+- [ ] F1  — Glide ball min `noz*5` → `noz*8` — avoids Arachne small-perimeter slowdown (MasterEngine.scad L428)
+- [ ] F2  — Diamond hull middle cuboid Y=`0.1` → `noz*2` — below min printable width (RenderLid.scad L130, RenderBox.scad L133 + L193)
+- [ ] F16 — Radial hub min-size thresholds `1.5` + `4.0` → nozzle-parametric (RenderGrid.scad L79)
+- [ ] F7  — Jar grid clearance `cyl_wall_h - 0.5` → layer-aligned subtraction (RenderJar.scad L33)
+- [ ] F8  — Glide groove `h - sl - 1.0` → layer-aligned drop (RenderBox.scad L51)
+- [ ] F9  — Thread rod Z `up(sl - 0.1)` → `up(sl - m_lh/2)` (RenderLid.scad L143)
+
+### Priority 3 — Minor / cosmetic
+- [ ] F4  — Ledge lip chamfer Z-edges (RenderTray.scad ~L97) — BOSL2 `Z_EDGES` syntax uncertain
+- [ ] F5  — Hinge pillar top chamfer (RenderBox.scad ~L118–124)
+- [ ] F17 — Jar grid height compound subtraction → layer-aligned (RenderGrid.scad ~L181)
+- [ ] F19 — Remove/wire dead constants `HINGE_BOSS_DEPTH` + `HINGE_BOSS_WIDTH` (MasterConstants.scad L37-38)
+
+### Non-TODO high-value work
+- [ ] Wire pill box intents in MasterManifest.scad (`1-Day AM/PM Box`, `7-Day Pill Box`,
+      `14-Day AM/PM Box`, `Pillbox Set *`) — see `git show d84fbcc:MasterManifest.scad`
+- [ ] Push branch + open PR against `refactor/code-clarity-and-safety`
+- [ ] RIB primitive (Primitive 5) — FrankenTray ribs, code in RenderRib.scad
