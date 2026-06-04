@@ -2,7 +2,33 @@
 
 ---
 
-## 0. All generated models must print support-free
+## 0. Structural integrity and strength are non-negotiable
+
+**Rule:** All generated containers must have decent structural integrity. These are
+functional storage objects — desiccant containers, pill organizers, general storage —
+not display models. They must survive real use.
+
+**How we achieve it:**
+- **Wall thickness** = snapped to nozzle multiples via `m_safe_wall` — no partial
+  extrusions, no weak inter-layer gaps
+- **Floor/lid thickness** = snapped to layer-height multiples via `m_safe_floor` /
+  `m_safe_lid` — flat surfaces align to layer boundaries, no micro-stepping
+- **Corner bosses** on stackable trays — solid cylinder pillars at all 4 corners
+  distribute stacking load into the tray walls, not just the floor
+- **Strut widths** = nozzle-multiple snapped (see Lesson 0c) — every mesh strut
+  is a complete extrusion pass, no weak partial lines
+- **Minimum wall** = `nozzle × wall_loops` — never thinner than the slicer's
+  configured perimeter count
+- **Mesh strut proportion** = 25% of hole diameter minimum — large holes get
+  proportionally thicker struts
+
+**Flag immediately** if any geometry change reduces wall count below `wall_loops`,
+thins a load-bearing surface below `m_safe_floor`, or introduces a mesh so open
+that the remaining struts can't bear typical storage loads.
+
+---
+
+## 0a. All generated models must print support-free
 
 **Rule:** Every primitive and composite must be printable on FDM without supports.
 
