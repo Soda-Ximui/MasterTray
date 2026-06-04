@@ -9,6 +9,8 @@ Wall_Loops         = 2;    // [1 : 1 : 10]
 Layer_Height       = 0.28; // [0.12, 0.16, 0.20, 0.24, 0.28]
 // Mesh hole corner rounding as a fraction of hole diameter (0.05=near-sharp, 0.45=near-circle).
 // Raise to reduce print-head deceleration at hole corners; lower for crisper square shapes.
+// Only affects square/slotted holes larger than ~2.1mm — below that the Arachne floor
+// (one extrusion width) always wins and this knob has no effect.
 Corner_Round_Ratio = 0.20; // [0.05:0.05:0.45]
 
 // 1.05 = Bambu Studio default extrusion width (105% of nozzle diameter)
