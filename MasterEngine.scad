@@ -456,14 +456,24 @@ function span_h_clamped(req_h, max_h) = min(req_h, max_h);
 // ==============================================================================
 
 /// apply_master_bounds(w, l, h, r, c)
-/// Clips child geometry to a rounded-corner bounding box using intersection.
-/// Ensures no geometry escapes the outer container walls.
-/// The h*3 oversize prevents the clip from cutting the top of tall objects.
+/// Clips child geometry to a rounded-corner, chamfered-top bounding box.
+///
+/// Two-pass intersection:
+///   Pass 1 — rounds the four vertical (Z) corner edges.
+///             h*3 oversize avoids inadvertently clipping tall children.
+///   Pass 2 — chamfers the four top horizontal edges at exactly h.
+///             XY is oversized by EPS so it doesn't disturb the corner rounding.
+///
+/// Result: vertical corners rounded, top rim chamfered, sides/bottom untouched.
+/// The `c` parameter was previously accepted but silently ignored — this wires it up.
 module apply_master_bounds(w, l, h, r, c) {
   c_r = max(0.1, min(r, (w / 2) - 0.1, (l / 2) - 0.1));
   intersection() {
-    children();
-    cuboid([w, l, h * 3], rounding=c_r, edges="Z", anchor=BOTTOM);
+    intersection() {
+      children();
+      cuboid([w, l, h * 3], rounding=c_r, edges="Z", anchor=BOTTOM);
+    }
+    cuboid([w + EPS, l + EPS, h], chamfer=max(0, c), edges=TOP, anchor=BOTTOM);
   }
 }
 

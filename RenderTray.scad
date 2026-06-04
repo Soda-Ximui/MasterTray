@@ -127,11 +127,12 @@ module factory_render_tray(data, opts, phys) {
         union() {
             apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
                 core_tray_chassis(data);
-            // Nesting ledge
+            // Nesting ledge — bottom edge chamfered to guide insertion into tray below
             down(ledge_h)
                 apply_master_bounds(w - sw*2, l - sw*2, ledge_h,
                                     m_c_rad(data) - sw, m_chamf(data))
-                cuboid([w, l, ledge_h + EPS], anchor=BOTTOM);
+                cuboid([w, l, ledge_h + EPS], anchor=BOTTOM,
+                       chamfer=m_chamf(data), edges=BOTTOM);
             // Snap bead — diamond cross-section ring at bottom of ledge.
             // All faces at 45°: support-free in print orientation.
             down(ledge_h)

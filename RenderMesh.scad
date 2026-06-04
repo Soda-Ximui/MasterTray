@@ -60,10 +60,13 @@ module framed_mesh(data, w, l, h, is_cyl=false, cfg=undef, fn=0) {
 
 // cylindrical_mesh_wall — hollow cylinder shell with optional radial pattern holes.
 module cylindrical_mesh_wall(data, d, h, wall_t, cfg=undef, fn=0) {
-    cyl_fn = fn > 0 ? fn : $fn;
+    cyl_fn    = fn > 0 ? fn : $fn;
+    // Safety chamfer on top and bottom rim: 4 extrusion passes wide so it's
+    // always printable and provides a tactile rounded edge (no knife rim).
+    rim_chamf = m_noz(data) * 4;
     if (cfg == undef) {
         difference() {
-            cyl(d=d, h=h, anchor=BOTTOM, $fn=cyl_fn);
+            cyl(d=d, h=h, chamfer=rim_chamf, anchor=BOTTOM, $fn=cyl_fn);
             down(1) cyl(d=d - wall_t*2, h=h+2, anchor=BOTTOM, $fn=cyl_fn);
         }
     } else {
@@ -82,7 +85,7 @@ module cylindrical_mesh_wall(data, d, h, wall_t, cfg=undef, fn=0) {
         z_step = h_active / nz;
         difference() {
             difference() {
-                cyl(d=d, h=h, anchor=BOTTOM, $fn=cyl_fn);
+                cyl(d=d, h=h, chamfer=rim_chamf, anchor=BOTTOM, $fn=cyl_fn);
                 down(1) cyl(d=d - wall_t*2, h=h+2, anchor=BOTTOM, $fn=cyl_fn);
             }
             for (i = [0 : nz-1])

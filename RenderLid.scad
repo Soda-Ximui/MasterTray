@@ -145,7 +145,7 @@ module factory_render_lid(data, opts, phys) {
             union() {
                 up(sl / 2) framed_mesh(data, w, w, sl, true,
                                         get_mesh_cfg(data, HOLE_LID, STRUT_LID, true));
-                up(sl) cyl(d=w, h=cap_h, anchor=BOTTOM);
+                up(sl) cyl(d=w, h=cap_h, chamfer2=noz*4, anchor=BOTTOM);
             }
             // EPS pullback: cutter starts one boolean-epsilon below lid surface so the
             // thread is cleanly subtracted without a zero-thickness manifold edge.

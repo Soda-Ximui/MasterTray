@@ -186,13 +186,16 @@ module factory_render_box(data, opts, phys) {
             }
             // Spine pillars (centre, supports both hinges)
             translate([-(w-sw*2)/2 + sw/2, 0, sf])
-                cuboid([sw*3, spine_w, axle_z+cc_z-sf], anchor=BOTTOM);
+                cuboid([sw*3, spine_w, axle_z+cc_z-sf], chamfer=m_chamf(data),
+                       edges=TOP, anchor=BOTTOM);
             translate([ (w-sw*2)/2 - sw/2, 0, sf])
-                cuboid([sw*3, spine_w, axle_z+cc_z-sf], anchor=BOTTOM);
+                cuboid([sw*3, spine_w, axle_z+cc_z-sf], chamfer=m_chamf(data),
+                       edges=TOP, anchor=BOTTOM);
             if (cols > 1 && !skip_p)
                 for (i = [1 : cols-1])
                     translate([-int_w/2 + i*(int_w/cols), 0, sf])
-                        cuboid([div_t, spine_w, axle_z+cc_z-sf], anchor=BOTTOM);
+                        cuboid([div_t, spine_w, axle_z+cc_z-sf], chamfer=m_chamf(data),
+                               edges=TOP, anchor=BOTTOM);
             // Two axle pins
             translate([0, -hinge_y, axle_z])
                 yrot(90) cyl(d=hinge_d, h=w - sw*2, chamfer=0.5, $fn=36);
