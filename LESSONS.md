@@ -28,7 +28,36 @@ that the remaining struts can't bear typical storage loads.
 
 ---
 
-## 0a. All generated models must print support-free
+## 0b. All edges use chamfer or fillet — no sharp 90° overhangs
+
+**Rule:** Every edge in the system is either chamfered or filleted. No sharp 90°
+horizontal edge is left exposed on a downward-facing surface.
+
+**Why:** FDM printers cannot print a sharp 90° overhang without supports. A chamfer
+≤45° is self-supporting. A fillet on a vertical edge avoids stress concentrations
+and improves layer adhesion at corners.
+
+**How we achieve it:**
+
+| Edge type | Treatment | Mechanism |
+|-----------|-----------|-----------|
+| Vertical corners (XY plane) | Fillet | `apply_master_bounds` → `cuboid(rounding=m_c_rad)` |
+| Bottom outer edge of walls | Chamfer | `m_chamf(data)` passed to BOSL2 `cuboid`/`cyl` |
+| Top of cylinder (lid, boss, peg) | Chamfer2 | `cyl(..., chamfer2=m_chamf(data))` |
+| Bottom of cylinder (jar floor) | Chamfer | `cyl(..., chamfer=m_chamf(data))` |
+| Peg rod ends | Chamfer both ends | `cyl(..., chamfer=0.5)` |
+| Snap bead | Diamond cross-section | All faces ≤45° by geometry — no explicit chamfer needed |
+
+**Standard values** (both physics-derived from printer settings):
+- `m_chamf(data)` = `nozzle × MAX_CHAMFER_MULT` — horizontal edge chamfer
+- `m_c_rad(data)` = derived from wall thickness — vertical corner fillet radius
+
+**Flag immediately** if any new geometry introduces a horizontal edge > 45° on a
+downward-facing surface, or a sharp vertical corner on an outer wall.
+
+---
+
+## 0c. All generated models must print support-free
 
 **Rule:** Every primitive and composite must be printable on FDM without supports.
 
