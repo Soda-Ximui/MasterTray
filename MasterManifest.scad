@@ -89,12 +89,22 @@ function compile_manifest(intent, data) =
       ]
   :
   (intent == "Flip Box") ? [
-    ["FLIP_BOX", data, [],                            get_physics_profile(data)],
-    ["LID",      data, [["LID_TYPE", "Flip_Single"]], get_physics_profile(data)]
+    ["BOX", data, [["LID_TYPE", "Flip_Single"]], get_physics_profile(data)],
+    ["LID", data, [["LID_TYPE", "Flip_Single"]], get_physics_profile(data)]
   ] :
-  (intent == "Double Flip Box") ? [
-    ["DOUBLE_FLIP_BOX", data, [],                     get_physics_profile(data)]
-  ] :
+  (intent == "Double Flip Box") ?
+    let(phys = get_physics_profile(data),
+        w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0),
+        clearance = breathing_room(COMP_CCLIP, data),
+        spine_gap = breathing_room(COMP_SPINE, data),
+        hinge_y = (4.0 + clearance*2 + get_val(NOZZLE_DIAMETER, data, 0.4)*8) / 2 + spine_gap,
+        lid_l = l - hinge_y)
+    [
+      ["BOX", data,                          [["LID_TYPE", "Flip_Double"]],   phys],
+      ["LID", concat([["LENGTH", lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys],
+      ["LID", concat([["LENGTH", lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys]
+    ]
+  :
   (intent == "Box") ? [
     ["BOX", data, [["LID_TYPE", "Snap"]],             get_physics_profile(data)],
     ["LID", data, [["LID_TYPE", "Snap"]],             get_physics_profile(data)]
