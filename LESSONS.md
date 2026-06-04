@@ -187,7 +187,46 @@ cross a factory boundary.
 
 ---
 
-## 2. `use` vs `include` for factory modules
+## 2. Built-in grid height is driven by LID_TYPE — the tray adapts to its lid
+
+**Rule:** When a tray/box has a built-in grid (`HAS_BUILTIN_GRID=true`), the internal
+divider wall height is NOT simply "tray height minus floor". It is capped by whatever
+the lid type requires to close properly.
+
+**The constraint per lid type:**
+
+| LID_TYPE | Grid wall height cap | Reason |
+|----------|---------------------|--------|
+| Plain / Snap / Glide | `bh - sf - sl` | Full interior height |
+| `Flip_Single` | `axle_z` = `bh - clip_outer_d/2` | Lid must flip closed over dividers |
+| `Flip_Double` | `axle_z` (same) | Same hinge geometry |
+
+**How it flows:**
+```
+factory_render_box(data, opts, phys)
+  lid_type = get_val("LID_TYPE", opts)
+  grid_wall_h = lid_type == "Flip_*" ? axle_z : bh - sf - sl
+  d = concat([[GRID_WALL_H, grid_wall_h]], data)  ← inject before chassis call
+  core_tray_chassis(d)
+    → render_internal_grid(d)
+        → reads GRID_WALL_H from d
+        → dividers capped at grid_wall_h
+```
+
+**The hinge pillars ARE the grid divider pillars** (on the hinge side). In
+`factory_render_box` with `Flip_Single`, the inter-column divider stubs at the +Y
+face serve both as structural hinge support AND as grid column separators. They
+are built by `factory_render_box`, NOT by `render_internal_grid`. The internal
+grid handles only the full-depth dividers running front-to-back.
+
+**Implementation note:** `GRID_WALL_H` must be in MasterEnum and prepended to
+data in the factory before calling `core_tray_chassis`. `render_internal_grid`
+reads it with `get_val(GRID_WALL_H, data, bh - sf - sl)` — the fallback is the
+full interior height for plain boxes.
+
+---
+
+## 3. `use` vs `include` for factory modules
 
 **Rule:** Use `include` for your own factory files. Use `use` only for
 third-party libraries (BOSL2).

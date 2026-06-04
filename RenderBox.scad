@@ -28,10 +28,19 @@ module factory_render_box(data, opts, phys) {
 
     echo(str("-> Factory [BOX] | ", w, "x", l, "x", h, " | lid=", lid_type));
 
+    // Compute max internal grid wall height and inject into data.
+    // render_internal_grid reads GRID_WALL_H so dividers don't block lid closure.
+    is_flip = (lid_type == "Flip_Single" || lid_type == "Flip_Double");
+    hinge_d_  = 4.0;
+    clip_od_  = hinge_d_ + breathing_room(COMP_CCLIP, data)*2 + noz*8;
+    axle_z_   = h - clip_od_ / 2;
+    grid_wall_h = is_flip ? axle_z_ : (h - sf - sl);
+    data_g = concat([[GRID_WALL_H, grid_wall_h]], data);
+
     if (lid_type == "Snap" || lid_type == "Slip") {
         // ── Plain box: chassis + corner rounding only ──────────────────────────
         apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
-            core_tray_chassis(data);
+            core_tray_chassis(data_g);
 
     } else if (lid_type == "Glide") {
         // ── Glide box: groove channel + ball-catch dimples ─────────────────────
@@ -48,7 +57,7 @@ module factory_render_box(data, opts, phys) {
 
         difference() {
             apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
-                core_tray_chassis(data);
+                core_tray_chassis(data_g);
             // Groove channel for lid to slide into
             up(h - sl - 1.0)
                 cuboid([groove_w, groove_l, groove_h], anchor=BOTTOM);
@@ -83,7 +92,7 @@ module factory_render_box(data, opts, phys) {
         union() {
             difference() {
                 apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
-                    core_tray_chassis(data);
+                    core_tray_chassis(data_g);
                 // Hinge bore recess on +Y face
                 translate([0, l/2 + hinge_y, axle_z])
                     yrot(90) cyl(d=clip_od + clearance*4, h=clip_len+2, $fn=36);
@@ -134,7 +143,7 @@ module factory_render_box(data, opts, phys) {
         union() {
             difference() {
                 apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
-                    core_tray_chassis(data);
+                    core_tray_chassis(data_g);
                 // Hinge bore recesses on both Y faces
                 hull() {
                     translate([0, -hinge_y, axle_z])
