@@ -8,3 +8,4 @@
 | What rule governs this geometry decision? | `docs/LESSONS.md` |
 | What's left to do? | `TODO.md` |
 | Where was I? | `HANDOFF.md` |
+| What tools do I need installed? | `SETUP.md` |
