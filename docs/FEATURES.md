@@ -182,14 +182,31 @@ Three independent knobs, one set per surface (wall, floor, lid):
 Any one knob being "off" kills the mesh on that surface. `get_mesh_cfg` returns
 `undef` when mesh should be skipped; the factory renders solid instead.
 
+### Strut % Semantics
+
+**Strut % = the fraction of the surface that is solid border.** 10% strut → 90%
+of the surface is open mesh. The geometry changes per surface type:
+
+| Surface | How strut % is applied |
+|---------|------------------------|
+| Flat rectangle | Each linear dimension independently: mesh rect = W×(1−s%) by L×(1−s%). Solid border = s%/2 on each of the four sides. An extra fixed pad (`nozzle×4.5`) is added to prevent half-holes at the boundary — actual border is slightly wider than s% alone. |
+| Flat circle (jar floor/lid) | **Area-based**: mesh circle area = (1−s%) of total circle area. Diameter = `d × √(1−s%)`. Solid ring width scales correctly with s%. |
+| Cylindrical wall | Height only: mesh zone occupies (1−s%) of wall height, centred. Solid band = s%/2 at top, s%/2 at bottom. No solid band around the circumference — holes go all the way around. |
+
+**Threaded neck and strut priority:** On threaded jars, the mesh wall (`cyl_wall_h`)
+is a physically separate geometry piece placed below the taper and thread sections.
+Strut % governs only the mesh wall section. The threaded neck always gets its full
+solid space regardless of strut setting — structural isolation by construction, not
+by strut math.
+
 **Flat mesh** (`framed_mesh`) — used on box/tray floor and lid. Pattern tiles
-are `linear_extrude`d through a flat slab. `is_cyl=true` uses a circular
-boundary (jar floors).
+are `linear_extrude`d through a flat slab. `is_cyl=true` uses circular boundary
+(jar floors/lids) with area-based strut scaling.
 
 **Cylindrical mesh** (`cylindrical_mesh_wall`) — used on jar walls. Pattern
 primitives are placed radially through the wall shell, distributed evenly around
-the circumference and up the height. `n_cols` (around) and `n_rows` (up) are
-derived from the strut percentage and hole step size.
+the circumference and up the height. `n_rows` (up) is derived from strut % and
+hole step size; `n_cols` (around) fills the full circumference.
 
 ---
 
