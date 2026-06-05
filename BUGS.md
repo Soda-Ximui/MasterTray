@@ -67,4 +67,60 @@ Strut% only governs the mesh wall section; the neck is structurally isolated abo
 
 ---
 
-_Add new entries as B2, B3, … in order of discovery._
+## B2 — Screw lid cap height inherits jar neck height instead of minimum thread engagement
+
+**Status:** Fixed in `RenderLid.scad` line 141  
+**Severity:** High — lid prints ~70% taller than necessary; wastes filament and print time  
+**Reported:** 2026-06-04 (user: "jar lid too tall")
+
+### Root cause
+
+The Screw lid cap height was derived by copying the jar neck geometry:
+
+```scad
+// BEFORE (wrong): RenderLid.scad line 141
+lip_h = JAR_LIP_HEIGHT;              // 8.0mm — the jar's threaded neck height
+cap_h = max(0.1, lip_h + sw * 1.5); // 8.0 + 2.4×1.5 = 11.6mm
+```
+
+`lip_h + sw*1.5` is the sum of the jar neck's thread section (`lip_h`) and its taper
+cone (`sw*1.5`). The taper is a feature on the **jar body** — it transitions the jar
+wall diameter down to the neck diameter. The lid cap slides over the neck; it has no
+taper and does not need taper clearance.
+
+**Total lid height at defaults:** `sl + cap_h` = `2.0 + 11.6` = **13.6mm**
+
+### Fix
+
+Cap height = minimum thread engagement: 3 full turns at the configured pitch,
+floored at `sw*2` (ensures at least 2 full wall passes on the cap cylinder).
+
+```scad
+// AFTER: RenderLid.scad line 141
+cap_h = max(m_thread_pitch(data) * 3, sw * 2);
+```
+
+**Total lid height at defaults** (`pitch=2.0, sw=2.4`):  
+`max(6.0, 4.8) = 6.0mm cap` → `sl + cap_h = 2.0 + 6.0` = **8.0mm** (−5.6mm, −41%)
+
+### Height comparison at common settings
+
+| pitch | sw | Before cap_h | After cap_h | Saving |
+|-------|----|-------------|-------------|--------|
+| 2.0mm | 2.4mm | 11.6mm | 6.0mm | −5.6mm |
+| 2.0mm | 3.2mm | 12.8mm | 6.4mm | −6.4mm |
+| 3.0mm | 2.4mm | 11.6mm | 9.0mm | −2.6mm |
+
+### All other lid types — confirmed correct
+
+| Lid type | Height | Verdict |
+|----------|--------|---------|
+| Snap | `sl` only | ✅ |
+| Glide | `sl` only | ✅ |
+| Flip_Single | `sl` + C-clip hinge above (mechanically required) | ✅ |
+| Slip | `sl` only | ✅ |
+| **Screw** | **Was `sl + lip_h + sw*1.5`; now `sl + max(pitch×3, sw×2)`** | **Fixed** |
+
+---
+
+_Add new entries as B3, B4, … in order of discovery._
