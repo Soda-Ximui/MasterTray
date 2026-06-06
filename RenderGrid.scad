@@ -151,14 +151,23 @@ module render_internal_grid(data) {
 
 // render_box_grid_core — cartesian grid body, box or clipped-to-jar.
 // When IS_JAR_GRID=true in data, the grid is intersected with the jar cylinder.
+// Drop-in sizing depends on dimension_mode:
+//   Total  — subtract computed safe-wall/floor from outer dims, add tolerance gap.
+//   Usable — LWH are the target interior dims; subtract only the user wall/floor
+//            settings (which were added by MasterBuilder to produce raw dims), then
+//            subtract the tolerance gap so the grid slides snugly inside.
 module render_box_grid_core(data, is_builtin=false) {
     bw  = m_bw(data); bl = m_bl(data); bh = m_bh(data);
     sf  = m_safe_floor(data); sw = m_safe_wall(data);
-    div_t   = get_val(THICK_DIVIDER, data, 1.2);
-    tol     = is_builtin ? 0 : GRID_DROP_IN_TOL;
-    int_w   = bw - sw*2 - tol;
-    int_l   = bl - sw*2 - tol;
-    int_d   = bw - sw*2 - tol;   // for jar clipping
+    div_t    = get_val(THICK_DIVIDER, data, 1.2);
+    tol      = is_builtin ? 0 : GRID_DROP_IN_TOL;
+    dim_mode = is_builtin ? "Total" : get_val(DIMENSION_MODE, data, "Total");
+    tw       = get_val(THICK_WALL,  data, 2.4);
+    tf       = get_val(THICK_FLOOR, data, 2.0);
+    tl       = get_val(THICK_LID,   data, 2.0);
+    int_w   = (dim_mode == "Usable") ? bw - tw*2 - tol : bw - sw*2 - tol;
+    int_l   = (dim_mode == "Usable") ? bl - tw*2 - tol : bl - sw*2 - tol;
+    int_d   = int_w;   // for jar clipping (jars: int_w == int_l)
     is_jar  = get_val(IS_JAR_GRID, data, false);
     cfg       = get_grid_config(data);
     cols      = cfg[0][0]; rows = cfg[0][1];
@@ -166,7 +175,9 @@ module render_box_grid_core(data, is_builtin=false) {
     // Base only for drop-in — built-in grids sit on the tray floor already
     has_base  = !is_builtin && cfg[3];
     base_t    = has_base ? cfg[4] : 0;
-    default_h = is_builtin ? get_val(GRID_WALL_H, data, bh - sf) : cfg[5];
+    default_h = is_builtin ? get_val(GRID_WALL_H, data, bh - sf)
+              : (dim_mode == "Usable") ? bh - tf - tl - tol
+              : cfg[5];
 
     if (is_jar) {
         // Jar: clip rectangular walls to the circular container boundary
@@ -192,19 +203,26 @@ module render_box_grid_core(data, is_builtin=false) {
 }
 
 // render_jar_grid_core — radial drop-in grid body for jars.
+// Drop-in sizing follows the same dimension_mode logic as render_box_grid_core.
 module render_jar_grid_core(data, is_builtin=false) {
     bw  = m_bw(data); bh = m_bh(data);
     sf  = m_safe_floor(data); sw = m_safe_wall(data);
-    div_t = get_val(THICK_DIVIDER, data, 1.2);
-    tol   = is_builtin ? 0 : GRID_DROP_IN_TOL;
+    div_t    = get_val(THICK_DIVIDER, data, 1.2);
+    tol      = is_builtin ? 0 : GRID_DROP_IN_TOL;
+    dim_mode = is_builtin ? "Total" : get_val(DIMENSION_MODE, data, "Total");
+    tw       = get_val(THICK_WALL,  data, 2.4);
+    tf       = get_val(THICK_FLOOR, data, 2.0);
+    tl       = get_val(THICK_LID,   data, 2.0);
     has_threads = get_val(HAS_THREADS, data, false);
     lip_h = JAR_LIP_HEIGHT;   // centralized in MasterConstants
     lh    = m_lh(data);
     // Drop-in clearance snapped to nearest layer — preserves alignment of int_h.
     drop_in_clr = is_builtin ? 0 : lh * ceil(0.5 / lh);
-    int_h_raw = bh - sf - (has_threads ? lip_h + sw*1.5 : 0) - drop_in_clr;
+    int_h_raw = (dim_mode == "Usable")
+        ? bh - tf - tl - tol
+        : bh - sf - (has_threads ? lip_h + sw*1.5 : 0) - drop_in_clr;
     int_h = round(int_h_raw / lh) * lh;   // force layer alignment on the result
-    int_d = bw - sw*2 - tol;
+    int_d = (dim_mode == "Usable") ? bw - tw*2 - tol : bw - sw*2 - tol;
     cfg      = get_grid_config(data);
     // Base only for drop-in jar grids
     has_base = !is_builtin && cfg[3];
