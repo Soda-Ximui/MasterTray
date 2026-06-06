@@ -69,10 +69,15 @@ module render_cartesian_walls(cols, rows, spans, int_w, int_l, default_h, div_t)
 }
 
 // _render_radial_core — shared radial spoke geometry for jar grids.
+// cfg[1][3] = ray height (mm, already resolved), cfg[1][4] = hub height.
+// When heights exceed the jar interior they poke above the mouth — intentional
+// for open containers used as pencil/utensil holders.
 module _render_radial_core(int_h, radius, div_t, cfg) {
     rays    = cfg[1][0];
     c_raw   = cfg[1][1];
     is_perc = cfg[1][2];
+    ray_h   = len(cfg[1]) > 3 ? cfg[1][3] : int_h;
+    hub_h   = len(cfg[1]) > 4 ? cfg[1][4] : ray_h;
     // Convert C percentage to actual diameter; absolute values used as-is.
     c_dia   = is_perc ? radius * 2 * (c_raw / 100) : c_raw;
     inner   = c_dia - div_t * 2;
@@ -85,16 +90,16 @@ module _render_radial_core(int_h, radius, div_t, cfg) {
     c_eff   = (inner >= min_hollow) ? c_dia : max(min_solid, c_dia);
     if (inner >= min_hollow)
         difference() {
-            cyl(d=c_eff, h=int_h, anchor=BOTTOM);
-            down(1) cyl(d=inner, h=int_h+2, anchor=BOTTOM);
+            cyl(d=c_eff, h=hub_h, anchor=BOTTOM);
+            down(1) cyl(d=inner, h=hub_h+2, anchor=BOTTOM);
         }
     else
-        cyl(d=c_eff, h=int_h, anchor=BOTTOM);
+        cyl(d=c_eff, h=hub_h, anchor=BOTTOM);
     if (rays > 0)
         for (i = [0 : rays-1])
             zrot(i * 360/rays)
                 translate([c_eff/2 - EPS, -div_t/2, 0])
-                    cuboid([radius - c_eff/2 + EPS, div_t, int_h], anchor=BOTTOM+LEFT);
+                    cuboid([radius - c_eff/2 + EPS, div_t, ray_h], anchor=BOTTOM+LEFT);
 }
 
 // render_internal_grid — called from core_tray_chassis (box) or factory_render_jar.
@@ -119,9 +124,15 @@ module render_internal_grid(data) {
         echo(str("WARNING: layout contains radial tokens but IS_JAR_GRID is false",
                  " — radial dividers ignored for this container type."));
     up(sf) {
-        if (rays > 0 && is_jar)
-            _render_radial_core(int_h, int_w / 2, div_t, cfg);
-        else if (is_jar) {
+        if (rays > 0 && is_jar) {
+            // clip_h allows spokes to poke above jar mouth when ray_h > int_h.
+            ray_h  = len(cfg[1]) > 3 ? cfg[1][3] : int_h;
+            clip_h = max(int_h, ray_h);
+            intersection() {
+                cyl(d=int_w, h=clip_h, anchor=BOTTOM);
+                _render_radial_core(int_h, int_w / 2, div_t, cfg);
+            }
+        } else if (is_jar) {
             // Rectangular grid clipped to jar cylinder
             intersection() {
                 cyl(d=int_w, h=int_h, anchor=BOTTOM);
@@ -194,11 +205,13 @@ module render_jar_grid_core(data, is_builtin=false) {
     // Base only for drop-in jar grids
     has_base = !is_builtin && cfg[3];
     base_t   = has_base ? cfg[4] : 0;
+    ray_h  = len(cfg[1]) > 3 ? cfg[1][3] : int_h;
+    clip_h = max(int_h, ray_h);
     union() {
         if (has_base) cyl(d=int_d, h=base_t, anchor=BOTTOM);
         up(base_t)
             intersection() {
-                cyl(d=int_d, h=int_h, anchor=BOTTOM);
+                cyl(d=int_d, h=clip_h, anchor=BOTTOM);
                 _render_radial_core(int_h, int_d/2, div_t, cfg);
             }
     }

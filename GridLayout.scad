@@ -26,15 +26,43 @@ function has_cartesian(g_str) =
     len(tok_x) > 0;
 
 // --- RADIAL PARSER (JAR ONLY) ---
+// Syntax: R<rays>[/H[%]]  C<diameter>[%][/H[%]]
+//   R4        — 4 spokes, height = jar interior (default)
+//   R4/150%   — 4 spokes, height = 150% of interior → pokes above jar mouth
+//   R4/80     — 4 spokes, 80mm absolute height
+//   C20%/120% — hub = 20% of diameter, height = 120% of interior
+// Heights are resolved to mm in get_grid_config (needs effective_max_h).
+// Returns raw parsed values: [rays, c_val, c_is_perc, r_h_val, r_h_is_perc, c_h_val, c_h_is_perc]
+//   r_h_val / c_h_val = undef → use default height (flush with jar mouth)
 function parse_radial(g_str) =
-    let(tokens = get_grid_tokens(g_str),
-        tok_r = [for (t = tokens) if (t[0] == "R" || t[0] == "r") t],
-        tok_c = [for (t = tokens) if (t[0] == "C" || t[0] == "c") t],
-        
-        rays = len(tok_r) > 0 ? max(0, to_num(get_digits(tok_r[0]))) : 0,
-        c_val = len(tok_c) > 0 ? to_num(get_digits(tok_c[0])) : 6.0,
-        is_perc = len(tok_c) > 0 && tok_c[0][len(tok_c[0])-1] == "%")
-    [rays, c_val, is_perc];
+    let(
+        tokens      = get_grid_tokens(g_str),
+        tok_r       = [for (t = tokens) if (t[0] == "R" || t[0] == "r") t],
+        tok_c       = [for (t = tokens) if (t[0] == "C" || t[0] == "c") t],
+
+        // Normalise token: replace "/" with "," so str_split(",") works uniformly
+        // (same technique used by parse_single_span for "S" tokens).
+        r_norm      = len(tok_r) > 0
+                        ? str_join([for (i=[0:len(tok_r[0])-1]) tok_r[0][i]=="/" ? "," : tok_r[0][i]], "")
+                        : "",
+        r_parts     = str_split(r_norm, ","),
+        rays        = len(r_parts) > 0 ? max(0, to_num(get_digits(r_parts[0]))) : 0,
+        r_h_str     = len(r_parts) > 1 ? r_parts[1] : undef,
+        r_h_is_perc = (r_h_str != undef) && r_h_str[len(r_h_str)-1] == "%",
+        r_h_val     = (r_h_str != undef) ? to_num(get_digits(r_h_str)) : undef,
+
+        c_norm      = len(tok_c) > 0
+                        ? str_join([for (i=[0:len(tok_c[0])-1]) tok_c[0][i]=="/" ? "," : tok_c[0][i]], "")
+                        : "",
+        c_parts     = str_split(c_norm, ","),
+        c_base      = len(c_parts) > 0 ? c_parts[0] : "",
+        c_val       = len(c_base) > 0 ? to_num(get_digits(c_base)) : 6.0,
+        c_is_perc   = len(c_base) > 0 && c_base[len(c_base)-1] == "%",
+        c_h_str     = len(c_parts) > 1 ? c_parts[1] : undef,
+        c_h_is_perc = (c_h_str != undef) && c_h_str[len(c_h_str)-1] == "%",
+        c_h_val     = (c_h_str != undef) ? to_num(get_digits(c_h_str)) : undef
+    )
+    [rays, c_val, c_is_perc, r_h_val, r_h_is_perc, c_h_val, c_h_is_perc];
 
 function has_radial(g_str) = 
     let(rad = parse_radial(g_str)) 
@@ -80,7 +108,10 @@ function get_grid_config(data) =
         sf = m_safe_floor(data),
         sl = m_safe_lid(data),
         
-        is_closed = (type == BOX || type == FLIP_BOX || type == JAR_LID || type == DOUBLE_FLIP_BOX || type == DESICCANT_BOX),
+        // TYPE defaults to BOX when not set (jars don't inject it), so we also
+        // check IS_JAR_GRID to distinguish jar context from a true box.
+        is_jar    = get_val(IS_JAR_GRID, data, false),
+        is_closed = !is_jar && (type == BOX || type == FLIP_BOX || type == JAR_LID || type == DOUBLE_FLIP_BOX || type == DESICCANT_BOX),
 
         max_internal_h = bh - sf - (is_closed ? sl : 0),
         // GRID_WALL_H injected by factories (e.g. factory_render_jar for neck clearance,
@@ -90,11 +121,28 @@ function get_grid_config(data) =
         effective_max_h = (grid_wall_h_cap > 0) ? grid_wall_h_cap : max_internal_h,
         default_h = effective_max_h,
 
-        cart_dims = parse_cartesian(g_str),
-        rad_dims = parse_radial(g_str),
-        spans = parse_spans(g_str, default_h, effective_max_h, is_closed || grid_wall_h_cap > 0)
+        cart_dims   = parse_cartesian(g_str),
+        rad_dims    = parse_radial(g_str),
+        spans       = parse_spans(g_str, default_h, effective_max_h, is_closed || grid_wall_h_cap > 0),
+
+        // Resolve optional poke-through heights from R/H and C/H tokens.
+        // undef → flush with jar mouth (effective_max_h). % → relative to that.
+        // Clamp when: box-type closed container, OR threaded jar (neck blocks poke-through).
+        // Open jars: poke-through allowed — pencil/utensil holder use case.
+        jar_threaded = is_jar && get_val(HAS_THREADS, data, false),
+        clamp_height = is_closed || jar_threaded,
+        r_h_mm  = (rad_dims[3] == undef) ? effective_max_h :
+                   rad_dims[4] ? (effective_max_h * rad_dims[3] / 100) : rad_dims[3],
+        c_h_mm  = (rad_dims[5] == undef) ? r_h_mm :
+                   rad_dims[6] ? (effective_max_h * rad_dims[5] / 100) : rad_dims[5],
+        ray_h   = clamp_height ? min(r_h_mm, effective_max_h) : r_h_mm,
+        hub_h   = clamp_height ? min(c_h_mm, effective_max_h) : c_h_mm,
+
+        // cfg[1] = [rays, c_val, c_is_perc, ray_h_mm, hub_h_mm]
+        // Indices 0-2 unchanged — existing callers unaffected.
+        rad_cfg = [rad_dims[0], rad_dims[1], rad_dims[2], ray_h, hub_h]
     )
-    [cart_dims, rad_dims, spans, has_base, base_t, default_h];
+    [cart_dims, rad_cfg, spans, has_base, base_t, default_h];
 
 // --- DEBUGGER ---
 module debug_grid_parser(data) {
