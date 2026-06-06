@@ -315,8 +315,9 @@ function parse_connection_tokens(raw) =
     ];
 
 // True if token is a hub shape specifier: C<n>, S<n>, or T<n> (len > 1).
+// len >= 1 so bare "C"/"S"/"T"/"D" (no size = nub) is recognised.
 function _is_shape_tok(s) =
-    len(s) > 1 && (s[0] == "C" || s[0] == "S" || s[0] == "T");
+    len(s) >= 1 && (s[0] == "C" || s[0] == "S" || s[0] == "T" || s[0] == "D");
 
 // True if token is a height value: ends with % OR first char is ASCII digit 0-9.
 function _is_height_tok(s) =

@@ -28,23 +28,36 @@ Whitespace around commas, brackets, and parentheses is ignored.
 ## Anchor Definition — `A(...)`
 
 ```
-A( name, position [, shape] [, height] )
+A( name, position [, shape [, shape_height]] )
 ```
 
 | Field | Required | Values |
 |-------|----------|--------|
 | `name` | yes | any alphanumeric identifier: `A1`, `hub`, `mid` |
 | `position` | yes | `x,y` in mm from the SW (bottom-left) interior corner, OR `C` for centre |
-| `shape` | no | `C<r>` circle radius r mm, `S<s>` square side s mm, `T<s>` equilateral triangle side s mm |
-| `height` | no | `<n>%` of the object's max internal height, or `<n>` absolute mm. Default = max internal height. |
+| `shape` | no | `C<n>`, `S<n>`, `T<n>`, `D<n>` — see table below. `n` absent or `n=0` → decorative nub. |
+| `shape_height` | no | `<n>%` or `<n>` mm height of the hub shape only. Default = max internal height. |
+
+**Shape height is independent of rib height.** Ribs that originate from this
+anchor use the full max internal height by default; override per-rib with the
+height field in `[from, to, height]`. The `shape_height` field only controls
+how tall the hub prism itself is.
+
+### Shape rendering
+
+| Token | Shape | Notes |
+|-------|-------|-------|
+| `C<n>` | Cylinder, diameter `2n` | Hollow when inner diameter ≥ 6 extrusion passes |
+| `S<n>` | Square prism, side `n` | Solid |
+| `T<n>` | Equilateral triangle prism, side `n` | Solid, point facing +Y |
+| `D<n>` | Diamond prism (square side `n` rotated 45°) | Solid |
+| any with `n=0`, `n` absent, or `n` below ~2 mm | Decorative nub | Minimal solid shape — marks the anchor visually, structurally negligible |
 
 ### Height — `<n>%`
 
-The percentage applies to the **divider wall height only** and is relative to
-the object's **max internal height** — the full usable interior depth after
-floor and safe-floor are subtracted. For closed containers (boxes, flip boxes,
-lidded jars) this is already capped at the lid clearance height; the renderer
-also hard-clamps any value above that cap.
+Percentage is relative to the object's **max internal height** — full usable
+interior depth after floor is subtracted. Closed containers cap at lid
+clearance height; the renderer hard-clamps any value above that cap.
 
 | Container type | What `100%` means |
 |----------------|-------------------|
@@ -72,24 +85,16 @@ y=0      SW ──────── S ──────── SE  x=int_w
 ### Examples
 
 ```
-A(hub, C)                  — point anchor at centre, full height
-A(hub, C, C20)             — circle hub r=20 at centre, full height
-A(hub, C, C20, 150%)       — circle hub r=20 at centre, 150% height (pokes above open jar)
-A(A1, 35, 60)              — point anchor at 35mm from left, 60mm from bottom
-A(A1, 35, 60, S15)         — square hub side=15 at (35, 60)
-A(A1, 35, 60, S15, 80%)    — square hub, 80% of max internal height
+A(hub, C)                  — point anchor at centre, no shape
+A(hub, C, C20)             — circle hub diameter 40 at centre, full height
+A(hub, C, C20, 150%)       — circle hub, 150% shape height (pokes above open jar)
+A(hub, C, C)               — decorative nub at centre (no size given)
+A(A1, 35, 60)              — point anchor at (35, 60), no shape
+A(A1, 35, 60, S15)         — square hub side=15 at (35, 60), full height
+A(A1, 35, 60, S15, 80%)    — square hub, 80% shape height; ribs still default to 100%
+A(A1, 35, 60, D12)         — diamond hub (12mm side, rotated 45°) at (35, 60)
+A(A1, 35, 60, T0)          — decorative triangle nub at (35, 60)
 ```
-
-### Shape rendering
-
-The shape is rendered as a solid prism AT the anchor position, at the
-anchor's height.
-
-| Token | Shape | Notes |
-|-------|-------|-------|
-| `C<r>` | Cylinder, radius r | Hollow if inner diameter ≥ 6 extrusion passes (same rule as radial hub) |
-| `S<s>` | Square prism, side s | Solid |
-| `T<s>` | Equilateral triangle prism, side s | Solid, point facing +Y |
 
 ---
 

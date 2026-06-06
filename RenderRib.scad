@@ -83,18 +83,24 @@ function _resolve_to(to_str, ax, ay, anchor_defs, int_w, int_l, is_jar, int_d) =
     [ax, ay];
 
 // Render hub shape at current position (caller must translate).
-// shape_str: "" = none, "C<r>" = cylinder d=2r, "S<s>" = square prism s×s, "T<s>" = triangle side s.
+// shape_str: "" = none, "C<n>" = cylinder d=2n, "S<n>" = square side n,
+//            "T<n>" = equilateral triangle side n, "D<n>" = diamond (square rotated 45°).
+// n absent, 0, or below NUB_D → decorative nub (NUB_D solid cylinder).
+NUB_D = 2.0;  // minimum printable hub diameter (mm)
 module _render_hub(shape_str, h) {
     if (shape_str != "" && h > 0.01) {
         first    = shape_str[0];
         size_val = to_num(get_digits(shape_str));
-        if (first == "C") cyl(d=size_val*2, h=h, anchor=BOTTOM);
-        if (first == "S") cuboid([size_val, size_val, h], anchor=CENTER+BOTTOM);
+        is_nub   = (size_val < NUB_D);
+        eff      = is_nub ? NUB_D : size_val;
+        if (first == "C") cyl(d=is_nub ? NUB_D : eff*2, h=h, anchor=BOTTOM);
+        if (first == "S") cuboid([eff, eff, h], anchor=CENTER+BOTTOM);
+        if (first == "D") zrot(45) cuboid([eff, eff, h], anchor=CENTER+BOTTOM);
         if (first == "T") {
             // Equilateral triangle prism, point facing +Y
-            ht = size_val * sqrt(3) / 2;
+            ht = eff * sqrt(3) / 2;
             linear_extrude(h)
-                polygon([[-size_val/2, -ht/3], [size_val/2, -ht/3], [0, 2*ht/3]]);
+                polygon([[-eff/2, -ht/3], [eff/2, -ht/3], [0, 2*ht/3]]);
         }
     }
 }
@@ -112,8 +118,9 @@ module _franken_v2_geom(anchor_defs, conn_defs, int_w, int_l, default_h, max_h, 
         if (from_def != undef) {
             ax      = from_def[5] ? 0 : _sw_to_mm(from_def[1], int_w);
             ay      = from_def[5] ? 0 : _sw_to_mm(from_def[2], int_l);
-            from_h  = _resolve_height(from_def[4], default_h, max_h, is_closed);
-            rib_h   = (cdef[2] == "") ? from_h : _resolve_height(cdef[2], default_h, max_h, is_closed);
+            // Ribs default to max internal height — shape_height on the anchor
+            // only controls the hub prism, not the ribs leaving it.
+            rib_h   = (cdef[2] == "") ? default_h : _resolve_height(cdef[2], default_h, max_h, is_closed);
             to_pt   = _resolve_to(cdef[1], ax, ay, anchor_defs, int_w, int_l, is_jar, int_d);
             bx = to_pt[0];  by = to_pt[1];
             dx = bx - ax;   dy = by - ay;
