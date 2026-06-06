@@ -83,34 +83,55 @@ function _resolve_to(to_str, ax, ay, anchor_defs, int_w, int_l, is_jar, int_d) =
     [ax, ay];
 
 // Render hub shape at current position (caller must translate).
-// shape_str: "" = none, "C<n>" = cylinder d=2n, "S<n>" = square side n,
-//            "T<n>" = equilateral triangle side n, "D<n>" = diamond (square rotated 45°).
-// n absent, 0, or below NUB_D → decorative nub (NUB_D solid cylinder).
-NUB_D = 2.0;  // minimum printable hub diameter (mm)
-module _render_hub(shape_str, h) {
+// shape_str: "C<n>" cylinder d=n, "S<n>" square side n,
+//            "T<n>" equilateral triangle side n, "D<n>" diamond (square rotated 45°).
+// n absent, 0, or n < sw  →  solid decorative nub (NUB_D diameter/side).
+// n >= sw                  →  hollow shell, wall thickness = div_t.
+// All four shapes follow the same solid/hollow rule.
+NUB_D = 2.0;
+module _render_hub(shape_str, h, div_t, sw) {
     if (shape_str != "" && h > 0.01) {
         first    = shape_str[0];
         size_val = to_num(get_digits(shape_str));
-        is_nub   = (size_val < NUB_D);
+        is_nub   = (size_val < sw);
         eff      = is_nub ? NUB_D : size_val;
-        if (first == "C") {
-            d     = is_nub ? NUB_D : eff;
-            inner = d - nozzle_d * 4;   // wall = 2 extrusion passes each side
-            if (!is_nub && inner >= nozzle_d * 6)
-                difference() {
-                    cyl(d=d,     h=h,       anchor=BOTTOM);
-                    down(EPS) cyl(d=inner, h=h+EPS2, anchor=BOTTOM);
-                }
-            else
-                cyl(d=d, h=h, anchor=BOTTOM);
-        }
-        if (first == "S") cuboid([eff, eff, h], anchor=CENTER+BOTTOM);
-        if (first == "D") zrot(45) cuboid([eff, eff, h], anchor=CENTER+BOTTOM);
+        inner    = eff - div_t * 2;
+        hollow   = !is_nub && inner >= div_t;
+
+        if (first == "C")
+            if (hollow) difference() {
+                cyl(d=eff,   h=h,       anchor=BOTTOM);
+                down(EPS) cyl(d=inner, h=h+EPS2, anchor=BOTTOM);
+            } else
+                cyl(d=eff, h=h, anchor=BOTTOM);
+
+        if (first == "S")
+            if (hollow) difference() {
+                cuboid([eff,   eff,   h],       anchor=CENTER+BOTTOM);
+                down(EPS) cuboid([inner, inner, h+EPS2], anchor=CENTER+BOTTOM);
+            } else
+                cuboid([eff, eff, h], anchor=CENTER+BOTTOM);
+
+        if (first == "D")
+            if (hollow) difference() {
+                zrot(45) cuboid([eff,   eff,   h],       anchor=CENTER+BOTTOM);
+                down(EPS) zrot(45) cuboid([inner, inner, h+EPS2], anchor=CENTER+BOTTOM);
+            } else
+                zrot(45) cuboid([eff, eff, h], anchor=CENTER+BOTTOM);
+
         if (first == "T") {
-            // Equilateral triangle prism, point facing +Y
             ht = eff * sqrt(3) / 2;
-            linear_extrude(h)
-                polygon([[-eff/2, -ht/3], [eff/2, -ht/3], [0, 2*ht/3]]);
+            if (hollow) {
+                ht_i = inner * sqrt(3) / 2;
+                difference() {
+                    linear_extrude(h)
+                        polygon([[-eff/2, -ht/3],   [eff/2, -ht/3],   [0, 2*ht/3]]);
+                    down(EPS) linear_extrude(h+EPS2)
+                        polygon([[-inner/2, -ht_i/3], [inner/2, -ht_i/3], [0, 2*ht_i/3]]);
+                }
+            } else
+                linear_extrude(h)
+                    polygon([[-eff/2, -ht/3], [eff/2, -ht/3], [0, 2*ht/3]]);
         }
     }
 }
@@ -121,7 +142,7 @@ module _franken_v2_geom(anchor_defs, conn_defs, int_w, int_l, default_h, max_h, 
         ax = adef[5] ? 0 : _sw_to_mm(adef[1], int_w);
         ay = adef[5] ? 0 : _sw_to_mm(adef[2], int_l);
         ah = _resolve_height(adef[4], default_h, max_h, is_closed);
-        translate([ax, ay, 0]) _render_hub(adef[3], ah);
+        translate([ax, ay, 0]) _render_hub(adef[3], ah, div_t, sw);
     }
     for (cdef = conn_defs) {
         from_def = _find_anchor_def(anchor_defs, cdef[0]);
