@@ -1,5 +1,5 @@
 # Session Handoff — MasterTray
-_Last updated: 2026-06-05 — mesh semantics, strut fixes, Astro site_
+_Last updated: 2026-06-05 — mesh min_margin, poke-through grids, drop-in fix, FrankenTray v2 spec_
 
 ---
 
@@ -10,121 +10,117 @@ cd C:\repos\3D\MasterTray
 claude
 ```
 
-Then tell Claude: "Read HANDOFF.md and continue."
+Tell Claude: "Read docs/HANDOFF.md and continue."
 
 ---
 
 ## Branch & State
 
 **Branch:** `refactor/code-clarity-and-safety`
-**Last commit:** `bcc83d6`
-**Status:** All committed, NOT pushed since last session.
+**Last commit:** `c429fe5`
+**Status:** All committed, NOT pushed.
 
 ```
-bcc83d6 fix: jar floor strut% now relative to visible inner diameter
-87cf6a1 test: set defaults for strut% visual verification
-4559f87 docs: clarify strut% vs hole spacing semantics in engine comments
-1b38d52 refactor: remove needs_margin — container geometry owns the solid edge
-5e55c74 fix: screw lid strut not sticking — needs_margin=false for Screw type
-e679682 fix: mesh defaults — hole 2.0mm, struts 25%, spacing min 1.0mm
-fb55c04 fix: mesh_hole_spacing default 0.8mm — remove misleading 0=auto sentinel
-fc018da fix: restore mesh_hole_spacing Customizer knob; add Double Flip Box to dropdown
-59a4179 refactor: move root *.md into docs/, simplify Astro content glob
+c429fe5 docs: grid layout quick reference in STATUS.md
+79f8370 feat: cycling per-ray heights + fix drop-in grid not generated
+3b39703 feat: poke-through height for radial grid — R<n>/H and C<d>/H syntax
+34d84a8 feat: add min_margin to mesh — structural no-hole zone at every edge
 ```
 
 ---
 
 ## What Was Done This Session
 
-### Astro docs site fixes
-- Dead links fixed — content collection now covers `docs/**/*.md` (all root-level docs moved into `docs/`)
-- Mermaid diagrams render as SVG (Shiki uses `pre[data-language="mermaid"]`, not `code.language-mermaid`)
-- All Astro root config files committed (`package.json`, `astro.config.mjs`, etc.)
-- Old `html/` static site and `index.html` deleted — Astro replaces them
-- `.claude/launch.json` updated with Astro dev server entry (port 4321)
-- `justfile` completely rewritten: `just dev`, `just build`, `just serve` (Caddy), `just e2e` (Playwright), `just render`, `just render-all`
+### 1. Mesh min_margin (`34d84a8`)
+- `mesh_params` now returns `min_m = noz × wall_loops` as `cfg[5]`
+- `framed_mesh`: `eff_w/eff_l = w/l − 2×min_m` before strut% applies
+- `cylindrical_mesh_wall`: `eff_h = h − 2×min_m`, `z_offset = min_m + centred strut gap`
+- Guarantees solid structural ring at jar neck, box lip, floor/wall bond — even at strut=0%
 
-### Tools confirmed installed
-| Tool | Status |
-|------|--------|
-| Playwright | ✅ Installed |
-| Caddy | ✅ Installed |
-| Bruno | ✅ Installed |
+### 2. Radial poke-through height (`3b39703`)
+- `R4/80` or `R4/150%` — spokes extend above jar mouth (pencil holder use case)
+- `C15%/120%` — hub height independent of spoke height
+- Clamped for threaded jars and closed containers; allowed for open jars
+- Fixed pre-existing `is_closed` bug: TYPE defaulted to BOX in jar context → was silently clamping all jar grid heights
 
-### Mesh system fixes
+### 3. Per-ray cycling heights + drop-in grid fix (`79f8370`)
+- `R4/80,55` — alternating tall/short spokes (crown effect); cycles `heights[i % len]`
+- `cfg[1][3]` is now always a list of heights
+- Drop-in grid was never added to main intents — fixed with `maybe_dropin_grid()` helper
+  - Wired into: Open Jar, Jar with Lid, Threaded Jar, Simple Jar, Box, Standalone Box, Simple Tray, Flip Box, Double Flip Box
+  - Invalid grid_layout strings (`"Hello world"`) silently produce no grid
+  - W≠L jar builds emit one correctly-sized grid per jar diameter
 
-**Strut% semantics (critical — was confused, now correct):**
-- `strut%` = solid BORDER region surrounding the mesh (NOT hole density)
-- `hole spacing` = density/pitch of holes within the mesh region (independent of strut%)
-- For rectangular: strut% shrinks the inner mesh rectangle, leaving a solid border on each side
-- For cylindrical: strut% sets solid band height at top + bottom; mesh fills the middle
-- These two controls are fully orthogonal — `get_grid_step` never reads strut%, `get_mesh_dim` never reads spacing
+### 4. Render colorscheme
+- All render commands switched from `Tomorrow` to `DeepOcean`
+- Back-faces (inner surfaces through mesh holes) render red — inverted normals immediately visible
 
-**`needs_margin` removed entirely (`1b38d52`):**
-- Was forcing lid strut% to `max(user, (200×min_solid_edge)/size)` — silently overriding user settings
-- Correct principle: the minimum solid margin at jar neck / box lip is provided by the PHYSICAL container geometry (jar neck cylinder, box wall), not by the mesh border
-- `needs_margin` parameter removed from `get_mesh_cfg`; `LID_MIN_SOLID` and `min_solid_edge_for_lid` deleted
-
-**Mesh defaults fixed (`e679682`):**
-- `mesh_hole_size`: `0.0` → `2.0mm` (was triggering `hole <= 0.05` guard → no mesh ever rendered → strut% had nothing to work on)
-- `strut_*_perc`: `100` → `25%` (100 also disables mesh)
-- `mesh_hole_spacing` min slider: `0.1` → `1.0mm`
-
-**Customizer additions:**
-- `mesh_hole_spacing = 0.8` added to `[Mesh Aesthetics]` below hole size
-- `"Double Flip Box"` added to `Part_To_Build` dropdown (was implemented in manifest but missing from UI)
-
-**Jar floor strut fix (`bcc83d6`):**
-- Bug: floor mesh used full outer diameter `w`. Jar wall (sw≈2.4mm) covers the outer ring of the floor, hiding most of the strut border. At 25% strut on a 54mm jar, visible solid ring was only ~1.25mm instead of expected ~3.6mm.
-- Fix: split floor into two parts in `RenderJar.scad`:
-  1. Outer solid ring (`w` to `inner_d = w - sw*2`) — structural, hidden under wall
-  2. Inner meshed disc (`inner_d`) — strut% relative to visible inner area
+### 5. FrankenTray v2 spec written
+- `docs/FRANKENTRAY_SPEC.md` — full design spec, ready for implementation
+- NOT implemented yet — spec only
 
 ---
 
-## IMMEDIATE NEXT STEP — min_margin in mesh system
+## IMMEDIATE NEXT STEP — Implement FrankenTray v2
 
-**This was agreed on in the session and must be implemented.**
+Full spec at `docs/FRANKENTRAY_SPEC.md`. Summary:
 
-**The principle:** ALL mesh surfaces reserve a minimum structural margin BEFORE strut% applies. strut=0% should never push holes into structurally required material — it means "mesh to the edge of the safe zone."
-
-Currently strut=0% means:
-- Floor: holes go right to the inner wall edge (no minimum ring)
-- Cylindrical wall: holes span full cylinder height (no minimum solid bands at top/bottom)
-- Lid: holes go to the lid edge
-
-**The fix:** add `min_margin = noz * m_wloops(data)` to `mesh_params` as a 6th return element, then use it in `framed_mesh` and `cylindrical_mesh_wall`.
-
-### mesh_params (RenderMesh.scad ~L36)
-Add `min_m = noz * m_wloops(data)` and return as `[noz, pat, hole, strut, step, min_m]`.
-
-### framed_mesh (RenderMesh.scad ~L53)
-```scad
-min_m = mp[5];
-eff_w = max(0.1, w - 2*min_m);
-eff_l = max(0.1, l - 2*min_m);
-// For circular:
-mesh_d = eff_w * sqrt(max(0, 1 - strut/100));
-// For rectangular:
-mesh_w = max(0.1, eff_w * (1 - strut/100) - pad);
-mesh_l = max(0.1, eff_l * (1 - strut/100) - pad);
-// Update nx/ny based on mesh_d or mesh_w/mesh_l
-// Update clip circle/rect to use mesh_d / [mesh_w, mesh_l]
+### Syntax
+```
+A(name, position [, shape] [, height])   — anchor definition
+[from, to [, height]]                    — connection
 ```
 
-### cylindrical_mesh_wall (RenderMesh.scad ~L94)
-```scad
-min_m    = mp[5];
-eff_h    = max(0.1, h - 2*min_m);
-h_mesh   = eff_h * (1 - strut/100);
-z_offset = min_m + (eff_h - h_mesh) / 2;
-// replace: z_pos = (h - h_active)/2 + ...
-// with:    z_pos = z_offset + (i + 0.5) * z_step
+Parser strips ALL whitespace first — humans can format freely.
+
+### Example (photo layout)
+```
+A( A1, 30, 65 )  A( A2, 68, 58 )  A( A3, 30, 28 )
+[ A1, N ]  [ A1, E ]  [ A1, A2 ]  [ A2, E ]  [ A3, S ]
 ```
 
-**Result at strut=0%:** holes stop `min_m ≈ 0.8mm` from every structural edge. Hole density unchanged.
+### Implementation plan
 
-**After implementing:** re-render with test defaults (below) and confirm visible solid bands on wall at strut=0%.
+**Step 1 — Parser (`GridLayout.scad`)**
+- Strip whitespace: `str_join([for(i=...) if(s[i]!=" " && s[i]!="\t") s[i]], "")`
+- `parse_anchor_tokens(g_str)` → `[[name, x_pct, y_pct, shape, height_mm], ...]`
+  - Find tokens matching `A(...)` (starts with `A(`, ends with `)`)
+  - Split content on `,` → [name, pos_a, pos_b_or_shape, ...]
+  - If pos_b == `C`: position = (50, 50)
+  - Shape: detect `C<n>`, `S<n>`, `T<n>`
+  - Height: detect `<n>%` or `<n>`
+- `parse_connection_tokens(g_str)` → `[[from, to, height_mm], ...]`
+  - Find tokens matching `[...]`
+  - Split on `,` → [from, to] or [from, to, height]
+
+**Step 2 — Resolver**
+- Build name→coords map from anchor list
+- For each connection, resolve `to`:
+  - Anchor name → look up (bx, by) in map
+  - `N/S/E/W/NE/NW/SE/SW` → compute wall endpoint relative to `from` anchor
+  - Number (degrees) → ray-cast to container boundary
+
+**Step 3 — Geometry (`RenderRib.scad`)**
+- `rib_between(p1, p2, div_t, h)`:
+  ```scad
+  dx=p2[0]-p1[0]; dy=p2[1]-p1[1];
+  translate([(p1[0]+p2[0])/2, (p1[1]+p2[1])/2, 0])
+    zrot(atan2(dy,dx))
+    cuboid([norm([dx,dy]), div_t, h], anchor=CENTER+BOTTOM);
+  ```
+- Hub shape at anchor: `C<r>` → cyl, `S<s>` → cuboid, `T<s>` → prism
+- Wall projection: N from (ax,ay) → endpoint (ax, +int_l/2), etc.
+- Angle ray-cast: parametric `(ax + t·cos θ, ay + t·sin θ)` vs 4 walls or circle
+
+**Step 4 — Wire into `render_franken_ribs` (`RenderRib.scad`)**
+- Detect `A(` tokens in g_str → use new v2 path
+- No `A(` → fall back to existing v1 single-anchor path (backward compat)
+
+### Coordinate conversion (% → mm)
+```
+real_x = (x_pct/100 - 0.5) * int_w   // 0% → -int_w/2, 50% → 0, 100% → +int_w/2
+real_y = (y_pct/100 - 0.5) * int_l
+```
 
 ---
 
@@ -133,16 +129,18 @@ z_offset = min_m + (eff_h - h_mesh) / 2;
 ```scad
 part_width = 54.5;  part_length = 54;  part_height = 55;
 mesh_hole_size = 1.6;   mesh_hole_spacing = 1.2;
-strut_wall_perc  =  0;   // should show narrow solid band at top+bottom after min_margin fix
-strut_floor_perc = 25;   // should show clear solid ring inside jar
-strut_lid_perc   = 75;   // should show mostly solid with small central mesh
+strut_wall_perc  =  0;
+strut_floor_perc = 25;
+strut_lid_perc   = 75;
 ```
 
 **Render command (PowerShell):**
 ```powershell
 $o = "C:\Program Files\OpenSCAD\openscad.com"
-& $o -o output/test.png --render --camera=80,0,30,55,0,20,500 --colorscheme=Tomorrow -D 'Part_To_Build="Jar with Lid"' MasterBuilder.scad
+& $o -o output/test.png --render --camera=80,0,30,55,0,20,500 --colorscheme=DeepOcean -D 'Part_To_Build="Jar with Lid"' MasterBuilder.scad
 ```
+
+**Color guide (DeepOcean):** blue = outer faces (correct), red = inner faces through holes (normal), magenta = geometry problem.
 
 ---
 
@@ -150,15 +148,15 @@ $o = "C:\Program Files\OpenSCAD\openscad.com"
 
 | Rule | Where |
 |------|-------|
-| strut% = solid border surrounding mesh region | RenderMesh.scad header |
-| hole size + spacing = density, independent of strut% | MasterEngine.scad `get_grid_step` |
-| Container geometry owns the structural margin (not the mesh) | MasterEngine.scad `get_mesh_cfg` comment |
-| Jar floor mesh uses inner_d (w - sw*2), not outer w | RenderJar.scad |
+| strut% applies within safe zone (after min_margin) | RenderMesh.scad header |
+| min_margin = noz × wall_loops, guaranteed at every structural edge | RenderMesh.scad `mesh_params` |
+| Container geometry owns the structural edge (not the mesh) | MasterEngine.scad `get_mesh_cfg` |
+| Jar floor mesh uses inner_d (w − sw×2), not outer w | RenderJar.scad |
+| ray_heights in cfg[1][3] is always a LIST (even single value) | GridLayout.scad `get_grid_config` |
+| maybe_dropin_grid() is the single place drop-in grids enter the manifest | MasterManifest.scad |
 | Factory IS the implementation — opts drive variants | LESSONS.md §1 |
 | All circle dims are diameters | LESSONS.md §0b |
 | Support-free always | LESSONS.md §0c |
-| 0 = auto for geometry overrides (chamfer, corner radius) | MasterBuilder Advanced |
-| Salvage from 858dabc and d84fbcc before writing | LESSONS.md feedback |
 
 ---
 
@@ -167,14 +165,15 @@ $o = "C:\Program Files\OpenSCAD\openscad.com"
 | File | Purpose |
 |------|---------|
 | `MasterBuilder.scad` | Customizer UI — USE THIS |
-| `MasterManifest.scad` | Intent → component list |
+| `MasterManifest.scad` | Intent → component list; `maybe_dropin_grid()` helper |
 | `MasterEngine.scad` | Physics getters, `get_mesh_cfg`, `get_grid_step` |
-| `MasterConstants.scad` | All named constants |
-| `RenderMesh.scad` | `framed_mesh` + `cylindrical_mesh_wall` — **min_margin needed here** |
-| `RenderJar.scad` | Jar factory — floor split into outer ring + inner disc this session |
-| `RenderLid.scad` | All lid types — needs_margin removed this session |
+| `GridLayout.scad` | Grid string parser — all token types including FrankenTray v2 (pending) |
+| `RenderMesh.scad` | `framed_mesh` + `cylindrical_mesh_wall` with min_margin |
+| `RenderGrid.scad` | Grid factories; `_render_radial_core` with cycling heights |
+| `RenderRib.scad` | FrankenTray renderer — v1 exists, v2 pending |
+| `docs/FRANKENTRAY_SPEC.md` | FrankenTray v2 design spec |
+| `docs/STATUS.md` | Human-readable project status + grid layout quick reference |
 | `docs/BUGS.md` | B1 (sqrt scaling), B2 (screw lid height) |
-| `astro/` | Docs site — `cd astro && pnpm dev` → localhost:4321 |
 
 ---
 
@@ -183,22 +182,19 @@ $o = "C:\Program Files\OpenSCAD\openscad.com"
 | # | Primitive | Status |
 |---|-----------|--------|
 | 1 | TRAY | ✅ Done |
-| 2 | JAR | ✅ Done (floor strut fix this session) |
-| 3 | LID | ✅ Done (needs_margin removed this session) |
+| 2 | JAR | ✅ Done |
+| 3 | LID | ✅ Done |
 | 3b | BOX | ✅ Done |
 | 4 | GRID | ✅ Done |
-| 5 | RIB | ⬜ Not started |
-
-Pill box intents (1-Day, 7-Day, 14-Day, Pillbox Set) are wired in MasterManifest.scad.
+| 5 | RIB / FrankenTray v2 | 🔲 Spec done, implementation next |
 
 ---
 
-## Open Code Items (from TODO.md Priority 1)
+## Open Code Items
 
 | ID | File | Issue |
 |----|------|-------|
 | F15 | RenderBox.scad ~L103 | flip-box hinge assert |
-| F18 | RenderGrid.scad | lip_h → JAR_LIP_HEIGHT (check if done) |
 | F6 | RenderLid.scad ~L120 | diamond latch layer_snap |
 | F14 | RenderLid.scad ~L44 | snap bead layer-align |
 
