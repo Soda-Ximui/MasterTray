@@ -18,6 +18,27 @@
 
 include <MasterEngine.scad>
 include <MasterProcessor.scad>
+include <GridLayout.scad>
+
+// maybe_dropin_grid — appends a drop-in GRID entry when all three conditions hold:
+//   1. grid_type == "Drop-in"
+//   2. grid_layout string is non-empty
+//   3. grid_layout string is valid (is_valid_grid_layout)
+//
+// Condition 3 means garbage strings ("Hello world") produce no entry and no error.
+// is_jar=true sets IS_JAR_GRID in opts so the grid uses circular boundary + radial tokens.
+//
+// For W≠L jar builds: call once per width with the appropriate data so each jar
+// gets a correctly-sized grid (e.g. concat(maybe_dropin_grid(...w...), maybe_dropin_grid(...l...))).
+function maybe_dropin_grid(data, phys, is_jar=false) =
+  let(
+    g_str  = m_grid_layout(data),
+    g_type = get_val(GRID_TYPE, data, "None"),
+    valid  = g_str != "" && is_valid_grid_layout(g_str)
+  )
+  (g_type == "Drop-in" && valid)
+    ? [["GRID", data, is_jar ? [[IS_JAR_GRID, true]] : [], phys]]
+    : [];
 
 // Desiccant mesh overrides — prepended to data so they take priority over Customizer.
 // rect: box/wedge surfaces.   cyl: jar surfaces.
@@ -55,62 +76,92 @@ function flip_lid_l(data) = get_val(LENGTH, data, LENGTH0) - flip_hinge_y(data);
 
 function compile_manifest(intent, data) =
   (intent == "Threaded Jar") ?
-    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0))
-    (w == l) ? [
-      ["JAR", data,                       jar_opts([["IS_THREADED", true]], data), get_physics_profile(data)],
-      ["LID", data,                       [["LID_TYPE", "Screw"]],                 get_physics_profile(data)]
-    ] : [
-      ["JAR", concat([["WIDTH", w]], data), jar_opts([["IS_THREADED", true]], data), get_physics_profile(data)],
-      ["JAR", concat([["WIDTH", l]], data), jar_opts([["IS_THREADED", true]], data), get_physics_profile(data)]
-    ]
+    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0),
+        phys = get_physics_profile(data))
+    concat(
+      (w == l) ? [
+        ["JAR", data,                       jar_opts([["IS_THREADED", true]], data), phys],
+        ["LID", data,                       [["LID_TYPE", "Screw"]],                 phys]
+      ] : [
+        ["JAR", concat([["WIDTH", w]], data), jar_opts([["IS_THREADED", true]], data), phys],
+        ["JAR", concat([["WIDTH", l]], data), jar_opts([["IS_THREADED", true]], data), phys]
+      ],
+      w == l
+        ? maybe_dropin_grid(data, phys, true)
+        : concat(maybe_dropin_grid(concat([[WIDTH, w]], data), phys, true),
+                 maybe_dropin_grid(concat([[WIDTH, l]], data), phys, true))
+    )
   :
   (intent == "Jar with Lid") ?
-    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0))
-    (w == l) ? [
-      ["JAR", data,                       jar_opts([["IS_THREADED", true]], data), get_physics_profile(data)],
-      ["LID", data,                       [["LID_TYPE", "Screw"]],                 get_physics_profile(data)]
-    ] : [
-      ["JAR", concat([["WIDTH", w]], data), jar_opts([["IS_THREADED", true]], data), get_physics_profile(data)],
-      ["LID", concat([["WIDTH", w]], data), [["LID_TYPE", "Screw"]],                get_physics_profile(data)],
-      ["JAR", concat([["WIDTH", l]], data), jar_opts([["IS_THREADED", true]], data), get_physics_profile(data)],
-      ["LID", concat([["WIDTH", l]], data), [["LID_TYPE", "Screw"]],                get_physics_profile(data)]
-    ]
+    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0),
+        phys = get_physics_profile(data))
+    concat(
+      (w == l) ? [
+        ["JAR", data,                       jar_opts([["IS_THREADED", true]], data), phys],
+        ["LID", data,                       [["LID_TYPE", "Screw"]],                 phys]
+      ] : [
+        ["JAR", concat([[WIDTH, w]], data), jar_opts([["IS_THREADED", true]], data), phys],
+        ["LID", concat([[WIDTH, w]], data), [["LID_TYPE", "Screw"]],                phys],
+        ["JAR", concat([[WIDTH, l]], data), jar_opts([["IS_THREADED", true]], data), phys],
+        ["LID", concat([[WIDTH, l]], data), [["LID_TYPE", "Screw"]],                phys]
+      ],
+      w == l
+        ? maybe_dropin_grid(data, phys, true)
+        : concat(maybe_dropin_grid(concat([[WIDTH, w]], data), phys, true),
+                 maybe_dropin_grid(concat([[WIDTH, l]], data), phys, true))
+    )
   :
   (intent == "Simple Jar") ?
-    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0))
-    (w == l) ?
-      [["JAR", data, jar_opts([], data),                    get_physics_profile(data)]]
-    :
-      [
-        ["JAR", concat([["WIDTH", l]], data), jar_opts([], data), get_physics_profile(data)],
-        ["JAR", concat([["WIDTH", w]], data), jar_opts([], data), get_physics_profile(data)]
-      ]
+    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0),
+        phys = get_physics_profile(data))
+    concat(
+      (w == l) ?
+        [["JAR", data, jar_opts([], data), phys]]
+      :
+        [
+          ["JAR", concat([[WIDTH, l]], data), jar_opts([], data), phys],
+          ["JAR", concat([[WIDTH, w]], data), jar_opts([], data), phys]
+        ],
+      w == l
+        ? maybe_dropin_grid(data, phys, true)
+        : concat(maybe_dropin_grid(concat([[WIDTH, l]], data), phys, true),
+                 maybe_dropin_grid(concat([[WIDTH, w]], data), phys, true))
+    )
   :
   (intent == "Open Jar") ?
-    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0))
-    (w == l) ?
-      [["JAR", data, jar_opts([["IS_THREADED", false]], data), get_physics_profile(data)]]
-    :
-      [
-        ["JAR", concat([["WIDTH", w]], data), jar_opts([["IS_THREADED", false]], data), get_physics_profile(data)],
-        ["JAR", concat([["WIDTH", l]], data), jar_opts([["IS_THREADED", false]], data), get_physics_profile(data)]
-      ]
+    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0),
+        phys = get_physics_profile(data))
+    concat(
+      (w == l) ?
+        [["JAR", data, jar_opts([["IS_THREADED", false]], data), phys]]
+      :
+        [
+          ["JAR", concat([[WIDTH, w]], data), jar_opts([["IS_THREADED", false]], data), phys],
+          ["JAR", concat([[WIDTH, l]], data), jar_opts([["IS_THREADED", false]], data), phys]
+        ],
+      w == l
+        ? maybe_dropin_grid(data, phys, true)
+        : concat(maybe_dropin_grid(concat([[WIDTH, w]], data), phys, true),
+                 maybe_dropin_grid(concat([[WIDTH, l]], data), phys, true))
+    )
   :
   (intent == "Flip Box") ?
     let(phys = get_physics_profile(data))
-    [
-      ["BOX", data, [["LID_TYPE", "Flip_Single"]], phys],
-      ["LID", data, [["LID_TYPE", "Flip_Single"]], phys]
-    ]
+    concat(
+      [["BOX", data, [["LID_TYPE", "Flip_Single"]], phys],
+       ["LID", data, [["LID_TYPE", "Flip_Single"]], phys]],
+      maybe_dropin_grid(data, phys)
+    )
   :
   (intent == "Double Flip Box") ?
     let(phys  = get_physics_profile(data),
         lid_l = flip_lid_l(data))
-    [
-      ["BOX", data,                              [["LID_TYPE", "Flip_Double"]],   phys],
-      ["LID", concat([[LENGTH, lid_l]], data),   [["LID_TYPE", "Flip_Single"]], phys],
-      ["LID", concat([[LENGTH, lid_l]], data),   [["LID_TYPE", "Flip_Single"]], phys]
-    ]
+    concat(
+      [["BOX", data,                            [["LID_TYPE", "Flip_Double"]],   phys],
+       ["LID", concat([[LENGTH, lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys],
+       ["LID", concat([[LENGTH, lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys]],
+      maybe_dropin_grid(data, phys)
+    )
   :
   // --- PILL BOX INTENTS ---
   (intent == "1-Day AM/PM Box") ?
@@ -171,21 +222,27 @@ function compile_manifest(intent, data) =
   :
   (intent == "Box") ?
     let(phys = get_physics_profile(data))
-    [
-      ["BOX", data, [["LID_TYPE", "Snap"]],  phys],
-      ["LID", data, [["LID_TYPE", "Snap"]],  phys]
-    ]
+    concat(
+      [["BOX", data, [["LID_TYPE", "Snap"]], phys],
+       ["LID", data, [["LID_TYPE", "Snap"]], phys]],
+      maybe_dropin_grid(data, phys)
+    )
   :
   (intent == "Standalone Box") ?
     let(phys = get_physics_profile(data))
-    [
-      ["BOX", data, [["LID_TYPE", "Glide"]], phys],
-      ["LID", data, [["LID_TYPE", "Glide"]], phys]
-    ]
+    concat(
+      [["BOX", data, [["LID_TYPE", "Glide"]], phys],
+       ["LID", data, [["LID_TYPE", "Glide"]], phys]],
+      maybe_dropin_grid(data, phys)
+    )
   :
-  (intent == "Simple Tray") ? [
-    ["TRAY", data, [],                                get_physics_profile(data)]
-  ] :
+  (intent == "Simple Tray") ?
+    let(phys = get_physics_profile(data))
+    concat(
+      [["TRAY", data, [], phys]],
+      maybe_dropin_grid(data, phys)
+    )
+  :
   (intent == "Standalone Box Grid") ? [
     ["GRID", data, [],                                get_physics_profile(data)]
   ] :

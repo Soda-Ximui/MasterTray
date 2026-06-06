@@ -76,8 +76,10 @@ module _render_radial_core(int_h, radius, div_t, cfg) {
     rays    = cfg[1][0];
     c_raw   = cfg[1][1];
     is_perc = cfg[1][2];
-    ray_h   = len(cfg[1]) > 3 ? cfg[1][3] : int_h;
-    hub_h   = len(cfg[1]) > 4 ? cfg[1][4] : ray_h;
+    // cfg[1][3] is a list of heights (cycling). cfg[1][4] is hub height (scalar).
+    // Single-value list [80] = uniform height. [80,60] = alternating tall/short crown.
+    ray_heights = len(cfg[1]) > 3 ? cfg[1][3] : [int_h];
+    hub_h       = len(cfg[1]) > 4 ? cfg[1][4] : ray_heights[0];
     // Convert C percentage to actual diameter; absolute values used as-is.
     c_dia   = is_perc ? radius * 2 * (c_raw / 100) : c_raw;
     inner   = c_dia - div_t * 2;
@@ -96,10 +98,12 @@ module _render_radial_core(int_h, radius, div_t, cfg) {
     else
         cyl(d=c_eff, h=hub_h, anchor=BOTTOM);
     if (rays > 0)
-        for (i = [0 : rays-1])
+        for (i = [0 : rays-1]) {
+            h_i = ray_heights[i % len(ray_heights)];
             zrot(i * 360/rays)
                 translate([c_eff/2 - EPS, -div_t/2, 0])
-                    cuboid([radius - c_eff/2 + EPS, div_t, ray_h], anchor=BOTTOM+LEFT);
+                    cuboid([radius - c_eff/2 + EPS, div_t, h_i], anchor=BOTTOM+LEFT);
+        }
 }
 
 // render_internal_grid — called from core_tray_chassis (box) or factory_render_jar.
@@ -125,9 +129,9 @@ module render_internal_grid(data) {
                  " — radial dividers ignored for this container type."));
     up(sf) {
         if (rays > 0 && is_jar) {
-            // clip_h allows spokes to poke above jar mouth when ray_h > int_h.
-            ray_h  = len(cfg[1]) > 3 ? cfg[1][3] : int_h;
-            clip_h = max(int_h, ray_h);
+            // clip_h: tallest spoke or interior height, whichever is greater.
+            ray_heights_bi = len(cfg[1]) > 3 ? cfg[1][3] : [int_h];
+            clip_h = max(concat([int_h], ray_heights_bi));
             intersection() {
                 cyl(d=int_w, h=clip_h, anchor=BOTTOM);
                 _render_radial_core(int_h, int_w / 2, div_t, cfg);
@@ -205,8 +209,8 @@ module render_jar_grid_core(data, is_builtin=false) {
     // Base only for drop-in jar grids
     has_base = !is_builtin && cfg[3];
     base_t   = has_base ? cfg[4] : 0;
-    ray_h  = len(cfg[1]) > 3 ? cfg[1][3] : int_h;
-    clip_h = max(int_h, ray_h);
+    ray_heights_di = len(cfg[1]) > 3 ? cfg[1][3] : [int_h];
+    clip_h = max(concat([int_h], ray_heights_di));
     union() {
         if (has_base) cyl(d=int_d, h=base_t, anchor=BOTTOM);
         up(base_t)

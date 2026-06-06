@@ -45,11 +45,13 @@ function parse_radial(g_str) =
         r_norm      = len(tok_r) > 0
                         ? str_join([for (i=[0:len(tok_r[0])-1]) tok_r[0][i]=="/" ? "," : tok_r[0][i]], "")
                         : "",
-        r_parts     = str_split(r_norm, ","),
-        rays        = len(r_parts) > 0 ? max(0, to_num(get_digits(r_parts[0]))) : 0,
-        r_h_str     = len(r_parts) > 1 ? r_parts[1] : undef,
-        r_h_is_perc = (r_h_str != undef) && r_h_str[len(r_h_str)-1] == "%",
-        r_h_val     = (r_h_str != undef) ? to_num(get_digits(r_h_str)) : undef,
+        r_parts      = str_split(r_norm, ","),
+        rays         = len(r_parts) > 0 ? max(0, to_num(get_digits(r_parts[0]))) : 0,
+        // Height parts: everything after the ray count (r_parts[1], r_parts[2], …).
+        // Single value R4/80 → [80]. Cycling list R4/80,60 → [80,60]. None → undef.
+        r_h_parts    = len(r_parts) > 1 ? [for (i = [1:len(r_parts)-1]) r_parts[i]] : undef,
+        r_h_is_percs = r_h_parts != undef ? [for (p = r_h_parts) p[len(p)-1] == "%"] : undef,
+        r_h_vals     = r_h_parts != undef ? [for (p = r_h_parts) to_num(get_digits(p))] : undef,
 
         c_norm      = len(tok_c) > 0
                         ? str_join([for (i=[0:len(tok_c[0])-1]) tok_c[0][i]=="/" ? "," : tok_c[0][i]], "")
@@ -62,7 +64,7 @@ function parse_radial(g_str) =
         c_h_is_perc = (c_h_str != undef) && c_h_str[len(c_h_str)-1] == "%",
         c_h_val     = (c_h_str != undef) ? to_num(get_digits(c_h_str)) : undef
     )
-    [rays, c_val, c_is_perc, r_h_val, r_h_is_perc, c_h_val, c_h_is_perc];
+    [rays, c_val, c_is_perc, r_h_vals, r_h_is_percs, c_h_val, c_h_is_perc];
 
 function has_radial(g_str) = 
     let(rad = parse_radial(g_str)) 
@@ -125,22 +127,30 @@ function get_grid_config(data) =
         rad_dims    = parse_radial(g_str),
         spans       = parse_spans(g_str, default_h, effective_max_h, is_closed || grid_wall_h_cap > 0),
 
-        // Resolve optional poke-through heights from R/H and C/H tokens.
+        // Resolve optional poke-through heights from R/H[,H2,…] and C/H tokens.
         // undef → flush with jar mouth (effective_max_h). % → relative to that.
         // Clamp when: box-type closed container, OR threaded jar (neck blocks poke-through).
         // Open jars: poke-through allowed — pencil/utensil holder use case.
+        //
+        // ray_heights is always a list, even for a single value.
+        // Cycling: _render_radial_core uses heights[i % len(heights)] per spoke.
         jar_threaded = is_jar && get_val(HAS_THREADS, data, false),
         clamp_height = is_closed || jar_threaded,
-        r_h_mm  = (rad_dims[3] == undef) ? effective_max_h :
-                   rad_dims[4] ? (effective_max_h * rad_dims[3] / 100) : rad_dims[3],
-        c_h_mm  = (rad_dims[5] == undef) ? r_h_mm :
+        r_h_vals_raw = rad_dims[3],
+        r_h_percs    = rad_dims[4],
+        // Resolve each height value in the list to mm; fall back to effective_max_h if undef.
+        r_h_mm_list  = (r_h_vals_raw == undef) ? [effective_max_h] :
+          [for (i = [0:len(r_h_vals_raw)-1])
+            r_h_percs[i] ? (effective_max_h * r_h_vals_raw[i] / 100) : r_h_vals_raw[i]],
+        ray_heights  = [for (h = r_h_mm_list) clamp_height ? min(h, effective_max_h) : h],
+        // Hub height: single value, defaults to max of ray heights when not specified.
+        c_h_mm  = (rad_dims[5] == undef) ? max(ray_heights) :
                    rad_dims[6] ? (effective_max_h * rad_dims[5] / 100) : rad_dims[5],
-        ray_h   = clamp_height ? min(r_h_mm, effective_max_h) : r_h_mm,
         hub_h   = clamp_height ? min(c_h_mm, effective_max_h) : c_h_mm,
 
-        // cfg[1] = [rays, c_val, c_is_perc, ray_h_mm, hub_h_mm]
+        // cfg[1] = [rays, c_val, c_is_perc, ray_heights (list), hub_h_mm (scalar)]
         // Indices 0-2 unchanged — existing callers unaffected.
-        rad_cfg = [rad_dims[0], rad_dims[1], rad_dims[2], ray_h, hub_h]
+        rad_cfg = [rad_dims[0], rad_dims[1], rad_dims[2], ray_heights, hub_h]
     )
     [cart_dims, rad_cfg, spans, has_base, base_t, default_h];
 
