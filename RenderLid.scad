@@ -148,10 +148,12 @@ module factory_render_lid(data, opts, phys) {
         cap_h   = max(m_thread_pitch(data) * 3, sw * 2);
         neck_od = w - sw * 2 - 0.6;
         // Face-down: flat top on bed, interior thread on vertical walls.
+        // needs_margin=false: retention is in the threaded cylinder, not the flat face.
+        // Snap/Glide/Flip use needs_margin=true because their mechanisms live on the border.
         difference() {
             union() {
                 up(sl / 2) framed_mesh(data, w, w, sl, true,
-                                        get_mesh_cfg(data, HOLE_LID, STRUT_LID, true));
+                                        get_mesh_cfg(data, HOLE_LID, STRUT_LID, false));
                 up(sl) cyl(d=w, h=cap_h, chamfer2=noz*4, anchor=BOTTOM);
             }
             // EPS pullback: cutter starts one boolean-epsilon below lid surface so the

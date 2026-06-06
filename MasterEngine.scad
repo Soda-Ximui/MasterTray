@@ -186,10 +186,15 @@ function get_mesh_cfg(data, h_key, s_key, needs_margin=false) =
   (hole <= 0.05) ? undef :
   let(strut = get_val(s_key, data, 25))
   (strut >= 99) ? undef :
-  let(final_s = !needs_margin ? strut :
-                max(strut, (200 * get_val(LID_MIN_SOLID, data, LID_MIN_SOLID0))
-                           / min(m_bw(data), m_bl(data))))
-  (final_s >= 99) ? undef : [hole, final_s];
+  let(margin_min = needs_margin ? (200 * get_val(LID_MIN_SOLID, data, LID_MIN_SOLID0))
+                                   / min(m_bw(data), m_bl(data)) : 0,
+      final_s   = max(strut, margin_min))
+  (final_s >= 99) ? undef :
+  let(dummy = (needs_margin && final_s > strut)
+              ? echo(str("⚠ lid strut clamped: user=", strut, "% → ", round(final_s),
+                         "% (min_solid_edge=", get_val(LID_MIN_SOLID, data, LID_MIN_SOLID0),
+                         "mm / size=", min(m_bw(data), m_bl(data)), "mm)")) : 0)
+  [hole, final_s];
 
 /// get_grid_step(hole, min_sp, noz): step = hole diameter + strut width
 ///
