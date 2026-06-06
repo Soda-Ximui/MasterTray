@@ -25,25 +25,25 @@ jar_shape = "Circle"; // ["Circle", "Quad", "Hexa", "Octa", "Dodeca"]
 
 
 /* [Dimensions: W x L x H] */
-part_width = 30; // [10 : 0.42 : 300]
-part_length = 40; // [10 : 0.42 : 300]
-part_height = 20; // [5 : 0.28 : 300]
+part_width = 54.5; // [10 : 0.5 : 300]
+part_length = 54; // [10 : 0.5 : 300]
+part_height = 55; // [5 : 0.5 : 300]
 dimension_mode = "Total"; // Total", "Usable"]
 
 
 /* [Mesh Aesthetics] */
 mesh_pattern = "Teardrop"; // ["Honeycomb", "Teardrop", "Slotted", "Circle", "Square", "Diamond", "None"]
 // Hole diameter (mm). Min printable ≈ 1.0mm at 0.4mm nozzle.
-mesh_hole_size = 2.0; // [0.5 : 0.1 : 8.0]
+mesh_hole_size = 1.6; // [0.5 : 0.1 : 8.0]
 // Minimum gap between hole edges (mm). Physics floor always applies regardless.
 // Tip: Wall_Loops × Nozzle_Diameter (e.g. 2 × 0.4 = 0.8mm at default settings).
-mesh_hole_spacing = 0.8; // [1.0 : 0.1 : 5.0]
+mesh_hole_spacing = 1.2; // [1.0 : 0.1 : 5.0]
 // Solid border as % of surface. 0 = edge-to-edge holes. 100 = fully solid (no mesh).
 // The minimum solid margin at the jar neck / box lip is provided by the container
 // geometry itself — the mesh strut% is purely aesthetic and always honoured as-is.
-strut_wall_perc  = 25; // [0 : 5 : 100]
+strut_wall_perc  =  0; // [0 : 5 : 100]
 strut_floor_perc = 25; // [0 : 5 : 100]
-strut_lid_perc   = 25; // [0 : 5 : 100]
+strut_lid_perc   = 75; // [0 : 5 : 100]
 
 /* [Lid Options] */
 lid_glide_direction = "H"; // ["H", "V"]
