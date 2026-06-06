@@ -1,5 +1,5 @@
 # Session Handoff — MasterTray
-_Last updated: 2026-06-05 — mesh min_margin, poke-through grids, drop-in fix, FrankenTray v2 spec + Astro nav_
+_Last updated: 2026-06-06 — FrankenTray v2 implemented (A/[...] syntax, hub shapes, wall/angle/anchor-to-anchor connections)_
 
 ---
 
@@ -67,66 +67,11 @@ bcc83d6 fix: jar floor strut% now relative to visible inner diameter
 
 ---
 
-## IMMEDIATE NEXT STEP — Implement FrankenTray v2
+## IMMEDIATE NEXT STEP
 
-Full spec at `docs/FRANKENTRAY_SPEC.md`. Summary:
+FrankenTray v2 is **done** (commit `d1328f5`). All primitives complete.
 
-### Syntax
-```
-A(name, position [, shape] [, height])   — anchor definition
-[from, to [, height]]                    — connection
-```
-
-Parser strips ALL whitespace first — humans can format freely.
-
-### Example (photo layout)
-```
-A( A1, 30, 65 )  A( A2, 68, 58 )  A( A3, 30, 28 )
-[ A1, N ]  [ A1, E ]  [ A1, A2 ]  [ A2, E ]  [ A3, S ]
-```
-
-### Implementation plan
-
-**Step 1 — Parser (`GridLayout.scad`)**
-- Strip whitespace: `str_join([for(i=...) if(s[i]!=" " && s[i]!="\t") s[i]], "")`
-- `parse_anchor_tokens(g_str)` → `[[name, x_pct, y_pct, shape, height_mm], ...]`
-  - Find tokens matching `A(...)` (starts with `A(`, ends with `)`)
-  - Split content on `,` → [name, pos_a, pos_b_or_shape, ...]
-  - If pos_b == `C`: position = (50, 50)
-  - Shape: detect `C<n>`, `S<n>`, `T<n>`
-  - Height: detect `<n>%` or `<n>`
-- `parse_connection_tokens(g_str)` → `[[from, to, height_mm], ...]`
-  - Find tokens matching `[...]`
-  - Split on `,` → [from, to] or [from, to, height]
-
-**Step 2 — Resolver**
-- Build name→coords map from anchor list
-- For each connection, resolve `to`:
-  - Anchor name → look up (bx, by) in map
-  - `N/S/E/W/NE/NW/SE/SW` → compute wall endpoint relative to `from` anchor
-  - Number (degrees) → ray-cast to container boundary
-
-**Step 3 — Geometry (`RenderRib.scad`)**
-- `rib_between(p1, p2, div_t, h)`:
-  ```scad
-  dx=p2[0]-p1[0]; dy=p2[1]-p1[1];
-  translate([(p1[0]+p2[0])/2, (p1[1]+p2[1])/2, 0])
-    zrot(atan2(dy,dx))
-    cuboid([norm([dx,dy]), div_t, h], anchor=CENTER+BOTTOM);
-  ```
-- Hub shape at anchor: `C<r>` → cyl, `S<s>` → cuboid, `T<s>` → prism
-- Wall projection: N from (ax,ay) → endpoint (ax, +int_l/2), etc.
-- Angle ray-cast: parametric `(ax + t·cos θ, ay + t·sin θ)` vs 4 walls or circle
-
-**Step 4 — Wire into `render_franken_ribs` (`RenderRib.scad`)**
-- Detect `A(` tokens in g_str → use new v2 path
-- No `A(` → fall back to existing v1 single-anchor path (backward compat)
-
-### Coordinate conversion (% → mm)
-```
-real_x = (x_pct/100 - 0.5) * int_w   // 0% → -int_w/2, 50% → 0, 100% → +int_w/2
-real_y = (y_pct/100 - 0.5) * int_l
-```
+Open items: see Open Code Items table below, or look at known bugs in `docs/BUGS.md`.
 
 ---
 
@@ -192,7 +137,7 @@ $o = "C:\Program Files\OpenSCAD\openscad.com"
 | 3 | LID | ✅ Done |
 | 3b | BOX | ✅ Done |
 | 4 | GRID | ✅ Done |
-| 5 | RIB / FrankenTray v2 | 🔲 Spec done, implementation next |
+| 5 | RIB / FrankenTray v2 | ✅ Done |
 
 ---
 
