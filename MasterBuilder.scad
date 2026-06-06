@@ -34,9 +34,10 @@ dimension_mode = "Total"; // Total", "Usable"]
 /* [Mesh Aesthetics] */
 mesh_pattern = "Teardrop"; // ["Honeycomb", "Teardrop", "Slotted", "Circle", "Square", "Diamond", "None"]
 mesh_hole_size = 0.0; // [0.0 : 0.1 : 5.0]
-// Minimum gap between hole edges (mm). 0 = auto (Wall_Loops × Nozzle_Diameter).
+// Minimum gap between hole edges (mm). Default 0.8 = 2 wall loops × 0.4mm nozzle.
 // Raise to thicken struts; lower for more open mesh. Physics floor always applies.
-mesh_hole_spacing = 0.0; // [0.0 : 0.1 : 5.0]
+// If you change Nozzle_Diameter, update this accordingly (Wall_Loops × Nozzle_Diameter).
+mesh_hole_spacing = 0.8; // [0.1 : 0.1 : 5.0]
 strut_wall_perc = 100; // [0 : 5 : 100]
 strut_floor_perc = 100; // [0 : 5 : 100]
 strut_lid_perc = 100; // [0 : 5 : 100]
@@ -131,7 +132,7 @@ ui_payload = [
     [HOLE_WALL,          mesh_hole_size],
     [HOLE_FLOOR,         mesh_hole_size],
     [HOLE_LID,           mesh_hole_size],
-    [HOLE_SPACING,       mesh_hole_spacing > 0 ? mesh_hole_spacing : Wall_Loops * Nozzle_Diameter],
+    [HOLE_SPACING,       mesh_hole_spacing],
     [STRUT_WALL,         strut_wall_perc], 
     [STRUT_FLOOR,        strut_floor_perc], 
     [STRUT_LID,          strut_lid_perc],
