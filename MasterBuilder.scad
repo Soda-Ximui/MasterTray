@@ -33,14 +33,17 @@ dimension_mode = "Total"; // Total", "Usable"]
 
 /* [Mesh Aesthetics] */
 mesh_pattern = "Teardrop"; // ["Honeycomb", "Teardrop", "Slotted", "Circle", "Square", "Diamond", "None"]
-mesh_hole_size = 0.0; // [0.0 : 0.1 : 5.0]
-// Minimum gap between hole edges (mm). Default 0.8 = 2 wall loops × 0.4mm nozzle.
-// Raise to thicken struts; lower for more open mesh. Physics floor always applies.
-// If you change Nozzle_Diameter, update this accordingly (Wall_Loops × Nozzle_Diameter).
-mesh_hole_spacing = 0.8; // [0.1 : 0.1 : 5.0]
-strut_wall_perc = 100; // [0 : 5 : 100]
-strut_floor_perc = 100; // [0 : 5 : 100]
-strut_lid_perc = 100; // [0 : 5 : 100]
+// Hole diameter (mm). Min printable ≈ 1.0mm at 0.4mm nozzle.
+mesh_hole_size = 2.0; // [0.5 : 0.1 : 8.0]
+// Minimum gap between hole edges (mm). Physics floor always applies regardless.
+// Tip: Wall_Loops × Nozzle_Diameter (e.g. 2 × 0.4 = 0.8mm at default settings).
+mesh_hole_spacing = 0.8; // [1.0 : 0.1 : 5.0]
+// Solid border as % of surface. 0 = edge-to-edge holes. 100 = fully solid (no mesh).
+// Lid strut has a minimum enforced by min_solid_edge_for_lid — your value is a floor
+// not a ceiling; small boxes may show more solid border than you dialled.
+strut_wall_perc  = 25; // [0 : 5 : 100]
+strut_floor_perc = 25; // [0 : 5 : 100]
+strut_lid_perc   = 25; // [0 : 5 : 100]
 
 /* [Lid Options] */
 lid_glide_direction = "H"; // ["H", "V"]
