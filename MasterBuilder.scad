@@ -20,7 +20,7 @@ Corner_Round_Ratio = 0.20; // [0.05:0.05:0.45]
 //STEP_Z = Layer_Height;
 
 /* [Build Selection] */
-Part_To_Build = "Jar with Lid"; // ["Box", "Standalone Box", "Flip Box", "1-Day AM/PM Box", "1-Day 2-Compartment (Single Lid)", "7-Day Pill Box", "14-Day AM/PM Box", "Pillbox Set (Double Lid)", "Pillbox Set (Single Lid)", "Pillbox Full Set", "Lid", "Simple Tray", "Nesting Tray (Short)", "Modular Peg Tray (Long)", "Standalone Box Grid", "Standalone Jar Grid", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", "Plaque", "Grid Test"]
+Part_To_Build = "Jar with Lid"; // ["Box", "Standalone Box", "Flip Box", "Double Flip Box", "1-Day AM/PM Box", "1-Day 2-Compartment (Single Lid)", "7-Day Pill Box", "14-Day AM/PM Box", "Pillbox Set (Double Lid)", "Pillbox Set (Single Lid)", "Pillbox Full Set", "Lid", "Simple Tray", "Nesting Tray (Short)", "Modular Peg Tray (Long)", "Standalone Box Grid", "Standalone Jar Grid", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", "Plaque", "Grid Test"]
 jar_shape = "Circle"; // ["Circle", "Quad", "Hexa", "Octa", "Dodeca"]
 
 
@@ -34,6 +34,9 @@ dimension_mode = "Total"; // Total", "Usable"]
 /* [Mesh Aesthetics] */
 mesh_pattern = "Teardrop"; // ["Honeycomb", "Teardrop", "Slotted", "Circle", "Square", "Diamond", "None"]
 mesh_hole_size = 0.0; // [0.0 : 0.1 : 5.0]
+// Minimum gap between hole edges (mm). 0 = auto (Wall_Loops × Nozzle_Diameter).
+// Raise to thicken struts; lower for more open mesh. Physics floor always applies.
+mesh_hole_spacing = 0.0; // [0.0 : 0.1 : 5.0]
 strut_wall_perc = 100; // [0 : 5 : 100]
 strut_floor_perc = 100; // [0 : 5 : 100]
 strut_lid_perc = 100; // [0 : 5 : 100]
@@ -128,6 +131,7 @@ ui_payload = [
     [HOLE_WALL,          mesh_hole_size],
     [HOLE_FLOOR,         mesh_hole_size],
     [HOLE_LID,           mesh_hole_size],
+    [HOLE_SPACING,       mesh_hole_spacing > 0 ? mesh_hole_spacing : Wall_Loops * Nozzle_Diameter],
     [STRUT_WALL,         strut_wall_perc], 
     [STRUT_FLOOR,        strut_floor_perc], 
     [STRUT_LID,          strut_lid_perc],
