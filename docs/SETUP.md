@@ -116,9 +116,9 @@ For the MasterTray docs site specifically: **Astro** — it renders Markdown nat
 
 | Tool | Install | Why |
 |------|---------|-----|
-| **Playwright** | `pnpm add -D playwright` | Browser automation + screenshot testing for web UIs |
-| **Caddy** | `winget install CaddyServer.Caddy` | Dead-simple local HTTPS dev server; no config file needed |
-| **Bruno** | `winget install Bruno.Bruno` | API client (Postman alternative, files-based — works with git) |
+| **Playwright** | ✅ Installed | Browser automation + screenshot testing for web UIs — `just e2e` |
+| **Caddy** | ✅ Installed | Dead-simple local HTTPS dev server — `just serve` |
+| **Bruno** | ✅ Installed | API client (Postman alternative, files-based — works with git) |
 
 ### What's already covered
 

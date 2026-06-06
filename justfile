@@ -68,8 +68,8 @@ handoff n='0':
 render:
     New-Item -ItemType Directory -Force {{out_dir}} | Out-Null
     & "{{openscad}}" -o {{out_dir}}/preview.png --render `
-      --camera=0,20,30,55,0,25,350 --colorscheme=DeepOcean `
-      MasterBuilder.scad
+    --camera=0,20,30,55,0,25,350 --colorscheme=DeepOcean `
+    MasterBuilder.scad
     Write-Host "→ {{out_dir}}/preview.png"
 
 # ── OpenSCAD: render all major intents ────────────────────────────────────────
@@ -77,15 +77,15 @@ render:
 render-all:
     New-Item -ItemType Directory -Force {{out_dir}} | Out-Null
     @( `
-      "Simple Tray", "Box", "Standalone Box", "Flip Box", "Double Flip Box", `
-      "Nesting Tray (Short)", "Modular Peg Tray (Long)", `
-      "Open Jar", "Threaded Jar", "Jar with Lid", `
-      "Simple Jar", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", `
-      "Standalone Box Grid", "Standalone Jar Grid" `
+    "Simple Tray", "Box", "Standalone Box", "Flip Box", "Double Flip Box", `
+    "Nesting Tray (Short)", "Modular Peg Tray (Long)", `
+    "Open Jar", "Threaded Jar", "Jar with Lid", `
+    "Simple Jar", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", `
+    "Standalone Box Grid", "Standalone Jar Grid" `
     ) | ForEach-Object { `
-      $slug = $_ -replace '[^a-zA-Z0-9]+', '-'; `
-      $out  = "{{out_dir}}/$slug.png"; `
-      & "{{openscad}}" -o $out --render --camera=0,20,30,55,0,25,350 `
-        --colorscheme=DeepOcean -D "Part_To_Build=`"$_`"" MasterBuilder.scad; `
-      Write-Host "  → $out" `
+    $slug = $_ -replace '[^a-zA-Z0-9]+', '-'; `
+    $out  = "{{out_dir}}/$slug.png"; `
+    & "{{openscad}}" -o $out --render --camera=0,20,30,55,0,25,350 `
+    --colorscheme=DeepOcean -D "Part_To_Build=`"$_`"" MasterBuilder.scad; `
+    Write-Host "  → $out" `
     }

@@ -12,16 +12,27 @@ include <MasterEngine.scad>
 function get_grid_tokens(g_str) = [for (t = str_split(g_str, " ")) if (t != "") t];
 
 // --- CARTESIAN PARSER ---
+// Handles both "3x2" (concatenated) and "3 x 2" (spaced) forms.
 function parse_cartesian(g_str) =
     let(tokens = get_grid_tokens(g_str),
-        tok_x = [for (tok = tokens) if (len(search("x", tok)) > 0 || len(search("X", tok)) > 0) tok])
-    (len(tok_x) == 0) ? [1, 1] :
-    let(dims = str_split(tok_x[0], ["x", "X"]),
-        cols = max(1, to_num(get_digits(dims[0]))),
-        rows = max(1, to_num(get_digits(dims[1]))))
-    [cols, rows];
+        // Find index of first token containing x/X
+        xi_list = [for (i = [0:len(tokens)-1])
+                    if (len(search("x", tokens[i])) > 0 || len(search("X", tokens[i])) > 0) i],
+        xi  = len(xi_list) > 0 ? xi_list[0] : -1,
+        tok = xi >= 0 ? tokens[xi] : "")
+    (xi < 0) ? [1, 1] :
+    (len(tok) > 1) ?
+        // Concatenated form "3x2": split on x/X
+        let(dims = str_split(tok, ["x", "X"]),
+            cols = max(1, to_num(get_digits(dims[0]))),
+            rows = max(1, to_num(get_digits(dims[1]))))
+        [cols, rows] :
+        // Standalone "x"/"X": adjacent tokens hold the dimensions
+        let(cols = (xi > 0)               ? max(1, to_num(get_digits(tokens[xi-1]))) : 1,
+            rows = (xi < len(tokens) - 1) ? max(1, to_num(get_digits(tokens[xi+1]))) : 1)
+        [cols, rows];
 
-function has_cartesian(g_str) = 
+function has_cartesian(g_str) =
     let(tok_x = [for (t = get_grid_tokens(g_str)) if (len(search("x", t)) > 0 || len(search("X", t)) > 0) t])
     len(tok_x) > 0;
 
@@ -186,6 +197,8 @@ function is_cartesian_token(tok) = len(search("x", tok)) > 0 || len(search("X", 
 function is_radial_token(tok)    = len(tok) > 0 && (tok[0] == "R" || tok[0] == "r");
 function is_center_token(tok)    = len(tok) > 0 && (tok[0] == "C" || tok[0] == "c");
 function is_span_token(tok)      = len(tok) > 0 && (tok[0] == "S" || tok[0] == "s");
+// Standalone digit token — appears when user writes "3 x 2" (spaced cartesian form).
+function is_digit_token(tok)     = len(tok) > 0 && ord(tok[0]) >= 48 && ord(tok[0]) <= 57;
 
 function is_valid_grid_layout(g_str) =
   (g_str == "") ? true :
@@ -194,7 +207,7 @@ function is_valid_grid_layout(g_str) =
   (len(tokens) == 0) ? false :
   len([for (t = tokens) if (
     is_cartesian_token(t) || is_radial_token(t) ||
-    is_center_token(t)    || is_span_token(t)
+    is_center_token(t)    || is_span_token(t)   || is_digit_token(t)
   ) t]) == len(tokens);
 
 // Flat accessors for callers that only need one value from parse_radial.
