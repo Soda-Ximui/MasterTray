@@ -1,0 +1,107 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+
+interface Props {
+	title: string;
+	description?: string;
+}
+const { title, description = '' } = Astro.props;
+---
+
+<html lang="en">
+	<head>
+		<BaseHead title={`${title} — MasterTray Docs`} description={description} />
+		<style>
+			.docs-layout {
+				display: grid;
+				grid-template-columns: 220px 1fr;
+				gap: 0;
+				min-height: calc(100vh - 60px);
+			}
+			.sidebar {
+				border-right: 1px solid rgb(var(--gray-light));
+				padding: 2em 1em;
+				font-size: 0.85em;
+				position: sticky;
+				top: 0;
+				height: calc(100vh - 60px);
+				overflow-y: auto;
+			}
+			.sidebar h3 {
+				font-size: 0.75em;
+				text-transform: uppercase;
+				letter-spacing: 0.1em;
+				color: rgb(var(--gray));
+				margin: 1.5em 0 0.5em;
+			}
+			.sidebar h3:first-child { margin-top: 0; }
+			.sidebar a {
+				display: block;
+				padding: 0.3em 0.5em;
+				border-radius: 4px;
+				text-decoration: none;
+				color: rgb(var(--gray-dark));
+				font-size: 0.95em;
+			}
+			.sidebar a:hover,
+			.sidebar a.active {
+				background: rgb(var(--gray-light));
+				color: var(--accent);
+			}
+			.prose {
+				padding: 2em 3em;
+				max-width: 860px;
+			}
+			.prose h1 { font-size: 2em; margin-bottom: 0.3em; }
+			@media (max-width: 720px) {
+				.docs-layout { grid-template-columns: 1fr; }
+				.sidebar { display: none; }
+				.prose { padding: 1em; }
+			}
+		</style>
+	<script type="module">
+		import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+		mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
+		document.querySelectorAll('pre[data-language="mermaid"]').forEach(pre => {
+			const div = document.createElement('div');
+			div.className = 'mermaid';
+			div.textContent = pre.querySelector('code').textContent;
+			pre.replaceWith(div);
+		});
+		mermaid.run();
+	</script>
+	</head>
+	<body>
+		<Header />
+		<div class="docs-layout">
+			<nav class="sidebar">
+				<h3>Start here</h3>
+				<a href="/docs/start">Where to Look (START)</a>
+				<a href="/docs/handoff">Session Handoff</a>
+				<a href="/docs/setup">Dev Setup</a>
+
+				<h3>Design</h3>
+				<a href="/docs/features">Features & System Design</a>
+				<a href="/docs/lessons">Lessons Learned</a>
+				<a href="/docs/architecture">Architecture</a>
+				<a href="/docs/sequence-diagrams">Sequence Diagrams</a>
+
+				<h3>Quality</h3>
+				<a href="/docs/bugs">Bug Registry</a>
+				<a href="/docs/refactoring">Refactoring Log</a>
+				<a href="/docs/todo">TODO</a>
+
+				<h3>Reference</h3>
+				<a href="/docs/grid-layout-guide">Grid Layout Guide</a>
+				<a href="/docs/3d-print-symptoms">3D Print Symptoms</a>
+				<a href="/docs/future">Future Ideas</a>
+			</nav>
+			<main class="prose">
+				<slot />
+			</main>
+		</div>
+		<Footer />
+	</body>
+</html>

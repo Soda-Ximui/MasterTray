@@ -1,5 +1,5 @@
 // ==============================================================================
-// FILE: MasterText.scad [v4.0]
+// FILE: MasterText.scad
 // ARCHITECTURE: Layer 1.2 (Text & Font Geometry Engine)
 // ==============================================================================
 include <MasterEnum.scad>
