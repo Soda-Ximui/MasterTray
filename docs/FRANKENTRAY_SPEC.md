@@ -144,21 +144,22 @@ until it hits the container wall (rectangular or cylindrical).
 [A1, 45, 60%]    — northeast, 60% of max internal height
 ```
 
-### `length` field *(PROPOSED — not yet implemented)*
+### `length` field
 
 Applies to wall-name and angle targets only. Caps the rib at `length` mm from
 the anchor instead of running all the way to the wall. The rib endpoint is
-`min(natural_length, length)` along the direction of travel.
+`min(natural_length, length)` along the direction of travel. Ignored when
+`to` is an anchor name (distance is fixed by the two points).
 
 ```
 [A1, N, 100%, 60]    — northward rib, full height, stops after 60 mm
 [A1, 90, 80%, 45]    — same direction written as angle
 [A1, E, 70%,  30]    — eastward stub, 30 mm long
+[A1, N, , 40]        — northward stub, default height, 40 mm long
 ```
 
-This makes free-floating dividers possible without placing virtual anchor nodes
-at every endpoint — the primary motivation for maze-style layouts where many
-short ribs radiate or branch without reaching the container wall.
+Hub clipping still applies after the length cap — a capped rib that would
+enter another hub is trimmed at the hub boundary regardless.
 
 ---
 
@@ -234,7 +235,7 @@ translate(mid) zrot(atan2(dy,dx)) cuboid([norm([dx,dy]), div_t, h], anchor=CENTE
 
 ## What Is NOT in v1
 
-- **`length` field** *(PROPOSED above)* — free-floating / truncated ribs
+- **`length` field** — implemented; see Connection section above
 - Rib stopping at another rib (requires ray-segment intersection against all other ribs)
 - Per-rib thickness (all ribs use `div_t`)
 - Curved ribs

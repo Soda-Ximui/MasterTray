@@ -69,6 +69,15 @@ function _angle_endpoint_cyl(theta_deg, ax, ay, int_d) =
     )
     [ax + t*cx, ay + t*cy];
 
+// --- LENGTH CAP ---
+
+// Cap endpoint (bx,by) at max_len mm from (ax,ay). No-op if rib is already shorter.
+// Used for anchor-to-wall and angle connections; ignored for anchor-to-anchor.
+function _length_cap(ax, ay, bx, by, max_len) =
+    let(dx = bx-ax, dy = by-ay, L = norm([dx, dy]))
+    (L < 0.001 || max_len >= L) ? [bx, by] :
+    [ax + max_len*dx/L, ay + max_len*dy/L];
+
 // --- HUB CLIPPING ---
 
 // Inscribed-circle clip radius for a hub shape.
@@ -216,7 +225,13 @@ module _franken_v2_geom(anchor_defs, conn_defs, int_w, int_l, default_h, max_h, 
             ay    = from_def[5] ? 0 : _sw_to_mm(from_def[2], int_l);
             rib_h = (cdef[2] == "") ? default_h : _resolve_height(cdef[2], default_h, max_h, is_closed);
             to_pt = _resolve_to(cdef[1], ax, ay, anchor_defs, int_w, int_l, is_jar, int_d);
-            bx = to_pt[0]; by = to_pt[1];
+            // Length cap: truncate rib at given mm from anchor (ignored for anchor-to-anchor).
+            length_str  = (len(cdef) > 3) ? cdef[3] : "";
+            is_a2a      = (_find_anchor_def(anchor_defs, cdef[1]) != undef);
+            capped_pt   = (length_str != "" && !is_a2a)
+                ? _length_cap(ax, ay, to_pt[0], to_pt[1], to_num(get_digits(length_str)))
+                : to_pt;
+            bx = capped_pt[0]; by = capped_pt[1];
             // Clip start out of source hub; clip end before entering any other hub.
             st = _start_clip_t(from_def,    ax, ay, bx, by, int_w, int_l, sw);
             et = _end_clip_t(anchor_defs, cdef[0], ax, ay, bx, by, int_w, int_l, sw);

@@ -347,14 +347,16 @@ function parse_anchor_def(content) =
     )
     [name, x_mm, y_mm, shape_str, height_str, is_center];
 
-// Parse connection content string: "from,to[,height]"
-// Returns [from_name, to_str, height_str]
+// Parse connection content string: "from,to[,height[,length]]"
+// Returns [from_name, to_str, height_str, length_str]
+// length_str: mm cap on rib travel from anchor. Ignored for anchor-to-anchor.
 function parse_connection_def(content) =
     let(parts = str_split(content, ","), np = len(parts))
     [
         (np > 0) ? parts[0] : "",
         (np > 1) ? parts[1] : "",
-        (np > 2) ? parts[2] : ""
+        (np > 2) ? parts[2] : "",
+        (np > 3) ? parts[3] : ""
     ];
 
 // True if to_str is a cardinal/intercardinal wall name.
