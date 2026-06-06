@@ -175,26 +175,26 @@ function to_num(d) =
 // TIER 2: MESH & GRID CONFIGURATION (Pattern and density calculations)
 // ==============================================================================
 
-/// get_mesh_cfg(data, h_key, s_key, needs_margin)
+/// get_mesh_cfg(data, h_key, s_key)
 /// Returns mesh configuration [hole_size, strut_percentage] for a surface.
 /// If conditions are met (no pattern, holes too small, etc.), returns undef.
 /// This prevents invalid mesh geometries from being generated.
-function get_mesh_cfg(data, h_key, s_key, needs_margin=false) =
+/// get_mesh_cfg(data, h_key, s_key)
+/// Returns [hole, strut] for a mesh surface, or undef when no mesh should be cut.
+///
+/// WHY NO needs_margin: the minimum solid edge at a lid/jar interface is provided
+/// by the physical container geometry — the jar neck cylinder and the box wall lip
+/// already guarantee that material unconditionally. Enforcing it again as a mesh
+/// border double-counts the constraint and silently overrides the user's strut%.
+/// The mesh strut% is purely aesthetic (open area / airflow) and is the user's call.
+function get_mesh_cfg(data, h_key, s_key) =
   let(pat = get_val(PATTERN, data, PATTERN0))
   (pat == NONE) ? undef :
   let(hole = get_val(h_key, data, 1.6))
   (hole <= 0.05) ? undef :
   let(strut = get_val(s_key, data, 25))
   (strut >= 99) ? undef :
-  let(margin_min = needs_margin ? (200 * get_val(LID_MIN_SOLID, data, LID_MIN_SOLID0))
-                                   / min(m_bw(data), m_bl(data)) : 0,
-      final_s   = max(strut, margin_min))
-  (final_s >= 99) ? undef :
-  let(dummy = (needs_margin && final_s > strut)
-              ? echo(str("⚠ lid strut clamped: user=", strut, "% → ", round(final_s),
-                         "% (min_solid_edge=", get_val(LID_MIN_SOLID, data, LID_MIN_SOLID0),
-                         "mm / size=", min(m_bw(data), m_bl(data)), "mm)")) : 0)
-  [hole, final_s];
+  [hole, strut];
 
 /// get_grid_step(hole, min_sp, noz): step = hole diameter + strut width
 ///

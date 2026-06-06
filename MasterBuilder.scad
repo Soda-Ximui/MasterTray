@@ -39,8 +39,8 @@ mesh_hole_size = 2.0; // [0.5 : 0.1 : 8.0]
 // Tip: Wall_Loops × Nozzle_Diameter (e.g. 2 × 0.4 = 0.8mm at default settings).
 mesh_hole_spacing = 0.8; // [1.0 : 0.1 : 5.0]
 // Solid border as % of surface. 0 = edge-to-edge holes. 100 = fully solid (no mesh).
-// Lid strut has a minimum enforced by min_solid_edge_for_lid — your value is a floor
-// not a ceiling; small boxes may show more solid border than you dialled.
+// The minimum solid margin at the jar neck / box lip is provided by the container
+// geometry itself — the mesh strut% is purely aesthetic and always honoured as-is.
 strut_wall_perc  = 25; // [0 : 5 : 100]
 strut_floor_perc = 25; // [0 : 5 : 100]
 strut_lid_perc   = 25; // [0 : 5 : 100]
@@ -68,7 +68,6 @@ floor_thickness = 2.0;
 lid_thickness = 2.0;   
 wall_thickness = 2.4;  
 divider_thickness = 1.2; 
-min_solid_edge_for_lid = 10;
 peg_thickness_multiplier = 2.0; 
 platter_gap = 15; 
 thread_pitch = 2.0; 
@@ -152,7 +151,6 @@ ui_payload = [
     [THICK_LID,          lid_thickness], 
     [THICK_WALL,         wall_thickness], 
     [THICK_DIVIDER,      divider_thickness],
-    [LID_MIN_SOLID,      min_solid_edge_for_lid], 
     [THICK_PEG_MULT,     peg_thickness_multiplier], 
     [PLATTER_GAP,        platter_gap], 
     [THREAD_PITCH,       thread_pitch],

@@ -48,7 +48,7 @@ module factory_render_lid(data, opts, phys) {
         union() {
             apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data))
                 up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false,
-                                        get_mesh_cfg(data, HOLE_LID, STRUT_LID, true));
+                                        get_mesh_cfg(data, HOLE_LID, STRUT_LID));
             // Retention beads on X sides — click under box wall top rim
             for (sx = [-1, 1])
                 translate([sx * (lid_w/2 - sw/2), 0, sl])
@@ -69,7 +69,7 @@ module factory_render_lid(data, opts, phys) {
         union() {
             apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data))
                 up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false,
-                                        get_mesh_cfg(data, HOLE_LID, STRUT_LID, true));
+                                        get_mesh_cfg(data, HOLE_LID, STRUT_LID));
 
             if (glide_snap == "Ball") {
                 // Two sphere bumps on X sides near the closed end.
@@ -100,7 +100,7 @@ module factory_render_lid(data, opts, phys) {
         union() {
             apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data))
                 up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false,
-                                        get_mesh_cfg(data, HOLE_LID, STRUT_LID, true));
+                                        get_mesh_cfg(data, HOLE_LID, STRUT_LID));
             // C-clip hinge on +Y face — suppressed if lid is too narrow for mechanism
             if (clip_len > 0) {
                 translate([0, lid_l/2 + hinge_y_off, clip_z])
@@ -153,7 +153,7 @@ module factory_render_lid(data, opts, phys) {
         difference() {
             union() {
                 up(sl / 2) framed_mesh(data, w, w, sl, true,
-                                        get_mesh_cfg(data, HOLE_LID, STRUT_LID, false));
+                                        get_mesh_cfg(data, HOLE_LID, STRUT_LID));
                 up(sl) cyl(d=w, h=cap_h, chamfer2=noz*4, anchor=BOTTOM);
             }
             // EPS pullback: cutter starts one boolean-epsilon below lid surface so the
@@ -168,6 +168,6 @@ module factory_render_lid(data, opts, phys) {
         lid_w = w - sw - 0.6; lid_l = l - sw / 2 - 0.6;
         apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data))
             up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false,
-                                    get_mesh_cfg(data, HOLE_LID, STRUT_LID, true));
+                                    get_mesh_cfg(data, HOLE_LID, STRUT_LID));
     }
 }
