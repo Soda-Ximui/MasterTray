@@ -176,17 +176,15 @@ function to_num(d) =
 // ==============================================================================
 
 /// get_mesh_cfg(data, h_key, s_key)
-/// Returns mesh configuration [hole_size, strut_percentage] for a surface.
-/// If conditions are met (no pattern, holes too small, etc.), returns undef.
-/// This prevents invalid mesh geometries from being generated.
-/// get_mesh_cfg(data, h_key, s_key)
 /// Returns [hole, strut] for a mesh surface, or undef when no mesh should be cut.
 ///
-/// WHY NO needs_margin: the minimum solid edge at a lid/jar interface is provided
-/// by the physical container geometry — the jar neck cylinder and the box wall lip
-/// already guarantee that material unconditionally. Enforcing it again as a mesh
+/// hole  — hole diameter (mm); controls hole size, together with spacing sets density
+/// strut — solid border surrounding the mesh region as % of the surface
+///         (NOT the strut between holes — that is set by hole size + spacing)
+///
+/// WHY NO needs_margin: the minimum solid edge at the jar neck / box lip is provided
+/// by the physical container geometry unconditionally. Enforcing it again as a mesh
 /// border double-counts the constraint and silently overrides the user's strut%.
-/// The mesh strut% is purely aesthetic (open area / airflow) and is the user's call.
 function get_mesh_cfg(data, h_key, s_key) =
   let(pat = get_val(PATTERN, data, PATTERN0))
   (pat == NONE) ? undef :
@@ -210,8 +208,10 @@ function get_mesh_cfg(data, h_key, s_key) =
 function get_grid_step(hole, min_sp, noz) =
   hole + max(min_sp, max(noz, round(max(noz * 2, hole * STRUT_HOLE_RATIO) / noz) * noz));
 
-/// get_mesh_dim(dim, perc): Calculate effective mesh dimension from percentage
-/// If surface is 100mm and 80% solid, remaining mesh area is 20mm across.
+/// get_mesh_dim(dim, strut): Inner mesh region size after subtracting solid border.
+/// strut% is the solid border as a fraction of the total surface.
+/// e.g. 100mm surface, strut=20% → 10mm solid on each side → 80mm mesh region.
+/// Density (holes/mm²) is set by hole size + spacing and is independent of strut%.
 function get_mesh_dim(dim, perc) = max(0.1, dim * (1 - (perc / 100)));
 
 /// get_n_steps(dim, perc, step): Calculate number of mesh pattern repetitions
