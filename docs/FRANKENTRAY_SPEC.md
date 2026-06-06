@@ -96,7 +96,7 @@ anchor's height.
 ## Connection — `[...]`
 
 ```
-[ from, to [, height] ]
+[ from, to [, height [, length]] ]
 ```
 
 | Field | Required | Values |
@@ -104,6 +104,7 @@ anchor's height.
 | `from` | yes | anchor name |
 | `to` | yes | anchor name, wall name, or angle in degrees |
 | `height` | no | `<n>%` or `<n>` mm. Overrides the anchor's own height for this rib only. |
+| `length` | no | `<n>` mm. Caps how far the rib travels from the anchor. See below. |
 
 ### `to` — three target types
 
@@ -112,6 +113,7 @@ anchor's height.
 [A1, A2]           — rib from A1 to A2
 [A1, A2, 80%]      — same, at 80% of max internal height
 ```
+`length` is ignored when `to` is an anchor name (distance is fixed by the two points).
 
 **2. Wall name** — rib projected from anchor to the named wall face.
 ```
@@ -133,6 +135,22 @@ until it hits the container wall (rectangular or cylindrical).
 [A1, 270]        — due south until wall
 [A1, 45, 60%]    — northeast, 60% of max internal height
 ```
+
+### `length` field *(PROPOSED — not yet implemented)*
+
+Applies to wall-name and angle targets only. Caps the rib at `length` mm from
+the anchor instead of running all the way to the wall. The rib endpoint is
+`min(natural_length, length)` along the direction of travel.
+
+```
+[A1, N, 100%, 60]    — northward rib, full height, stops after 60 mm
+[A1, 90, 80%, 45]    — same direction written as angle
+[A1, E, 70%,  30]    — eastward stub, 30 mm long
+```
+
+This makes free-floating dividers possible without placing virtual anchor nodes
+at every endpoint — the primary motivation for maze-style layouts where many
+short ribs radiate or branch without reaching the container wall.
 
 ---
 
@@ -208,6 +226,7 @@ translate(mid) zrot(atan2(dy,dx)) cuboid([norm([dx,dy]), div_t, h], anchor=CENTE
 
 ## What Is NOT in v1
 
+- **`length` field** *(PROPOSED above)* — free-floating / truncated ribs
 - Rib stopping at another rib (requires ray-segment intersection against all other ribs)
 - Per-rib thickness (all ribs use `div_t`)
 - Curved ribs
