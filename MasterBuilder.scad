@@ -28,7 +28,12 @@ jar_shape = "Circle"; // ["Circle", "Quad", "Hexa", "Octa", "Dodeca"]
 part_width = 54.5; // [10 : 0.5 : 300]
 part_length = 54; // [10 : 0.5 : 300]
 part_height = 55; // [5 : 0.5 : 300]
-dimension_mode = "Total"; // Total", "Usable"]
+dimension_mode = "Total"; // ["Total", "Usable"]
+// Grid layout string — leave blank for no grid. When non-empty all variants are
+// generated automatically: container, container+built-in grid, drop-in grid,
+// drop-in grid with base. LWH are the container dimensions; the drop-in grid
+// is sized to fit snugly inside.
+grid_layout = "";
 
 
 /* [Mesh Aesthetics] */
@@ -52,11 +57,6 @@ lid_glide_snap = "Ball"; // ["Ball", "Tab"]
 /* [Wall Modifications] */
 modify_wall = "None"; // ["None", "Dropped", "50%", "25%"]
 target_wall = "All Walls"; // ["All Walls", "Front", "Back", "Left", "Right"]
-
-/* [Grid System] */
-grid_type = "Built-in"; // ["Built-in", "Drop-in", "None"]
-grid_layout = "7x5 S2/2/2/3/150% S5/1/1/2/80 R3 C15%";
-grid_has_base = false;
 
 /* [Plaque / Labels] */
 plaque_style = "None"; // ["None", "Embedded", "Standalone"]
@@ -140,10 +140,7 @@ ui_payload = [
     [STRUT_LID,          strut_lid_perc],
     [WALL_MODIFY,        modify_wall], 
     [WALL_TARGET,        target_wall], 
-    [GRID_LAYOUT,        grid_layout], 
-    [GRID_TYPE,          grid_type], 
-    [GRID_HAS_BASE,      grid_has_base], 
-    [HAS_BUILTIN_GRID,   (grid_type == "Built-in")],
+    [GRID_LAYOUT,        grid_layout],
     [PLAQUE_STYLE,       plaque_style], 
     [PLAQUE_TEXT,        plaque_text], 
     [PLAQUE_TEXT_SIZE,   plaque_text_size],
