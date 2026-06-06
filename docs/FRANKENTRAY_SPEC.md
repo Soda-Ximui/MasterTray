@@ -1,5 +1,5 @@
 # FrankenTray v2 — Multi-Anchor Grid Spec
-_Status: DESIGN — not yet implemented_
+_Status: IMPLEMENTED_
 
 ---
 
@@ -34,25 +34,56 @@ A( name, position [, shape] [, height] )
 | Field | Required | Values |
 |-------|----------|--------|
 | `name` | yes | any alphanumeric identifier: `A1`, `hub`, `mid` |
-| `position` | yes | `x,y` as % of interior (0,0 = SW corner, 100,100 = NE corner) OR `C` for centre |
-| `shape` | no | `C<r>` circle radius r, `S<s>` square side s, `T<s>` equilateral triangle side s |
-| `height` | no | `<n>%` of interior height, or `<n>` absolute mm. Default = full interior height. Clamped for closed containers. |
+| `position` | yes | `x,y` in mm from the SW (bottom-left) interior corner, OR `C` for centre |
+| `shape` | no | `C<r>` circle radius r mm, `S<s>` square side s mm, `T<s>` equilateral triangle side s mm |
+| `height` | no | `<n>%` of the object's max internal height, or `<n>` absolute mm. Default = max internal height. |
+
+### Height — `<n>%`
+
+The percentage applies to the **divider wall height only** and is relative to
+the object's **max internal height** — the full usable interior depth after
+floor and safe-floor are subtracted. For closed containers (boxes, flip boxes,
+lidded jars) this is already capped at the lid clearance height; the renderer
+also hard-clamps any value above that cap.
+
+| Container type | What `100%` means |
+|----------------|-------------------|
+| Open tray / open jar | Full interior depth |
+| Box / flip box | Full interior depth minus lid clearance |
+| Threaded jar | Full interior depth (poke-through not allowed) |
+
+### Coordinate system
+
+```
+y=int_l  NW ──────── N ──────── NE  x=int_w
+          │                      │
+          W    interior           E
+          │       C=(int_w/2,     │
+          │         int_l/2)      │
+y=0      SW ──────── S ──────── SE  x=int_w
+         x=0
+```
+
+- Origin `(0, 0)` = SW interior corner (bottom-left)
+- `x` increases eastward (mm), `y` increases northward (mm)
+- `C` = centre = `(int_w/2, int_l/2)` — shorthand, size-independent
+- Coordinates are mm of **interior** space (wall thickness already subtracted)
 
 ### Examples
 
 ```
-A(hub, C)                  — point anchor at centre, no shape, full height
+A(hub, C)                  — point anchor at centre, full height
 A(hub, C, C20)             — circle hub r=20 at centre, full height
 A(hub, C, C20, 150%)       — circle hub r=20 at centre, 150% height (pokes above open jar)
-A(A1, 35, 60)              — point anchor at 35% x, 60% y
-A(A1, 35, 60, S15)         — square hub side=15 at 35%,60%
-A(A1, 35, 60, S15, 80%)    — square hub, 80% height
+A(A1, 35, 60)              — point anchor at 35mm from left, 60mm from bottom
+A(A1, 35, 60, S15)         — square hub side=15 at (35, 60)
+A(A1, 35, 60, S15, 80%)    — square hub, 80% of max internal height
 ```
 
 ### Shape rendering
 
 The shape is rendered as a solid prism AT the anchor position, at the
-anchor's height. It acts as the physical hub that ribs connect to.
+anchor's height.
 
 | Token | Shape | Notes |
 |-------|-------|-------|
@@ -72,30 +103,27 @@ anchor's height. It acts as the physical hub that ribs connect to.
 |-------|----------|--------|
 | `from` | yes | anchor name |
 | `to` | yes | anchor name, wall name, or angle in degrees |
-| `height` | no | `<n>%` or `<n>` mm. Overrides anchor default for this rib only. |
+| `height` | no | `<n>%` or `<n>` mm. Overrides the anchor's own height for this rib only. |
 
 ### `to` — three target types
 
 **1. Another anchor** — rib drawn as straight line between the two points.
 ```
 [A1, A2]           — rib from A1 to A2
-[A1, A2, 80%]      — same, at 80% height
+[A1, A2, 80%]      — same, at 80% of max internal height
 ```
 
 **2. Wall name** — rib projected from anchor to the named wall face.
-Keeps the anchor's perpendicular coordinate fixed (axis-aligned projection).
 ```
-[A1, N]    — vertical rib northward from A1, endpoint at (A1.x, +int_l/2)
-[A1, S]    — vertical rib southward from A1
-[A1, E]    — horizontal rib eastward from A1, endpoint at (+int_w/2, A1.y)
-[A1, W]    — horizontal rib westward
-[A1, NE]   — diagonal rib to NE corner (+int_w/2, +int_l/2)
-[A1, NW]   — diagonal rib to NW corner
-[A1, SE]   — diagonal rib to SE corner
-[A1, SW]   — diagonal rib to SW corner
+[A1, N]    — rib northward from A1, endpoint at (A1.x, int_l)
+[A1, S]    — rib southward from A1, endpoint at (A1.x, 0)
+[A1, E]    — rib eastward from A1, endpoint at (int_w, A1.y)
+[A1, W]    — rib westward from A1, endpoint at (0, A1.y)
+[A1, NE]   — diagonal rib to NE corner (int_w, int_l)
+[A1, NW]   — diagonal rib to NW corner (0, int_l)
+[A1, SE]   — diagonal rib to SE corner (int_w, 0)
+[A1, SW]   — diagonal rib to SW corner (0, 0)
 ```
-
-Corner targets (NE/NW/SE/SW) produce diagonal ribs and are rarely needed.
 
 **3. Angle (degrees)** — rib shoots from anchor at the given compass angle
 until it hits the container wall (rectangular or cylindrical).
@@ -103,11 +131,8 @@ until it hits the container wall (rectangular or cylindrical).
 ```
 [A1, 45]         — northeast diagonal until wall
 [A1, 270]        — due south until wall
-[A1, 45, 60%]    — northeast, 60% height
+[A1, 45, 60%]    — northeast, 60% of max internal height
 ```
-
-> **v1 scope:** angle-based ribs extend to the container wall only.
-> "Stop at another rib" is deferred to v2.
 
 ---
 
@@ -127,23 +152,8 @@ As a single Customizer string (whitespace stripped by parser):
 A(A1,30,65) A(A2,68,58) A(A3,30,28) [A1,N] [A1,E] [A1,A2] [A2,E] [A3,S]
 ```
 
----
-
-## Coordinate System
-
-```
-(0,100) NW -------- N -------- NE (100,100)
-         |                       |
-         W    interior           E
-         |       (50,50)=C       |
-         |                       |
-(0,0)  SW -------- S -------- SE (100,0)
-```
-
-- Origin (0,0) = SW interior corner
-- (100,100) = NE interior corner
-- `C` = centre = (50,50) → resolves to (0,0) in OpenSCAD's centre-relative coords
-- Coordinates are % of interior dimensions (after wall thickness subtracted)
+*(Coordinates are mm from SW corner. For a 115×240 interior these anchors
+are at roughly 26%, 27% / 59%, 24% / 26%, 12% — use real mm, not percents.)*
 
 ---
 
@@ -173,18 +183,19 @@ Tokens are dispatched by prefix:
 
 **Step 2 — Extract `A(...)` tokens.**
 Find `A(`, scan to matching `)`, split content on `,`.
-Build `name → [x_pct, y_pct, shape, height_mm]` map.
+Build name → `[x_mm_sw, y_mm_sw, shape_str, height_str, is_center]` map.
 
 **Step 3 — Extract `[...]` tokens.**
 Find `[`, scan to `]`, split content on `,`.
 Each gives `[from, to]` or `[from, to, height]`.
 
 **Step 4 — Resolve and render.**
-For each connection: look up `from` in anchor map → get (ax, ay).
+Convert `x_mm_sw` to centred OpenSCAD coords: `real_x = x_mm_sw - int_w/2`.
+For each connection: look up `from` in anchor map → get `(ax, ay)`.
 Resolve `to`:
-- Anchor name → look up (bx, by) → `rib_between(a, b, h)`
-- Wall name → compute wall endpoint from (ax, ay) → `rib_between(a, wall_pt, h)`
-- Number → ray-cast from (ax, ay) at angle → find intersection with boundary → `rib_between(a, hit_pt, h)`
+- Anchor name → look up → `rib_between(a, b, h)`
+- Wall name → compute wall endpoint → `rib_between(a, wall_pt, h)`
+- Number → ray-cast from `(ax, ay)` at angle → `rib_between(a, hit_pt, h)`
 
 **Geometry primitive — `rib_between(p1, p2, div_t, h)`:**
 ```

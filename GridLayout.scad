@@ -310,15 +310,17 @@ function _is_height_tok(s) =
     len(s) > 0 && (s[len(s)-1] == "%" || (ord(s[0]) >= 48 && ord(s[0]) <= 57));
 
 // Parse anchor content string: "name,x,y[,shape][,height]" or "name,C[,shape][,height]"
-// Returns [name, x_pct, y_pct, shape_str, height_str]
+// Coordinates are mm from the SW (bottom-left) interior corner.
+// C means tray centre (resolved in the renderer — no mm value needed).
+// Returns [name, x_mm_sw, y_mm_sw, shape_str, height_str, is_center]
 function parse_anchor_def(content) =
     let(
         parts     = str_split(content, ","),
         np        = len(parts),
         name      = (np > 0) ? parts[0] : "",
         is_center = (np > 1) && (parts[1] == "C"),
-        x_pct     = is_center ? 50 : ((np > 1) ? to_num(get_digits(parts[1])) : 50),
-        y_pct     = is_center ? 50 : ((np > 2) ? to_num(get_digits(parts[2])) : 50),
+        x_mm      = is_center ? 0 : ((np > 1) ? to_num(get_digits(parts[1])) : 0),
+        y_mm      = is_center ? 0 : ((np > 2) ? to_num(get_digits(parts[2])) : 0),
         // Optional fields start after position args
         opt_start = is_center ? 2 : 3,
         opt0      = (np > opt_start)   ? parts[opt_start]   : "",
@@ -328,7 +330,7 @@ function parse_anchor_def(content) =
         height_str = _is_shape_tok(opt0) ? opt1 :
                      (_is_height_tok(opt0) ? opt0 : "")
     )
-    [name, x_pct, y_pct, shape_str, height_str];
+    [name, x_mm, y_mm, shape_str, height_str, is_center];
 
 // Parse connection content string: "from,to[,height]"
 // Returns [from_name, to_str, height_str]

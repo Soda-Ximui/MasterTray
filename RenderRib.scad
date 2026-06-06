@@ -11,8 +11,10 @@ include <MasterUtility.scad>
 
 // --- FRANKENTRAY V2 HELPERS ---
 
-// Convert a % position (0=SW, 50=centre, 100=NE) to centred mm along dim.
-function _pct_to_mm(pct, dim) = (pct / 100 - 0.5) * dim;
+// Convert a mm-from-SW-corner coordinate to OpenSCAD centred mm.
+// Anchors use SW as origin; OpenSCAD uses the tray centre as origin.
+// C (centre) anchors skip this — the renderer uses 0 directly.
+function _sw_to_mm(x_mm_sw, dim) = x_mm_sw - dim/2;
 
 // Resolve a height string to mm.
 // "" → default_h; "80%" → 80 % of max_h; "60" → 60 mm absolute.
@@ -76,7 +78,8 @@ function _resolve_to(to_str, ax, ay, anchor_defs, int_w, int_l, is_jar, int_d) =
             ? _angle_endpoint_cyl (to_num(get_digits(to_str)), ax, ay, int_d)
             : _angle_endpoint_rect(to_num(get_digits(to_str)), ax, ay, int_w, int_l)) :
     let(adef = _find_anchor_def(anchor_defs, to_str))
-    (adef != undef) ? [_pct_to_mm(adef[1], int_w), _pct_to_mm(adef[2], int_l)] :
+    (adef != undef) ? (adef[5] ? [0, 0]
+                                : [_sw_to_mm(adef[1], int_w), _sw_to_mm(adef[2], int_l)]) :
     [ax, ay];
 
 // Render hub shape at current position (caller must translate).
@@ -99,16 +102,16 @@ module _render_hub(shape_str, h) {
 // Emit all v2 hub shapes and ribs. Called inside a clipping context.
 module _franken_v2_geom(anchor_defs, conn_defs, int_w, int_l, default_h, max_h, is_closed, is_jar, int_d, div_t) {
     for (adef = anchor_defs) {
-        ax = _pct_to_mm(adef[1], int_w);
-        ay = _pct_to_mm(adef[2], int_l);
+        ax = adef[5] ? 0 : _sw_to_mm(adef[1], int_w);
+        ay = adef[5] ? 0 : _sw_to_mm(adef[2], int_l);
         ah = _resolve_height(adef[4], default_h, max_h, is_closed);
         translate([ax, ay, 0]) _render_hub(adef[3], ah);
     }
     for (cdef = conn_defs) {
         from_def = _find_anchor_def(anchor_defs, cdef[0]);
         if (from_def != undef) {
-            ax      = _pct_to_mm(from_def[1], int_w);
-            ay      = _pct_to_mm(from_def[2], int_l);
+            ax      = from_def[5] ? 0 : _sw_to_mm(from_def[1], int_w);
+            ay      = from_def[5] ? 0 : _sw_to_mm(from_def[2], int_l);
             from_h  = _resolve_height(from_def[4], default_h, max_h, is_closed);
             rib_h   = (cdef[2] == "") ? from_h : _resolve_height(cdef[2], default_h, max_h, is_closed);
             to_pt   = _resolve_to(cdef[1], ax, ay, anchor_defs, int_w, int_l, is_jar, int_d);
