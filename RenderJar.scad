@@ -42,9 +42,20 @@ module factory_render_jar(data, opts, phys) {
         // Built-in grid (fused to jar interior, raised to floor level)
         up(sf) render_internal_grid(jar_data);
         // Floor (circular or polygonal)
-        up(sf / 2)
-            framed_mesh(data, w, w, sf, true,
+        // The floor disc spans the full outer diameter w, but the jar wall (sw thick)
+        // covers the outer ring and hides it from view. Rendering the mesh against the
+        // full w would cause most of the strut% solid border to vanish under the wall.
+        // Fix: render the hidden outer ring as solid, mesh only the visible inner disc.
+        // strut% then operates within the area the user actually sees.
+        inner_d = w - sw * 2;
+        up(sf / 2) union() {
+            // Outer solid ring — structural, hidden under wall
+            linear_extrude(height=sf, center=true)
+                difference() { circle(d=w, $fn=jar_fn); circle(d=inner_d, $fn=jar_fn); }
+            // Inner meshed disc — strut% relative to visible area
+            framed_mesh(data, inner_d, inner_d, sf, true,
                         get_mesh_cfg(data, HOLE_FLOOR, STRUT_FLOOR), jar_fn);
+        }
 
         // Wall
         up(sf)
