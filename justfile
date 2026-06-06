@@ -80,8 +80,7 @@ render-all:
     "Simple Tray", "Box", "Standalone Box", "Flip Box", "Double Flip Box", `
     "Nesting Tray (Short)", "Modular Peg Tray (Long)", `
     "Open Jar", "Threaded Jar", "Jar with Lid", `
-    "Simple Jar", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", `
-    "Standalone Box Grid", "Standalone Jar Grid" `
+    "Simple Jar", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set" `
     ) | ForEach-Object { `
     $slug = $_ -replace '[^a-zA-Z0-9]+', '-'; `
     $out  = "{{out_dir}}/$slug.png"; `

@@ -312,31 +312,6 @@ function compile_manifest(intent, data) =
     )
   :
 
-  // ── STANDALONE GRID INTENTS ─────────────────────────────────────────────────
-  // Always emit two GRID entries: without base and with base.
-
-  (intent == "Standalone Box Grid") ?
-    let(phys = get_physics_profile(data))
-    [
-      ["GRID", concat([[GRID_HAS_BASE, false]], data), [], phys],
-      ["GRID", concat([[GRID_HAS_BASE, true]],  data), [], phys]
-    ]
-  :
-  (intent == "Standalone Jar Grid") ?
-    let(phys = get_physics_profile(data),
-        w    = get_val(WIDTH, data, WIDTH0),
-        l    = get_val(LENGTH, data, LENGTH0),
-        jo   = [[IS_JAR_GRID, true]])
-    (w == l) ? [
-      ["GRID", concat([[GRID_HAS_BASE, false]], data),              jo, phys],
-      ["GRID", concat([[GRID_HAS_BASE, true]],  data),              jo, phys]
-    ] : [
-      ["GRID", concat([[GRID_HAS_BASE, false], [WIDTH, w]], data),  jo, phys],
-      ["GRID", concat([[GRID_HAS_BASE, true],  [WIDTH, w]], data),  jo, phys],
-      ["GRID", concat([[GRID_HAS_BASE, false], [WIDTH, l]], data),  jo, phys],
-      ["GRID", concat([[GRID_HAS_BASE, true],  [WIDTH, l]], data),  jo, phys]
-    ]
-  :
   (intent == "Nesting Tray (Short)") ? [
     ["TRAY", data, [[STACKABLE, true], [STACK_MODE, "Snap"]], get_physics_profile(data)]
   ] :
