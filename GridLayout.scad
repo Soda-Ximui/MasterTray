@@ -189,6 +189,7 @@ function is_span_token(tok)      = len(tok) > 0 && (tok[0] == "S" || tok[0] == "
 
 function is_valid_grid_layout(g_str) =
   (g_str == "") ? true :
+  has_franken_v2(g_str) ? true :   // v2 syntax — skip space-token validation
   let (tokens = [for (t = get_grid_tokens(g_str)) t])
   (len(tokens) == 0) ? false :
   len([for (t = tokens) if (
@@ -261,3 +262,107 @@ function parse_franken_config(g_str) =
         ribs = [for (rt = rib_toks) parse_rib_node(rt)]
     )
     [rays, hub_d, offset, ribs];
+
+// ==============================================================================
+// FRANKENTRAY V2 PARSER
+// Syntax:  A(name, x%, y% [, shape] [, height])   — anchor definition
+//          [from, to [, height]]                    — connection
+// All whitespace is stripped before tokenising — humans may format freely.
+// ==============================================================================
+
+// Strip all whitespace from string (space and tab).
+function strip_ws(s) =
+    str_join([for (i = [0:len(s)-1]) if (s[i] != " " && s[i] != "\t") s[i]], "");
+
+// Find the first occurrence of character ch in s at or after index start.
+// Returns len(s) when not found.
+function _next_char(s, start, ch) =
+    (start >= len(s)) ? len(s) :
+    (s[start] == ch)  ? start  :
+    _next_char(s, start+1, ch);
+
+// Returns list of raw content strings inside A(...) tokens.
+function parse_anchor_tokens(raw) =
+    let(s = strip_ws(raw), n = len(s))
+    [for (i = [0:n-2])
+        if (s[i] == "A" && s[i+1] == "(")
+        let(close = _next_char(s, i+2, ")"))
+        if (close < n)
+        substr(s, i+2, close - i - 2)
+    ];
+
+// Returns list of raw content strings inside [...] tokens.
+function parse_connection_tokens(raw) =
+    let(s = strip_ws(raw), n = len(s))
+    [for (i = [0:n-1])
+        if (s[i] == "[")
+        let(close = _next_char(s, i+1, "]"))
+        if (close < n)
+        substr(s, i+1, close - i - 1)
+    ];
+
+// True if token is a hub shape specifier: C<n>, S<n>, or T<n> (len > 1).
+function _is_shape_tok(s) =
+    len(s) > 1 && (s[0] == "C" || s[0] == "S" || s[0] == "T");
+
+// True if token is a height value: ends with % OR first char is ASCII digit 0-9.
+function _is_height_tok(s) =
+    len(s) > 0 && (s[len(s)-1] == "%" || (ord(s[0]) >= 48 && ord(s[0]) <= 57));
+
+// Parse anchor content string: "name,x,y[,shape][,height]" or "name,C[,shape][,height]"
+// Returns [name, x_pct, y_pct, shape_str, height_str]
+function parse_anchor_def(content) =
+    let(
+        parts     = str_split(content, ","),
+        np        = len(parts),
+        name      = (np > 0) ? parts[0] : "",
+        is_center = (np > 1) && (parts[1] == "C"),
+        x_pct     = is_center ? 50 : ((np > 1) ? to_num(get_digits(parts[1])) : 50),
+        y_pct     = is_center ? 50 : ((np > 2) ? to_num(get_digits(parts[2])) : 50),
+        // Optional fields start after position args
+        opt_start = is_center ? 2 : 3,
+        opt0      = (np > opt_start)   ? parts[opt_start]   : "",
+        opt1      = (np > opt_start+1) ? parts[opt_start+1] : "",
+        // opt0 is shape if it starts with C/S/T and len>1; otherwise it may be height
+        shape_str  = _is_shape_tok(opt0) ? opt0 : "",
+        height_str = _is_shape_tok(opt0) ? opt1 :
+                     (_is_height_tok(opt0) ? opt0 : "")
+    )
+    [name, x_pct, y_pct, shape_str, height_str];
+
+// Parse connection content string: "from,to[,height]"
+// Returns [from_name, to_str, height_str]
+function parse_connection_def(content) =
+    let(parts = str_split(content, ","), np = len(parts))
+    [
+        (np > 0) ? parts[0] : "",
+        (np > 1) ? parts[1] : "",
+        (np > 2) ? parts[2] : ""
+    ];
+
+// True if to_str is a cardinal/intercardinal wall name.
+function _is_wall_name(s) =
+    s == "N" || s == "S" || s == "E" || s == "W" ||
+    s == "NE" || s == "NW" || s == "SE" || s == "SW";
+
+// True if to_str is a numeric angle (starts with ASCII digit 0-9).
+function _to_is_angle(s) = len(s) > 0 && ord(s[0]) >= 48 && ord(s[0]) <= 57;
+
+// True if g_str contains v2 FrankenTray anchor syntax.
+function has_franken_v2(g_str) =
+    let(s = strip_ws(g_str), n = len(s))
+    len([for (i = [0:n-2]) if (s[i] == "A" && s[i+1] == "(") i]) > 0;
+
+// Parse all v2 tokens from g_str.
+// Returns [anchor_defs, connection_defs]
+//   anchor_defs:     [[name, x_pct, y_pct, shape_str, height_str], ...]
+//   connection_defs: [[from_name, to_str, height_str], ...]
+function parse_franken_v2(g_str) =
+    let(
+        a_raw = parse_anchor_tokens(g_str),
+        c_raw = parse_connection_tokens(g_str)
+    )
+    [
+        [for (ac = a_raw) parse_anchor_def(ac)],
+        [for (cc = c_raw) parse_connection_def(cc)]
+    ];
