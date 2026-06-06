@@ -1,258 +1,215 @@
 # Session Handoff — MasterTray
-_Last updated: 2026-06-04 — post print-quality sweep + magic number elimination_
+_Last updated: 2026-06-05 — mesh semantics, strut fixes, Astro site_
 
 ---
 
 ## How to Resume
 
-Open Claude Code **from inside `C:\repos\3D\MasterTray`**:
 ```
 cd C:\repos\3D\MasterTray
 claude
 ```
-Claude executable: `C:\Users\hobbes\AppData\Roaming\Claude\claude-code\<version>\claude.exe`
-Do NOT start a generic Claude chat — it will have no context.
+
+Then tell Claude: "Read HANDOFF.md and continue."
 
 ---
 
 ## Branch & State
 
-**Branch:** `feature/architecture-revamp`
-**Base:** `refactor/code-clarity-and-safety`
-**Last commit:** `0900f17` — `refactor: promote STRUT_HOLE_RATIO 0.25 magic number to named constant`
-**Commits ahead of base:** 6
+**Branch:** `refactor/code-clarity-and-safety`
+**Last commit:** `bcc83d6`
+**Status:** All committed, NOT pushed since last session.
 
-Recent commit log:
 ```
-0900f17 refactor: promote STRUT_HOLE_RATIO 0.25 magic number to named constant
-01d71de docs: clarify Corner_Round_Ratio Arachne floor threshold; expand FDM symptom guide
-f92dd19 refactor: eliminate magic numbers in mesh patterns; fix slotted spacing bug; expose corner rounding as Customizer knob
-af0cec5 feat: add bottom chamfer to apply_master_bounds — elephant foot relief on all primitives
-7224e8e fix: chamfer all user-facing sharp edges — box/tray top rims, jar walls, screw lid cap
-61aa64f feat: FDM print-quality sweep — nozzle-adaptive geometry, Arachne fixes, layer alignment
+bcc83d6 fix: jar floor strut% now relative to visible inner diameter
+87cf6a1 test: set defaults for strut% visual verification
+4559f87 docs: clarify strut% vs hole spacing semantics in engine comments
+1b38d52 refactor: remove needs_margin — container geometry owns the solid edge
+5e55c74 fix: screw lid strut not sticking — needs_margin=false for Screw type
+e679682 fix: mesh defaults — hole 2.0mm, struts 25%, spacing min 1.0mm
+fb55c04 fix: mesh_hole_spacing default 0.8mm — remove misleading 0=auto sentinel
+fc018da fix: restore mesh_hole_spacing Customizer knob; add Double Flip Box to dropdown
+59a4179 refactor: move root *.md into docs/, simplify Astro content glob
 ```
 
-**Status:** All committed, NOT pushed. No active PR yet on this branch.
+---
+
+## What Was Done This Session
+
+### Astro docs site fixes
+- Dead links fixed — content collection now covers `docs/**/*.md` (all root-level docs moved into `docs/`)
+- Mermaid diagrams render as SVG (Shiki uses `pre[data-language="mermaid"]`, not `code.language-mermaid`)
+- All Astro root config files committed (`package.json`, `astro.config.mjs`, etc.)
+- Old `html/` static site and `index.html` deleted — Astro replaces them
+- `.claude/launch.json` updated with Astro dev server entry (port 4321)
+- `justfile` completely rewritten: `just dev`, `just build`, `just serve` (Caddy), `just e2e` (Playwright), `just render`, `just render-all`
+
+### Tools confirmed installed
+| Tool | Status |
+|------|--------|
+| Playwright | ✅ Installed |
+| Caddy | ✅ Installed |
+| Bruno | ✅ Installed |
+
+### Mesh system fixes
+
+**Strut% semantics (critical — was confused, now correct):**
+- `strut%` = solid BORDER region surrounding the mesh (NOT hole density)
+- `hole spacing` = density/pitch of holes within the mesh region (independent of strut%)
+- For rectangular: strut% shrinks the inner mesh rectangle, leaving a solid border on each side
+- For cylindrical: strut% sets solid band height at top + bottom; mesh fills the middle
+- These two controls are fully orthogonal — `get_grid_step` never reads strut%, `get_mesh_dim` never reads spacing
+
+**`needs_margin` removed entirely (`1b38d52`):**
+- Was forcing lid strut% to `max(user, (200×min_solid_edge)/size)` — silently overriding user settings
+- Correct principle: the minimum solid margin at jar neck / box lip is provided by the PHYSICAL container geometry (jar neck cylinder, box wall), not by the mesh border
+- `needs_margin` parameter removed from `get_mesh_cfg`; `LID_MIN_SOLID` and `min_solid_edge_for_lid` deleted
+
+**Mesh defaults fixed (`e679682`):**
+- `mesh_hole_size`: `0.0` → `2.0mm` (was triggering `hole <= 0.05` guard → no mesh ever rendered → strut% had nothing to work on)
+- `strut_*_perc`: `100` → `25%` (100 also disables mesh)
+- `mesh_hole_spacing` min slider: `0.1` → `1.0mm`
+
+**Customizer additions:**
+- `mesh_hole_spacing = 0.8` added to `[Mesh Aesthetics]` below hole size
+- `"Double Flip Box"` added to `Part_To_Build` dropdown (was implemented in manifest but missing from UI)
+
+**Jar floor strut fix (`bcc83d6`):**
+- Bug: floor mesh used full outer diameter `w`. Jar wall (sw≈2.4mm) covers the outer ring of the floor, hiding most of the strut border. At 25% strut on a 54mm jar, visible solid ring was only ~1.25mm instead of expected ~3.6mm.
+- Fix: split floor into two parts in `RenderJar.scad`:
+  1. Outer solid ring (`w` to `inner_d = w - sw*2`) — structural, hidden under wall
+  2. Inner meshed disc (`inner_d`) — strut% relative to visible inner area
 
 ---
 
-## All 5 Primitives — Status
+## IMMEDIATE NEXT STEP — min_margin in mesh system
 
-| # | Primitive | Status | Notes |
-|---|-----------|--------|-------|
-| 1 | TRAY | ✅ Done | Hollow chassis, mesh, wall mods, stackable (Peg/Builtin/Snap), GRID_WALL_H |
-| 2 | JAR | ✅ Done | Circular floor + wall mesh, threaded neck, polygon shapes, built-in grid |
-| 3 | LID | ✅ Done | Snap, Glide (H/V, Ball/Tab), Flip_Single (diamond latch), Screw, Slip |
-| 3b | BOX | ✅ Done | Unified factory — all LID_TYPE variants inline, GRID_WALL_H injection |
-| 4 | GRID | ✅ Done | Cartesian + radial + spans, built-in + drop-in, jar circular clipping |
-| 5 | RIB | ⬜ Not started | FrankenTray vector ribs — code in RenderRib.scad, parser in GridLayout.scad |
+**This was agreed on in the session and must be implemented.**
 
----
+**The principle:** ALL mesh surfaces reserve a minimum structural margin BEFORE strut% applies. strut=0% should never push holes into structurally required material — it means "mesh to the edge of the safe zone."
 
-## What's Working (Manifest Intents)
+Currently strut=0% means:
+- Floor: holes go right to the inner wall edge (no minimum ring)
+- Cylindrical wall: holes span full cylinder height (no minimum solid bands at top/bottom)
+- Lid: holes go to the lid edge
 
-| Intent | Produces |
-|--------|---------|
-| Simple Tray | TRAY |
-| Box | BOX(Snap) + LID(Snap) |
-| Standalone Box | BOX(Glide) + LID(Glide) |
-| Flip Box | BOX(Flip_Single) + LID(Flip_Single) |
-| Double Flip Box | BOX(Flip_Double) + 2×LID(Flip_Single) |
-| Nesting Tray (Short) | TRAY(Snap stack) |
-| Modular Peg Tray (Long) | TRAY(Peg stack) + 4×PEG |
-| Open Jar | 1 or 2 JAR (dual-spawn w≠l) |
-| Threaded Jar | 1 or 2 JAR threaded |
-| Jar with Lid | JAR+LID pairs |
-| Simple Jar / S4 Jar / Spool Jar | JAR+LID (S4 = desiccant mesh locked) |
-| S4 Wedge | BOX(Glide)+LID(Glide) desiccant |
-| S4 Set | S4 Jar + Spool Jar + S4 Wedge |
-| Standalone Box Grid | GRID (drop-in box) |
-| Standalone Jar Grid | GRID (drop-in, circular clip, dual-spawn w≠l) |
-| ~13 others | → fallback TRAY + warning echo (pill boxes, etc.) |
+**The fix:** add `min_margin = noz * m_wloops(data)` to `mesh_params` as a 6th return element, then use it in `framed_mesh` and `cylindrical_mesh_wall`.
 
----
+### mesh_params (RenderMesh.scad ~L36)
+Add `min_m = noz * m_wloops(data)` and return as `[noz, pat, hole, strut, step, min_m]`.
 
-## What Changed This Session (2026-06-04)
-
-### Sharp edges / elephant foot (commits 7224e8e + af0cec5)
-
-**Problem:** Print test showed knife-sharp rims on jar and lid.
-
-**Root cause:** `apply_master_bounds(w, l, h, r, c)` accepted `c` chamfer parameter but never
-used it — the body only applied `r` (vertical corner rounding). Cylindrical mesh wall had
-no edge treatment at all.
-
-**Fix — `apply_master_bounds` rewritten to two-pass intersection:**
+### framed_mesh (RenderMesh.scad ~L53)
 ```scad
-module apply_master_bounds(w, l, h, r, c) {
-  c_r = max(0.1, min(r, (w/2)-0.1, (l/2)-0.1));
-  intersection() {
-    intersection() {
-      children();
-      cuboid([w, l, h*3], rounding=c_r, edges="Z", anchor=BOTTOM);  // Pass 1: vertical corners
-    }
-    cuboid([w+EPS, l+EPS, h], chamfer=max(0,c), edges=TOP+BOTTOM, anchor=BOTTOM); // Pass 2: horiz edges
-  }
-}
+min_m = mp[5];
+eff_w = max(0.1, w - 2*min_m);
+eff_l = max(0.1, l - 2*min_m);
+// For circular:
+mesh_d = eff_w * sqrt(max(0, 1 - strut/100));
+// For rectangular:
+mesh_w = max(0.1, eff_w * (1 - strut/100) - pad);
+mesh_l = max(0.1, eff_l * (1 - strut/100) - pad);
+// Update nx/ny based on mesh_d or mesh_w/mesh_l
+// Update clip circle/rect to use mesh_d / [mesh_w, mesh_l]
 ```
-- `edges=TOP+BOTTOM` → top rim safe to handle + bottom elephant foot relief (45° lead-in ramp)
-- `h*3` oversize on Pass 1 avoids BOSL2 clipping tall children
 
-**Cylindrical mesh wall** (`RenderMesh.scad`): added `rim_chamf = m_noz(data) * 4` (1.6mm) to
-both outer cyl calls.
-
-**Screw lid cap** (`RenderLid.scad`): `chamfer2=noz*4` on top edge.
-
-**Flip_Double spine pillars** (`RenderBox.scad`): added `chamfer=m_chamf(data), edges=TOP`
-(Flip_Single already had it — now consistent).
-
-**Snap nesting ledge** (`RenderTray.scad`): added `chamfer=m_chamf(data), edges=BOTTOM`
-(matched Peg mode which already had it).
-
----
-
-### Magic number elimination (commits f92dd19 + 0900f17)
-
-**New globals in `MasterEngine.scad`:**
+### cylindrical_mesh_wall (RenderMesh.scad ~L94)
 ```scad
-line_width         = nozzle_d * EXTRUSION_WIDTH_MULT;       // replaces 5× nozzle_d*1.05
-corner_round_ratio = is_undef(Corner_Round_Ratio) ? RECT_HOLE_ROUND_RATIO : Corner_Round_Ratio;
+min_m    = mp[5];
+eff_h    = max(0.1, h - 2*min_m);
+h_mesh   = eff_h * (1 - strut/100);
+z_offset = min_m + (eff_h - h_mesh) / 2;
+// replace: z_pos = (h - h_active)/2 + ...
+// with:    z_pos = z_offset + (i + 0.5) * z_step
 ```
 
-**New constants in `MasterConstants.scad`:**
-- `RECT_HOLE_ROUND_RATIO = 0.20` — square/slotted hole corner rounding fraction
-- `EXTRUSION_WIDTH_MULT = 1.05` — Bambu Studio 105% extrusion width
-- `STRUT_HOLE_RATIO = 0.25` — min strut width = 25% of hole diameter (large holes)
+**Result at strut=0%:** holes stop `min_m ≈ 0.8mm` from every structural edge. Hole density unchanged.
 
-**New Customizer knob in `MasterBuilder.scad`:**
+**After implementing:** re-render with test defaults (below) and confirm visible solid bands on wall at strut=0%.
+
+---
+
+## Test Defaults (leave in MasterBuilder.scad)
+
 ```scad
-Corner_Round_Ratio = 0.20; // [0.05:0.05:0.45]
-// Only affects holes > ~2.1mm (= line_width / RECT_HOLE_ROUND_RATIO)
-// Below that, Arachne floor (line_width = 0.42mm) always wins
+part_width = 54.5;  part_length = 54;  part_height = 55;
+mesh_hole_size = 1.6;   mesh_hole_spacing = 1.2;
+strut_wall_perc  =  0;   // should show narrow solid band at top+bottom after min_margin fix
+strut_floor_perc = 25;   // should show clear solid ring inside jar
+strut_lid_perc   = 75;   // should show mostly solid with small central mesh
 ```
 
-**Slotted pattern spacing bug fixed** (`MasterMeshPatterns.scad`):
-```scad
-// BEFORE (wrong): spacing=[step*1.5, step]  — pillars ~10% too thin
-// AFTER (correct): spacing=[step+hole, step] — exact 2*hole + pillar_width
+**Render command (PowerShell):**
+```powershell
+$o = "C:\Program Files\OpenSCAD\openscad.com"
+& $o -o output/test.png --render --camera=80,0,30,55,0,20,500 --colorscheme=Tomorrow -D 'Part_To_Build="Jar with Lid"' MasterBuilder.scad
 ```
-Impact: at hole=3mm, pillar was 7.02mm pitch (wrong) → now 7.68mm (correct, matches
-structural guarantee from `get_grid_step`).
 
 ---
 
-## Next Steps (Priority Order)
+## Key Architecture Rules
 
-### 1. Wire remaining pill box intents (HIGHEST VALUE)
-Intents that currently fall through to default TRAY:
-- `1-Day AM/PM Box`, `1-Day 2-Compartment (Single Lid)`, `7-Day Pill Box`,
-  `14-Day AM/PM Box`, `Pillbox Set (Double Lid)`, `Pillbox Set (Single Lid)`, `Pillbox Full Set`
-- Old manifest logic: `git show d84fbcc:MasterManifest.scad`
-- These use `DOUBLE_FLIP_BOX` or `FLIP_BOX` with `HAS_BUILTIN_GRID=true` and specific
-  `GRID_LAYOUT` strings injected inline
-
-### 2. Push branch + open PR
-All 6 commits are local. Push to `feature/architecture-revamp` and open PR against
-`refactor/code-clarity-and-safety`.
-```
-git push origin feature/architecture-revamp
-gh pr create ...
-```
-
-### 3. Work through TODO.md checklist
-See TODO.md — 14 items remain (F1–F19, some done). Priority 1 items are correctness
-issues that silently produce broken prints.
-
-### 4. RIB primitive (Primitive 5)
-FrankenTray vector-based ribs. Code exists in `RenderRib.scad`, parser in `GridLayout.scad`.
-Not started.
-
-### 5. HTML rebuild
-`docs/LESSONS.md`, `docs/3D Print Symptoms.md`, `docs/FEATURES.md` all updated but not in
-`index.html`. Do NOT run `just` — rebuild manually or defer.
-
----
-
-## Open Code Quality Issues (from prior audit)
-
-These are confirmed bugs not yet addressed:
-
-| ID | File | Issue |
-|----|------|-------|
-| CQ1 | MasterManifest.scad | `is_closed` jar span clamping — may over-clamp valid layouts |
-| CQ2 | build pipeline | `write_params_file` called twice |
-| CQ3 | YAML output | `false` encoding wrong |
-| CQ4 | Grid parser | `1.5x3` string strip drops decimal dot |
-| CQ5 | GridLayout.scad | Dead `is_closed` 7th element in `parse_single_span` |
-
----
-
-## Architecture Rules (full list in LESSONS.md)
-
-| Rule | File |
-|------|------|
+| Rule | Where |
+|------|-------|
+| strut% = solid border surrounding mesh region | RenderMesh.scad header |
+| hole size + spacing = density, independent of strut% | MasterEngine.scad `get_grid_step` |
+| Container geometry owns the structural margin (not the mesh) | MasterEngine.scad `get_mesh_cfg` comment |
+| Jar floor mesh uses inner_d (w - sw*2), not outer w | RenderJar.scad |
 | Factory IS the implementation — opts drive variants | LESSONS.md §1 |
-| Built-in grid height driven by LID_TYPE (GRID_WALL_H) | LESSONS.md §2 |
 | All circle dims are diameters | LESSONS.md §0b |
 | Support-free always | LESSONS.md §0c |
-| Chamfer/fillet all edges | LESSONS.md §0b |
-| 0=auto for geometry overrides (chamfer, corner radius, etc.) | MasterBuilder Advanced |
+| 0 = auto for geometry overrides (chamfer, corner radius) | MasterBuilder Advanced |
 | Salvage from 858dabc and d84fbcc before writing | LESSONS.md feedback |
-| grid_has_base defaults false (drop-in opt-in) | MasterBuilder.scad |
-| apply_master_bounds: chamfer=m_chamf(data), rounding from phys | MasterEngine.scad |
-| Cylindrical rims: nozzle_d×4 chamfer (4-pass structural rule) | RenderMesh.scad |
 
 ---
 
-## Key Data Flow
-
-```
-MasterBuilder.scad (Customizer)
-  → ui_payload [["KEY", val], ...]
-  → compile_manifest(intent, data)
-      → injects overrides inline: concat([[KEY, val]], data)
-      → returns [[type, data, opts, phys], ...]
-  → build_part() loops manifest
-      → get_xy() positions on platter
-      → dispatches factory_render_*(data, opts, phys)
-
-Key injections:
-  factory_render_box  → GRID_WALL_H (lid-aware height cap)
-  factory_render_jar  → IS_JAR_GRID, HAS_THREADS, GRID_WALL_H
-  S4 intents          → DESICCANT_MESH_RECT/CYL (locked airflow mesh)
-  Dual-spawn          → concat([[WIDTH, w]], data)
-```
-
----
-
-## Important Files
+## Key Files
 
 | File | Purpose |
 |------|---------|
-| `MasterBuilder.scad` | Customizer UI — USE THIS, not MasterBuild2 |
-| `MasterManifest.scad` | Intent routing + data injection |
-| `MasterEngine.scad` | Physics getters, get_xy platter packing, apply_master_bounds |
-| `MasterConstants.scad` | All magic numbers with documented rationale |
-| `MasterEnum.scad` | All string constants |
-| `MasterMeshPatterns.scad` | Pattern geometry (teardrop, diamond, slotted, etc.) |
-| `RenderMesh.scad` | framed_mesh + cylindrical_mesh_wall |
-| `RenderTray.scad` | core_tray_chassis + factory_render_tray |
-| `RenderBox.scad` | factory_render_box (all lid types) |
-| `RenderJar.scad` | factory_render_jar |
-| `RenderLid.scad` | factory_render_lid (all lid types) |
-| `RenderGrid.scad` | factory_render_grid + render_internal_grid |
-| `RenderRib.scad` | FrankenTray ribs (Primitive 5 — not wired) |
-| `GridLayout.scad` | Layout string parser (cartesian/radial/span/franken) |
-| `LESSONS.md` | Hard-won rules — read before touching anything |
-| `docs/FEATURES.md` | Full product feature documentation |
-| `FUTURE.md` | Deferred ideas |
-| `TODO.md` | Print-quality fix checklist (14 items) |
+| `MasterBuilder.scad` | Customizer UI — USE THIS |
+| `MasterManifest.scad` | Intent → component list |
+| `MasterEngine.scad` | Physics getters, `get_mesh_cfg`, `get_grid_step` |
+| `MasterConstants.scad` | All named constants |
+| `RenderMesh.scad` | `framed_mesh` + `cylindrical_mesh_wall` — **min_margin needed here** |
+| `RenderJar.scad` | Jar factory — floor split into outer ring + inner disc this session |
+| `RenderLid.scad` | All lid types — needs_margin removed this session |
+| `docs/BUGS.md` | B1 (sqrt scaling), B2 (screw lid height) |
+| `astro/` | Docs site — `cd astro && pnpm dev` → localhost:4321 |
 
 ---
 
-## FUTURE.md Items (do not implement now)
+## Primitives Status
 
-1. Wall slots for 1-row/1-col grids (structural support for parallel dividers)
-2. Drop-in dividers for flip boxes
-3. Desiccant box: 1.8mm holes confirmed safe — slotted pattern forced by `apply_inductions`,
-   step=3.48mm, pillar=1.68mm, 3.6×1.8mm slot retains 2mm+ silica gel beads
+| # | Primitive | Status |
+|---|-----------|--------|
+| 1 | TRAY | ✅ Done |
+| 2 | JAR | ✅ Done (floor strut fix this session) |
+| 3 | LID | ✅ Done (needs_margin removed this session) |
+| 3b | BOX | ✅ Done |
+| 4 | GRID | ✅ Done |
+| 5 | RIB | ⬜ Not started |
+
+Pill box intents (1-Day, 7-Day, 14-Day, Pillbox Set) are wired in MasterManifest.scad.
+
+---
+
+## Open Code Items (from TODO.md Priority 1)
+
+| ID | File | Issue |
+|----|------|-------|
+| F15 | RenderBox.scad ~L103 | flip-box hinge assert |
+| F18 | RenderGrid.scad | lip_h → JAR_LIP_HEIGHT (check if done) |
+| F6 | RenderLid.scad ~L120 | diamond latch layer_snap |
+| F14 | RenderLid.scad ~L44 | snap bead layer-align |
+
+---
+
+## Uncommitted / Untracked
+
+```
+ M gemini               ← leave alone (unrelated)
+?? .claude/settings.json
+?? astro/.vscode/
+?? build.pl
+?? output/             ← render outputs, not tracked
+```
