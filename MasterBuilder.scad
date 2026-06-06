@@ -20,20 +20,21 @@ Corner_Round_Ratio = 0.20; // [0.05:0.05:0.45]
 //STEP_Z = Layer_Height;
 
 /* [Build Selection] */
-Part_To_Build = "Jar with Lid"; // ["Box", "Standalone Box", "Flip Box", "Double Flip Box", "1-Day AM/PM Box", "1-Day 2-Compartment (Single Lid)", "7-Day Pill Box", "14-Day AM/PM Box", "Pillbox Set (Double Lid)", "Pillbox Set (Single Lid)", "Pillbox Full Set", "Lid", "Simple Tray", "Nesting Tray (Short)", "Modular Peg Tray (Long)", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", "Plaque", "Grid Test"]
+Part_To_Build = "Grid"; // ["Box", "Standalone Box", "Flip Box", "Double Flip Box", "1-Day AM/PM Box", "1-Day 2-Compartment (Single Lid)", "7-Day Pill Box", "14-Day AM/PM Box", "Pillbox Set (Double Lid)", "Pillbox Set (Single Lid)", "Pillbox Full Set", "Lid", "Simple Tray", "Nesting Tray (Short)", "Modular Peg Tray (Long)", "Open Jar", "Threaded Jar", "Jar with Lid", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", "Plaque", "Grid", "Grid Test"]
 jar_shape = "Circle"; // ["Circle", "Quad", "Hexa", "Octa", "Dodeca"]
 
 
 /* [Dimensions: W x L x H] */
-part_width = 54.5; // [10 : 0.5 : 300]
-part_length = 54; // [10 : 0.5 : 300]
-part_height = 55; // [5 : 0.5 : 300]
+part_width  = 115;  // [10 : 0.5 : 300]
+part_length = 240;  // [10 : 0.5 : 300]
+part_height = 75;   // [5 : 0.5 : 300]
 dimension_mode = "Total"; // ["Total", "Usable"]
-// Grid layout string — leave blank for no grid. When non-empty all variants are
-// generated automatically: container, container+built-in grid, drop-in grid,
-// drop-in grid with base. LWH are the container dimensions; the drop-in grid
-// is sized to fit snugly inside.
-grid_layout = "";
+// Grid layout string — leave blank for no grid. When non-empty, container intents
+// auto-generate all variants: plain + built-in grid + drop-in (no base) + drop-in
+// (with base). The "Grid" intent emits only the two drop-in variants.
+// Total mode: LWH are outer container dims; drop-in is sized to fit snugly inside.
+// Usable mode: LWH are interior dims; drop-in is sized to those dims minus tolerance.
+grid_layout = "A(A1,90,0)A(A2,90,70)A(A3,90,130)[A1,N,100%][A2,W,130%][A2,E,90%][A3,W,110%][A3,E,70%][A3,N,85%]";
 
 
 /* [Mesh Aesthetics] */

@@ -312,6 +312,14 @@ function compile_manifest(intent, data) =
     )
   :
 
+  // ── STANDALONE DROP-IN GRID ─────────────────────────────────────────────────
+  // Pure insert — no container. Set grid_layout; LWH are the container dims the
+  // grid is sized to fit inside (Total mode) or the desired interior (Usable mode).
+  (intent == "Grid") ?
+    let(phys = get_physics_profile(data))
+    grid_variants(data, phys)
+  :
+
   (intent == "Nesting Tray (Short)") ? [
     ["TRAY", data, [[STACKABLE, true], [STACK_MODE, "Snap"]], get_physics_profile(data)]
   ] :
