@@ -25,11 +25,14 @@ Whitespace around commas, brackets, and parentheses is ignored.
 
 ---
 
-## Anchor Definition — `A(...)`
+## Anchor Definition — `(...)`
 
 ```
-A( name, position [, shape [, shape_height]] )
+( name, position [, shape [, shape_height]] )
 ```
+
+The leading `A` is optional — `A(name,...)` and `(name,...)` are identical.
+Old strings with the `A` prefix continue to work.
 
 | Field | Required | Values |
 |-------|----------|--------|
@@ -85,15 +88,15 @@ y=0      SW ──────── S ──────── SE  x=int_w
 ### Examples
 
 ```
-A(hub, C)                  — point anchor at centre, no shape
-A(hub, C, C20)             — circle hub diameter 20 at centre, full height
-A(hub, C, C20, 150%)       — circle hub diameter 20, 150% shape height (pokes above open jar)
-A(hub, C, C)               — decorative nub at centre (no size given)
-A(A1, 35, 60)              — point anchor at (35, 60), no shape
-A(A1, 35, 60, S15)         — square hub side=15 at (35, 60), full height
-A(A1, 35, 60, S15, 80%)    — square hub, 80% shape height; ribs still default to 100%
-A(A1, 35, 60, D12)         — diamond hub (12mm side, rotated 45°) at (35, 60)
-A(A1, 35, 60, T0)          — decorative triangle nub at (35, 60)
+(hub, C)                  — point anchor at centre, no shape
+(hub, C, C20)             — circle hub diameter 20 at centre, full height
+(hub, C, C20, 150%)       — circle hub diameter 20, 150% shape height (pokes above open jar)
+(hub, C, C)               — decorative nub at centre (no size given)
+(A1, 35, 60)              — point anchor at (35, 60), no shape
+(A1, 35, 60, S15)         — square hub side=15 at (35, 60), full height
+(A1, 35, 60, S15, 80%)    — square hub, 80% shape height; ribs still default to 100%
+(A1, 35, 60, D12)         — diamond hub (12mm side, rotated 45°) at (35, 60)
+(A1, 35, 60, T0)          — decorative triangle nub at (35, 60)
 ```
 
 ---

@@ -278,7 +278,7 @@ function parse_franken_config(g_str) =
 
 // ==============================================================================
 // FRANKENTRAY V2 PARSER
-// Syntax:  A(name, x%, y% [, shape] [, height])   — anchor definition
+// Syntax:  (name, x, y [, shape] [, height])   — anchor definition  (A prefix optional)
 //          [from, to [, height]]                    — connection
 // All whitespace is stripped before tokenising — humans may format freely.
 // ==============================================================================
@@ -294,14 +294,15 @@ function _next_char(s, start, ch) =
     (s[start] == ch)  ? start  :
     _next_char(s, start+1, ch);
 
-// Returns list of raw content strings inside A(...) tokens.
+// Returns list of raw content strings inside (...) anchor tokens.
+// The leading A is optional — (name,x,y) and A(name,x,y) are both accepted.
 function parse_anchor_tokens(raw) =
     let(s = strip_ws(raw), n = len(s))
-    [for (i = [0:n-2])
-        if (s[i] == "A" && s[i+1] == "(")
-        let(close = _next_char(s, i+2, ")"))
+    [for (i = [0:n-1])
+        if (s[i] == "(")
+        let(close = _next_char(s, i+1, ")"))
         if (close < n)
-        substr(s, i+2, close - i - 2)
+        substr(s, i+1, close - i - 1)
     ];
 
 // Returns list of raw content strings inside [...] tokens.
@@ -366,8 +367,8 @@ function _to_is_angle(s) = len(s) > 0 && ord(s[0]) >= 48 && ord(s[0]) <= 57;
 
 // True if g_str contains v2 FrankenTray anchor syntax.
 function has_franken_v2(g_str) =
-    let(s = strip_ws(g_str), n = len(s))
-    len([for (i = [0:n-2]) if (s[i] == "A" && s[i+1] == "(") i]) > 0;
+    let(s = strip_ws(g_str))
+    len(search("(", s)) > 0;
 
 // Parse all v2 tokens from g_str.
 // Returns [anchor_defs, connection_defs]
