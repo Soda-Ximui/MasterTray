@@ -69,6 +69,67 @@ function _angle_endpoint_cyl(theta_deg, ax, ay, int_d) =
     )
     [ax + t*cx, ay + t*cy];
 
+// --- HUB CLIPPING ---
+
+// Inscribed-circle clip radius for a hub shape.
+// C: exact radius = n/2.  S, D: inscribed face distance = n/2.
+// T: inradius = n / (2*sqrt(3)).  Nubs (n < sw) return 0 — no clipping.
+function _hub_clip_r(shape_str, sw) =
+    let(first = shape_str[0],
+        n     = to_num(get_digits(shape_str)))
+    (n < sw) ? 0 :
+    (first == "C") ? n / 2 :
+    (first == "S") ? n / 2 :
+    (first == "D") ? n / 2 :
+    (first == "T") ? n / (2 * sqrt(3)) : 0;
+
+// t at which ray (ax,ay)+(t*dx,t*dy) ENTERS circle (hx,hy,r) from outside.
+// Returns undef if no forward intersection strictly in (0, 1).
+function _ray_enters_circle_t(ax, ay, dx, dy, hx, hy, r) =
+    let(ex = ax-hx, ey = ay-hy,
+        A  = dx*dx + dy*dy,
+        B  = 2*(ex*dx + ey*dy),
+        C  = ex*ex + ey*ey - r*r,
+        disc = B*B - 4*A*C)
+    (disc < 0 || A < 0.0001) ? undef :
+    let(t = (-B - sqrt(disc)) / (2*A))
+    (t > 0.001 && t < 0.999) ? t : undef;
+
+// t at which ray EXITS circle — used when start point is inside (source hub).
+function _ray_exits_circle_t(ax, ay, dx, dy, hx, hy, r) =
+    let(ex = ax-hx, ey = ay-hy,
+        A  = dx*dx + dy*dy,
+        B  = 2*(ex*dx + ey*dy),
+        C  = ex*ex + ey*ey - r*r,
+        disc = B*B - 4*A*C)
+    (disc < 0 || A < 0.0001) ? undef :
+    let(t = (-B + sqrt(disc)) / (2*A))
+    (t > 0.001) ? t : undef;
+
+// Earliest t at which rib (ax,ay)→(bx,by) enters any non-source hub.
+// Returns undef if no hub is hit before the endpoint.
+function _end_clip_t(anchor_defs, from_name, ax, ay, bx, by, int_w, int_l, sw) =
+    let(dx = bx-ax, dy = by-ay,
+        ts = [for (adef = anchor_defs)
+              if (adef[0] != from_name && adef[3] != "")
+              let(r  = _hub_clip_r(adef[3], sw),
+                  hx = adef[5] ? 0 : _sw_to_mm(adef[1], int_w),
+                  hy = adef[5] ? 0 : _sw_to_mm(adef[2], int_l),
+                  t  = (r > 0) ? _ray_enters_circle_t(ax, ay, dx, dy, hx, hy, r) : undef)
+              if (t != undef) t])
+    len(ts) > 0 ? min(ts) : undef;
+
+// t at which rib exits the source anchor's own hub (start offset).
+// Returns undef if source has no hub or rib starts outside it.
+function _start_clip_t(from_def, ax, ay, bx, by, int_w, int_l, sw) =
+    (from_def[3] == "") ? undef :
+    let(r = _hub_clip_r(from_def[3], sw))
+    (r <= 0) ? undef :
+    let(hx = from_def[5] ? 0 : _sw_to_mm(from_def[1], int_w),
+        hy = from_def[5] ? 0 : _sw_to_mm(from_def[2], int_l),
+        dx = bx-ax, dy = by-ay)
+    _ray_exits_circle_t(ax, ay, dx, dy, hx, hy, r);
+
 // Resolve the 'to' field of a connection to [x_mm, y_mm] centred coords.
 function _resolve_to(to_str, ax, ay, anchor_defs, int_w, int_l, is_jar, int_d) =
     _is_wall_name(to_str)
@@ -137,7 +198,11 @@ module _render_hub(shape_str, h, div_t, sw) {
 }
 
 // Emit all v2 hub shapes and ribs. Called inside a clipping context.
-module _franken_v2_geom(anchor_defs, conn_defs, int_w, int_l, default_h, max_h, is_closed, is_jar, int_d, div_t) {
+// Ribs are automatically clipped against all hub shapes:
+//   - start offset: rib begins at source hub boundary (not hub centre)
+//   - end clip:     rib stops at the boundary of the first hub it would enter
+// Clipping uses inscribed-circle approximation for S/D/T, exact for C.
+module _franken_v2_geom(anchor_defs, conn_defs, int_w, int_l, default_h, max_h, is_closed, is_jar, int_d, div_t, sw) {
     for (adef = anchor_defs) {
         ax = adef[5] ? 0 : _sw_to_mm(adef[1], int_w);
         ay = adef[5] ? 0 : _sw_to_mm(adef[2], int_l);
@@ -147,20 +212,24 @@ module _franken_v2_geom(anchor_defs, conn_defs, int_w, int_l, default_h, max_h, 
     for (cdef = conn_defs) {
         from_def = _find_anchor_def(anchor_defs, cdef[0]);
         if (from_def != undef) {
-            ax      = from_def[5] ? 0 : _sw_to_mm(from_def[1], int_w);
-            ay      = from_def[5] ? 0 : _sw_to_mm(from_def[2], int_l);
-            // Ribs default to max internal height — shape_height on the anchor
-            // only controls the hub prism, not the ribs leaving it.
-            rib_h   = (cdef[2] == "") ? default_h : _resolve_height(cdef[2], default_h, max_h, is_closed);
-            to_pt   = _resolve_to(cdef[1], ax, ay, anchor_defs, int_w, int_l, is_jar, int_d);
-            bx = to_pt[0];  by = to_pt[1];
-            dx = bx - ax;   dy = by - ay;
+            ax    = from_def[5] ? 0 : _sw_to_mm(from_def[1], int_w);
+            ay    = from_def[5] ? 0 : _sw_to_mm(from_def[2], int_l);
+            rib_h = (cdef[2] == "") ? default_h : _resolve_height(cdef[2], default_h, max_h, is_closed);
+            to_pt = _resolve_to(cdef[1], ax, ay, anchor_defs, int_w, int_l, is_jar, int_d);
+            bx = to_pt[0]; by = to_pt[1];
+            // Clip start out of source hub; clip end before entering any other hub.
+            st = _start_clip_t(from_def,    ax, ay, bx, by, int_w, int_l, sw);
+            et = _end_clip_t(anchor_defs, cdef[0], ax, ay, bx, by, int_w, int_l, sw);
+            ax2 = (st != undef) ? ax + st*(bx-ax) : ax;
+            ay2 = (st != undef) ? ay + st*(by-ay) : ay;
+            bx2 = (et != undef) ? ax + et*(bx-ax) : bx;
+            by2 = (et != undef) ? ay + et*(by-ay) : by;
+            dx = bx2-ax2; dy = by2-ay2;
             L  = norm([dx, dy]);
-            if (L > 0.1) {
-                translate([(ax+bx)/2, (ay+by)/2, 0])
+            if (L > 0.1)
+                translate([(ax2+bx2)/2, (ay2+by2)/2, 0])
                     zrot(atan2(dy, dx))
                     cuboid([L, div_t, rib_h], anchor=CENTER+BOTTOM);
-            }
         }
     }
 }
@@ -198,12 +267,12 @@ module render_franken_ribs(data) {
             intersection() {
                 cyl(d=int_d, h=int_h, anchor=BOTTOM);
                 _franken_v2_geom(anchor_defs, conn_defs, int_w, int_l, default_h, max_h,
-                                 is_closed, is_jar, int_d, div_t);
+                                 is_closed, is_jar, int_d, div_t, sw);
             }
         } else {
             apply_master_bounds(int_w, int_l, int_h, m_c_rad(data)-sw, m_chamf(data)/2)
                 _franken_v2_geom(anchor_defs, conn_defs, int_w, int_l, default_h, max_h,
-                                 is_closed, is_jar, int_d, div_t);
+                                 is_closed, is_jar, int_d, div_t, sw);
         }
 
     } else {
