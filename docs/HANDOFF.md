@@ -1,5 +1,5 @@
 # Session Handoff — MasterTray
-_Last updated: 2026-06-05 — mesh min_margin, poke-through grids, drop-in fix, FrankenTray v2 spec_
+_Last updated: 2026-06-05 — mesh min_margin, poke-through grids, drop-in fix, FrankenTray v2 spec + Astro nav_
 
 ---
 
@@ -10,22 +10,28 @@ cd C:\repos\3D\MasterTray
 claude
 ```
 
-Tell Claude: "Read docs/HANDOFF.md and continue."
+Tell Claude: "Read HANDOFF.md and continue."
+_(Root-level `HANDOFF.md` is a one-line stub that points here — Claude will find it immediately.)_
 
 ---
 
 ## Branch & State
 
 **Branch:** `refactor/code-clarity-and-safety`
-**Last commit:** `c429fe5`
+**Last commit:** `7900ac6` (see `git log --oneline -5` for current)
 **Status:** All committed, NOT pushed.
 
 ```
-c429fe5 docs: grid layout quick reference in STATUS.md
-79f8370 feat: cycling per-ray heights + fix drop-in grid not generated
-3b39703 feat: poke-through height for radial grid — R<n>/H and C<d>/H syntax
-34d84a8 feat: add min_margin to mesh — structural no-hole zone at every edge
+7900ac6 docs: session handoff — mesh fixes, min_margin next step
+bcc83d6 fix: jar floor strut% now relative to visible inner diameter
+87cf6a1 test: set defaults for strut% visual verification
+4559f87 docs: clarify strut% vs hole spacing semantics in engine comments
+1b38d52 refactor: remove needs_margin — container geometry owns the solid edge
 ```
+
+**This session also added (uncommitted):**
+- `HANDOFF.md` root stub → points to `docs/HANDOFF.md`
+- `astro/src/pages/index.astro` — Status + FrankenTray Spec added to nav
 
 ---
 

@@ -52,12 +52,23 @@ open:
 e2e:
     Set-Location {{astro_dir}}; pnpm exec playwright test
 
+# ── handoff history: every session's final state ─────────────────────────────
+[group('docs')]
+handoffs:
+    git log --follow --oneline docs/HANDOFF.md
+
+# ── show one handoff by number (0=latest, 1=previous, …) ─────────────────────
+[group('docs')]
+handoff n='0':
+    $hash = git log --follow --format="%H" docs/HANDOFF.md | Select-Object -Index {{n}}; `
+    git show "$hash`:docs/HANDOFF.md"
+
 # ── OpenSCAD: quick render to output/preview.png ─────────────────────────────
 [group('render')]
 render:
     New-Item -ItemType Directory -Force {{out_dir}} | Out-Null
     & "{{openscad}}" -o {{out_dir}}/preview.png --render `
-      --camera=0,20,30,55,0,25,350 --colorscheme=Tomorrow `
+      --camera=0,20,30,55,0,25,350 --colorscheme=DeepOcean `
       MasterBuilder.scad
     Write-Host "→ {{out_dir}}/preview.png"
 
@@ -75,6 +86,6 @@ render-all:
       $slug = $_ -replace '[^a-zA-Z0-9]+', '-'; `
       $out  = "{{out_dir}}/$slug.png"; `
       & "{{openscad}}" -o $out --render --camera=0,20,30,55,0,25,350 `
-        --colorscheme=Tomorrow -D "Part_To_Build=`"$_`"" MasterBuilder.scad; `
+        --colorscheme=DeepOcean -D "Part_To_Build=`"$_`"" MasterBuilder.scad; `
       Write-Host "  → $out" `
     }
