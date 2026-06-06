@@ -278,14 +278,23 @@ module render_franken_ribs(data) {
         max_h     = int_h;
         default_h = max_h;
 
+        // Poke-through: hubs may specify heights taller than int_h.
+        // apply_master_bounds clips to its h argument, so use the tallest
+        // resolved hub height as the clip ceiling. Percentage heights still
+        // resolve against max_h (int_h) so 100% = container depth as always.
+        max_hub_h = (len(anchor_defs) > 0)
+            ? max([for (a = anchor_defs) _resolve_height(a[4], default_h, max_h, is_closed)])
+            : default_h;
+        clip_h = max(int_h, max_hub_h);
+
         if (is_jar) {
             intersection() {
-                cyl(d=int_d, h=int_h, anchor=BOTTOM);
+                cyl(d=int_d, h=clip_h, anchor=BOTTOM);
                 _franken_v2_geom(anchor_defs, conn_defs, int_w, int_l, default_h, max_h,
                                  is_closed, is_jar, int_d, div_t, sw);
             }
         } else {
-            apply_master_bounds(int_w, int_l, int_h, m_c_rad(data)-sw, m_chamf(data)/2)
+            apply_master_bounds(int_w, int_l, clip_h, m_c_rad(data)-sw, m_chamf(data)/2)
                 _franken_v2_geom(anchor_defs, conn_defs, int_w, int_l, default_h, max_h,
                                  is_closed, is_jar, int_d, div_t, sw);
         }
