@@ -61,6 +61,17 @@ const { title, description = '' } = Astro.props;
 				.prose { padding: 1em; }
 			}
 		</style>
+	<script type="module">
+		import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+		mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
+		document.querySelectorAll('pre[data-language="mermaid"]').forEach(pre => {
+			const div = document.createElement('div');
+			div.className = 'mermaid';
+			div.textContent = pre.querySelector('code').textContent;
+			pre.replaceWith(div);
+		});
+		mermaid.run();
+	</script>
 	</head>
 	<body>
 		<Header />
