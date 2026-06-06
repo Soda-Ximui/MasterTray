@@ -1,53 +1,80 @@
 # ──────────────────────────────────────────────────────────────────────────────
-# MasterTray Documentation Build  (justfile)
-# Recommended over Makefile for day-to-day use: self-documents, no TAB issues.
+# MasterTray  (justfile)
 #
-# just          — build HTML (default)
-# just setup    — move *.md → docs/, create html/   (run once)
-# just html     — convert docs/*.md → html/*.html + index.html
-# just clean    — remove html/ and index.html
-# just rebuild  — clean + html
-# just open     — open index.html in default browser
+# just           — start Astro dev server (default)
+# just dev       — start Astro dev server on :4321
+# just build     — build Astro site → astro/dist/
+# just preview   — Astro's built-in preview of astro/dist/
+# just serve     — Caddy serves astro/dist/ (production-like, auto-HTTPS on localhost)
+# just open      — open http://localhost:4321 in default browser
+# just e2e       — run Playwright tests
+# just render    — render MasterBuilder.scad to output/preview.png (smoke test)
+# just render-all — render all 23 intents to output/
 # ──────────────────────────────────────────────────────────────────────────────
 
 set shell := ["powershell.exe", "-NoProfile", "-Command"]
 
-docs   := "docs"
-html   := "html"
-css    := "docs.css"
-master := "MASTERTRAY"
-filter := "fix-links.lua"
+astro_dir := "astro"
+dist_dir  := "astro/dist"
+out_dir   := "output"
+openscad  := "C:/Program Files/OpenSCAD/openscad.com"
 
 # ── default ───────────────────────────────────────────────────────────────────
-default: html
+default: dev
 
-# ── setup: move *.md → docs/ (run once after checkout) ───────────────────────
-[group('setup')]
-setup:
-	New-Item -ItemType Directory -Force {{docs}}, {{html}} | Out-Null
-	Get-ChildItem -Path . -Filter "*.md" -File | Where-Object { $_.Name -ne "HANDOFF.md" } | Move-Item -Destination {{docs}} -Force
-	Write-Host "Moved .md files to {{docs}}/"
+# ── Astro dev server ──────────────────────────────────────────────────────────
+[group('docs')]
+dev:
+    Set-Location {{astro_dir}}; pnpm dev
 
-# ── html: convert all docs/*.md → html/*.html + index.html ───────────────────
-[group('build')]
-html:
-	New-Item -ItemType Directory -Force {{html}} | Out-Null
-	Get-ChildItem {{docs}}\*.md | Where-Object { $_.BaseName -ne "{{master}}" } | ForEach-Object { $out = "{{html}}\$($_.BaseName).html"; pandoc $_.FullName --standalone --toc --toc-depth=3 --to html5 --lua-filter {{filter}} --css ../{{css}} --metadata "pagetitle=$($_.BaseName)" -o $out; Write-Host "  $out" }
-	pandoc {{docs}}\{{master}}.md --standalone --toc --toc-depth=2 --to html5 --lua-filter {{filter}} --css {{css}} --metadata "pagetitle=MasterTray Documentation" -o index.html
-	Write-Host "  index.html"
+# ── build static site ─────────────────────────────────────────────────────────
+[group('docs')]
+build:
+    Set-Location {{astro_dir}}; pnpm build
 
-# ── clean ─────────────────────────────────────────────────────────────────────
-[group('build')]
-clean:
-	Remove-Item -Recurse -Force {{html}} -ErrorAction SilentlyContinue
-	Remove-Item -Force index.html -ErrorAction SilentlyContinue
-	Write-Host "Cleaned."
+# ── Astro built-in preview (serves astro/dist/) ───────────────────────────────
+[group('docs')]
+preview: build
+    Set-Location {{astro_dir}}; pnpm preview
 
-# ── rebuild ───────────────────────────────────────────────────────────────────
-[group('build')]
-rebuild: clean html
+# ── Caddy: serve astro/dist/ with automatic local HTTPS ───────────────────────
+[group('docs')]
+serve: build
+    caddy file-server --root {{dist_dir}} --listen :8080 --browse
 
-# ── open index.html in default browser ───────────────────────────────────────
-[group('view')]
+# ── open docs in browser ──────────────────────────────────────────────────────
+[group('docs')]
 open:
-	Start-Process index.html
+    Start-Process "http://localhost:4321"
+
+# ── Playwright end-to-end tests ───────────────────────────────────────────────
+[group('test')]
+e2e:
+    Set-Location {{astro_dir}}; pnpm exec playwright test
+
+# ── OpenSCAD: quick render to output/preview.png ─────────────────────────────
+[group('render')]
+render:
+    New-Item -ItemType Directory -Force {{out_dir}} | Out-Null
+    & "{{openscad}}" -o {{out_dir}}/preview.png --render `
+      --camera=0,20,30,55,0,25,350 --colorscheme=Tomorrow `
+      MasterBuilder.scad
+    Write-Host "→ {{out_dir}}/preview.png"
+
+# ── OpenSCAD: render all major intents ────────────────────────────────────────
+[group('render')]
+render-all:
+    New-Item -ItemType Directory -Force {{out_dir}} | Out-Null
+    @( `
+      "Simple Tray", "Box", "Standalone Box", "Flip Box", "Double Flip Box", `
+      "Nesting Tray (Short)", "Modular Peg Tray (Long)", `
+      "Open Jar", "Threaded Jar", "Jar with Lid", `
+      "Simple Jar", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", `
+      "Standalone Box Grid", "Standalone Jar Grid" `
+    ) | ForEach-Object { `
+      $slug = $_ -replace '[^a-zA-Z0-9]+', '-'; `
+      $out  = "{{out_dir}}/$slug.png"; `
+      & "{{openscad}}" -o $out --render --camera=0,20,30,55,0,25,350 `
+        --colorscheme=Tomorrow -D "Part_To_Build=`"$_`"" MasterBuilder.scad; `
+      Write-Host "  → $out" `
+    }
