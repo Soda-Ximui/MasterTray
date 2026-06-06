@@ -1,0 +1,77 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import { SITE_DESCRIPTION, SITE_TITLE, GITHUB_URL } from '../consts';
+
+const nav = [
+	{ href: '/docs/features',       label: 'Features',         desc: 'System design, primitives, mesh control, FDM safety' },
+	{ href: '/docs/lessons',        label: 'Lessons',          desc: 'Hard-won rules — read before touching any code' },
+	{ href: '/docs/bugs',           label: 'Bug Registry',     desc: 'Known issues, root causes, fixes with before/after' },
+	{ href: '/docs/refactoring',    label: 'Refactoring Log',  desc: 'Intentional code-quality changes with commit refs' },
+	{ href: '/docs/sequence-diagrams', label: 'Diagrams',      desc: 'Mermaid sequence diagrams for the full pipeline' },
+	{ href: '/docs/todo',           label: 'TODO',             desc: 'Print-quality fix checklist, priority-ordered' },
+	{ href: '/docs/3d-print-symptoms', label: '3D Print Guide', desc: 'FDM symptoms, causes, Bambu Studio fixes' },
+	{ href: '/docs/setup',          label: 'Dev Setup',        desc: 'Tools, OpenSCAD CLI, web stack' },
+];
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+		<style>
+			.hero {
+				text-align: center;
+				padding: 3em 1em 2em;
+			}
+			.hero h1 { font-size: 2.5em; margin-bottom: 0.3em; }
+			.hero p  { color: rgb(var(--gray)); max-width: 560px; margin: 0 auto 2em; }
+			.grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+				gap: 1em;
+				max-width: 860px;
+				margin: 0 auto 3em;
+				padding: 0 1em;
+			}
+			.card {
+				border: 1px solid rgb(var(--gray-light));
+				border-radius: 8px;
+				padding: 1.2em 1.4em;
+				text-decoration: none;
+				color: inherit;
+				transition: box-shadow 0.15s, border-color 0.15s;
+			}
+			.card:hover {
+				box-shadow: var(--box-shadow);
+				border-color: var(--accent);
+			}
+			.card h2 { font-size: 1.1em; margin: 0 0 0.4em; color: var(--accent); }
+			.card p  { font-size: 0.85em; margin: 0; color: rgb(var(--gray)); line-height: 1.4; }
+			.github  { text-align: center; padding-bottom: 3em; }
+			.github a { color: var(--accent); font-size: 0.9em; }
+		</style>
+	</head>
+	<body>
+		<Header />
+		<main>
+			<div class="hero">
+				<h1>🗂 MasterTray Docs</h1>
+				<p>{SITE_DESCRIPTION}</p>
+			</div>
+			<div class="grid">
+				{nav.map(({ href, label, desc }) => (
+					<a class="card" href={href}>
+						<h2>{label}</h2>
+						<p>{desc}</p>
+					</a>
+				))}
+			</div>
+			<div class="github">
+				<a href={GITHUB_URL} target="_blank">View source on GitHub →</a>
+			</div>
+		</main>
+		<Footer />
+	</body>
+</html>
