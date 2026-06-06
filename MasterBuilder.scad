@@ -34,7 +34,7 @@ dimension_mode = "Total"; // ["Total", "Usable"]
 // (with base). The "Grid" intent emits only the two drop-in variants.
 // Total mode: LWH are outer container dims; drop-in is sized to fit snugly inside.
 // Usable mode: LWH are interior dims; drop-in is sized to those dims minus tolerance.
-grid_layout = "A(A1,90,0)A(A2,90,70)A(A3,90,130)[A1,N,100%][A2,W,130%][A2,E,90%][A3,W,110%][A3,E,70%][A3,N,85%]";
+grid_layout = "A(A1,90,67)A(A2,90,130)A(A3,45,67,C60)[A1,S][A1,A2][A1,A3][A3,W][A2,W][A2,N]";
 
 
 /* [Mesh Aesthetics] */

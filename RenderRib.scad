@@ -93,7 +93,7 @@ module _render_hub(shape_str, h) {
         size_val = to_num(get_digits(shape_str));
         is_nub   = (size_val < NUB_D);
         eff      = is_nub ? NUB_D : size_val;
-        if (first == "C") cyl(d=is_nub ? NUB_D : eff*2, h=h, anchor=BOTTOM);
+        if (first == "C") cyl(d=is_nub ? NUB_D : eff,   h=h, anchor=BOTTOM);
         if (first == "S") cuboid([eff, eff, h], anchor=CENTER+BOTTOM);
         if (first == "D") zrot(45) cuboid([eff, eff, h], anchor=CENTER+BOTTOM);
         if (first == "T") {

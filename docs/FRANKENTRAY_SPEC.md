@@ -47,7 +47,7 @@ how tall the hub prism itself is.
 
 | Token | Shape | Notes |
 |-------|-------|-------|
-| `C<n>` | Cylinder, diameter `2n` | Hollow when inner diameter ≥ 6 extrusion passes |
+| `C<n>` | Cylinder, diameter `n` | Hollow when inner diameter ≥ 6 extrusion passes |
 | `S<n>` | Square prism, side `n` | Solid |
 | `T<n>` | Equilateral triangle prism, side `n` | Solid, point facing +Y |
 | `D<n>` | Diamond prism (square side `n` rotated 45°) | Solid |
@@ -86,8 +86,8 @@ y=0      SW ──────── S ──────── SE  x=int_w
 
 ```
 A(hub, C)                  — point anchor at centre, no shape
-A(hub, C, C20)             — circle hub diameter 40 at centre, full height
-A(hub, C, C20, 150%)       — circle hub, 150% shape height (pokes above open jar)
+A(hub, C, C20)             — circle hub diameter 20 at centre, full height
+A(hub, C, C20, 150%)       — circle hub diameter 20, 150% shape height (pokes above open jar)
 A(hub, C, C)               — decorative nub at centre (no size given)
 A(A1, 35, 60)              — point anchor at (35, 60), no shape
 A(A1, 35, 60, S15)         — square hub side=15 at (35, 60), full height
