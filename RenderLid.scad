@@ -25,8 +25,13 @@ module factory_render_lid(data, opts, phys) {
     lid_type  = get_val("LID_TYPE",  opts, "Slip");
     glide_dir = get_val(GLIDE_DIR,   data, "H");
     glide_snap = get_val(GLIDE_SNAP, data, "Ball");
+    mirror_y  = get_val("MIRROR_Y",  opts, false);
+    filament  = get_val("FILAMENT_TYPE", data, "PETG");
 
-    echo(str("-> Factory [LID] | type=", lid_type, " glide_dir=", glide_dir, " snap=", glide_snap));
+    echo(str("-> Factory [LID] | type=", lid_type, " glide_dir=", glide_dir, " snap=", glide_snap,
+             mirror_y ? " [MIRROR_Y]" : ""));
+
+    scale([1, mirror_y ? -1 : 1, 1]) {
 
     // Ball catch shared dims (Snap + Glide Ball modes).
     // Scales with box footprint so large lids get proportionally stronger retention.
@@ -45,14 +50,19 @@ module factory_render_lid(data, opts, phys) {
         // noz*2 = 0.8mm at 0.4mm nozzle = 2.857 layers — fractional, weak retention.
         // 3 layers at 0.28mm lh = 0.84mm — clean boundary, reliable PETG click-force.
         bead_h = m_lh(data) * max(3, ceil(noz * 2 / m_lh(data)));
+        // snap_protr: how far bead outer face extends past box interior wall.
+        // clearance/2 closes the lid_w gap so bead starts at interior face,
+        // then protrudes noz further — enough for tactile click without over-stressing wall.
+        snap_protr = noz;
         union() {
             apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data))
                 up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false,
                                         get_mesh_cfg(data, HOLE_LID, STRUT_LID));
-            // Retention beads on X sides — click under box wall top rim.
+            // Retention beads on X sides — cam over box wall top rim and click under it.
+            // Bead outer face = box_interior_half + snap_protr (protrudes into wall).
             // Lowered by EPS so bead base overlaps into lid body (prevents slicer separation).
             for (sx = [-1, 1])
-                translate([sx * (lid_w/2 - sw/2), 0, sl - EPS])
+                translate([sx * (lid_w/2 + clearance/2 + snap_protr - sw/2), 0, sl - EPS])
                     cuboid([sw, lid_l - sw*2, bead_h + EPS], chamfer=bead_h/2,
                            edges="ALL", anchor=BOTTOM);
         }
@@ -104,6 +114,9 @@ module factory_render_lid(data, opts, phys) {
         clasp_depth = engagement_depth(COMP_CLASP, data);
         clip_wall  = noz * 4;
         clip_outer_d = hinge_d + clearance*2 + clip_wall*2;
+        // C-opening gap: PLA is brittle — wider gap means less arm flex required.
+        // PETG: 80% of axle d = 0.4mm flex per arm (validated). PLA: 90% = 0.2mm flex.
+        clip_gap = (filament == "PLA") ? hinge_d * 0.90 : hinge_d * 0.80;
         cc_z       = clip_outer_d / 2;
         hinge_y_off = clip_outer_d / 2;
         lid_w = w; lid_l = l; clip_len = lid_w - sw*6; clip_z = sl + cc_z;
@@ -129,7 +142,7 @@ module factory_render_lid(data, opts, phys) {
                         // Printed face-down: arc is at top of print, fully self-supporting.
                         // Pin enters from below as the lid is pressed onto the box hinge.
                         translate([0, 0, -clip_outer_d/2])
-                            cuboid([clip_len+2, hinge_d*0.8, clip_outer_d], anchor=CENTER);
+                            cuboid([clip_len+2, clip_gap, clip_outer_d], anchor=CENTER);
                     }
             }
             // Diamond latch tab on −Y face (clicks into box latch recess).
@@ -184,4 +197,6 @@ module factory_render_lid(data, opts, phys) {
             up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false,
                                     get_mesh_cfg(data, HOLE_LID, STRUT_LID));
     }
+
+    } // end scale([1, mirror_y ? -1 : 1, 1])
 }

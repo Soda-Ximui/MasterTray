@@ -228,7 +228,7 @@ function compile_manifest(intent, data) =
     concat(
       [["BOX", d0,                               [["LID_TYPE", "Flip_Double"]], phys],
        ["LID", concat([[LENGTH, lid_l]], dl),    [["LID_TYPE", "Flip_Single"]], phys],
-       ["LID", concat([[LENGTH, lid_l]], dl),    [["LID_TYPE", "Flip_Single"]], phys]],
+       ["LID", concat([[LENGTH, lid_l]], dl),    [["LID_TYPE", "Flip_Single"], ["MIRROR_Y", true]], phys]],
       hg ? [["BOX", d1, [["LID_TYPE", "Flip_Double"]], phys]] : []
     )
   :
@@ -249,12 +249,12 @@ function compile_manifest(intent, data) =
   (intent == "1-Day AM/PM Box") ?
     let(phys  = get_physics_profile(data),
         w     = get_val(WIDTH, data, WIDTH0),
-        lid_l = flip_lid_l(data),
+        lid_l = flip_half_lid_l(data),
         box_d = concat([[GRID_LAYOUT, "1x2"], [HAS_BUILTIN_GRID, true]], data))
     [
-      ["BOX", box_d,                                                           [["LID_TYPE", "Flip_Double"]],   phys],
-      ["LID", concat([[LENGTH, lid_l], [WIDTH, w - 0.6], [PLAQUE_TEXT, "AM"]], data), [["LID_TYPE", "Flip_Single"]], phys],
-      ["LID", concat([[LENGTH, lid_l], [WIDTH, w - 0.6], [PLAQUE_TEXT, "PM"]], data), [["LID_TYPE", "Flip_Single"]], phys]
+      ["BOX", box_d,                                                                    [["LID_TYPE", "Flip_Double"]], phys],
+      ["LID", concat([[LENGTH, lid_l], [WIDTH, w - 0.6], [PLAQUE_TEXT, "AM"]], data),  [["LID_TYPE", "Flip_Single"]], phys],
+      ["LID", concat([[LENGTH, lid_l], [WIDTH, w - 0.6], [PLAQUE_TEXT, "PM"]], data),  [["LID_TYPE", "Flip_Single"], ["MIRROR_Y", true]], phys]
     ]
   :
   (intent == "1-Day 2-Compartment (Single Lid)") ?
@@ -281,7 +281,7 @@ function compile_manifest(intent, data) =
   (intent == "14-Day AM/PM Box") ?
     let(phys  = get_physics_profile(data),
         w     = get_val(WIDTH, data, WIDTH0),
-        lid_l = flip_lid_l(data),
+        lid_l = flip_half_lid_l(data),
         cw    = w / 7,
         days = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
         box_d = concat([[GRID_LAYOUT, "7x2"], [HAS_BUILTIN_GRID, true]], data))
@@ -290,7 +290,7 @@ function compile_manifest(intent, data) =
       [for (i = [0:6])
         ["LID", concat([[WIDTH, cw - 0.6], [LENGTH, lid_l], [PLAQUE_TEXT, str(days[i], " AM")]], data), [["LID_TYPE", "Flip_Single"]], phys]],
       [for (i = [0:6])
-        ["LID", concat([[WIDTH, cw - 0.6], [LENGTH, lid_l], [PLAQUE_TEXT, str(days[i], " PM")]], data), [["LID_TYPE", "Flip_Single"]], phys]]
+        ["LID", concat([[WIDTH, cw - 0.6], [LENGTH, lid_l], [PLAQUE_TEXT, str(days[i], " PM")]], data), [["LID_TYPE", "Flip_Single"], ["MIRROR_Y", true]], phys]]
     )
   :
   (intent == "Pillbox Set (Double Lid)") ?
@@ -528,7 +528,7 @@ function compile_manifest(intent, data) =
     let(phys  = get_physics_profile(data),
         ext   = concat([[LID_STYLE, "External"]], data),
         rab   = concat([[LID_STYLE, "Rabbet"]],   data),
-        lid_l = flip_lid_l(data))
+        lid_l = flip_half_lid_l(data))
     [
       // Snap External — lid cams past wall rim
       ["BOX", ext, [["LID_TYPE", "Snap"]], phys],
@@ -545,10 +545,10 @@ function compile_manifest(intent, data) =
       // Flip Single — one lid, C-clip hinge +Y, diamond latch −Y
       ["BOX", data, [["LID_TYPE", "Flip_Single"]], phys],
       ["LID", data, [["LID_TYPE", "Flip_Single"]], phys],
-      // Flip Double — two lids opening from centre spine
+      // Flip Double — two lids opening from centre spine; second lid is mirror of first
       ["BOX", data, [["LID_TYPE", "Flip_Double"]], phys],
       ["LID", concat([[LENGTH, lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys],
-      ["LID", concat([[LENGTH, lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys]
+      ["LID", concat([[LENGTH, lid_l]], data), [["LID_TYPE", "Flip_Single"], ["MIRROR_Y", true]], phys]
     ]
   :
 

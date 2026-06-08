@@ -89,7 +89,8 @@ module factory_render_box(data, opts, phys) {
             // ── Rabbet glide: groove on inner wall face, lid drops inside ──────
             // Groove depth = sw/2 into the wall. Lid top is flush with box rim.
             rabbet_d = sw / 2;
-            rabbet_h = sl + glide_tol;
+            sl_glide_r = max(sl, ball_d);
+            rabbet_h = sl_glide_r + glide_tol;
             int_w_r  = w - sw*2;
             int_l_r  = l - sw*2;
             // Lid dims — must match RenderLid Rabbet formula
@@ -122,7 +123,10 @@ module factory_render_box(data, opts, phys) {
         // ── External glide: groove on outer wall top ───────────────────────────
         groove_w   = w - sw + 0.6;
         groove_l   = l + EPS;
-        groove_h   = sl + glide_tol;
+        // sl_glide matches the lid formula: lid is thickened to embed the ball.
+        // groove_h must accommodate that thicker lid, not just the nominal sl.
+        sl_glide_  = max(sl, ball_d);
+        groove_h   = sl_glide_ + glide_tol;
         // ceil() snaps the 1mm drop up to the nearest full layer boundary.
         // At 0.28mm lh: ceil(1.0/0.28)=4 layers → 1.12mm — groove sits on a clean layer.
         groove_z   = h - sl - m_lh(data) * ceil(1.0 / m_lh(data));
