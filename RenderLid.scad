@@ -80,9 +80,19 @@ module factory_render_lid(data, opts, phys) {
                                         get_mesh_cfg(data, HOLE_LID, STRUT_LID));
 
             if (glide_snap == "Ball") {
-                for (sx = [-1, 1])
+                for (sx = [-1, 1]) {
+                    // Snap ball — cam geometry for groove dimple engagement.
                     translate([sx * (lid_w/2 + ball_r - ball_protr), ball_y, sl/2])
                         sphere(d=ball_d);
+                    // Full-height rib on lid wall — spans Z=0..sl so the ball
+                    // (ball_r often > sl/2) connects at every print layer.
+                    // ball_r > sl/2 means the sphere clips below the bed and above
+                    // the lid top when printed face-down; the top portion would be a
+                    // floating shell with no wall support and detaches in print.
+                    // Rib stays inside the lid wall (no protrusion into groove channel).
+                    translate([sx * (lid_w/2 - ball_r/2), ball_y, sl/2])
+                        cuboid([ball_r + EPS, ball_d * 0.7, sl + EPS], anchor=CENTER);
+                }
             } else {
                 tab_h = sl * 0.6;
                 tab_d = noz * 3;
