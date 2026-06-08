@@ -66,14 +66,17 @@ modify_wall = "None"; // ["None", "Dropped", "50%", "25%"]
 target_wall = "All Walls"; // ["All Walls", "Front", "Back", "Left", "Right"]
 
 /* [Plaque / Labels] */
-// "Vertical" = clip grips thin vertical edge of dropped tray wall (use with dropped walls).
-// "Horizontal" = clip straddles horizontal top rim of any wall.
+// "Wall" = U-Clip + swivel face plate (for tray/box wall edges).
+// "Lid"  = face plate only, flat back — adhesive-mount on any flat lid surface.
+plaque_target = "Wall"; // ["Wall", "Lid"]
+// Wall only: "Vertical" = clip grips thin dropped-wall vertical edge.
+//            "Horizontal" = clip straddles horizontal top rim of any wall or box.
 clip_type  = "Vertical"; // ["Vertical", "Horizontal"]
 // Face plate width (mm). Set to match your label stock.
 plaque_w   = 50; // [20 : 5 : 120]
 // Face plate height (mm). Set to match your label stock.
 plaque_h   = 40; // [15 : 5 : 100]
-// Clip body height (mm) — should match the wall section it grips.
+// Wall only: clip body height (mm) — should span the wall section it grips.
 clip_h     = 20; // [10 : 5 : 60]
 
 /* [Core Engineering (R&D Exposed)] */
@@ -163,6 +166,7 @@ ui_payload = [
     [WALL_MODIFY,        modify_wall], 
     [WALL_TARGET,        target_wall], 
     [GRID_LAYOUT,        grid_layout],
+    [PLAQUE_TARGET,      plaque_target],
     [CLIP_TYPE,          clip_type],
     [PLAQUE_W,           plaque_w],
     [PLAQUE_H,           plaque_h],
