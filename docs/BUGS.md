@@ -123,4 +123,95 @@ cap_h = max(m_thread_pitch(data) * 3, sw * 2);
 
 ---
 
-_Add new entries as B3, B4, … in order of discovery._
+## B3 — Flip_Single C-clip hinge: floating cantilever when printed face-down
+
+**Status:** Fixed in `RenderLid.scad` — commit `51487cb`
+**Severity:** High — lid fails to print; Bambu Studio flags floating cantilever
+**Reported:** 2026-06-07 (print failure on Flip_Double half-lids, STL_12 + STL_13)
+
+### Root cause
+
+The C-clip slot was cut from the **top** of the arc:
+
+```scad
+// BEFORE (wrong):
+translate([0, 0, +clip_outer_d/2])
+    cuboid([clip_len+2, hinge_d*0.8, clip_outer_d], anchor=CENTER);
+```
+
+With the slot at `+clip_outer_d/2`, the opening faces upward. When the lid is printed
+face-down (flat outer surface on bed), the two C-arm tips are at the top of the print
+with nothing below them — a floating cantilever. Bambu Studio warns; the arms either
+fail to print or detach during the print.
+
+### Fix
+
+Move slot to `-clip_outer_d/2` — opening faces **downward**. The arc is now at the
+top of the print (self-supporting). The pin enters from below as the lid is pressed
+onto the box hinge.
+
+```scad
+// AFTER (correct):
+translate([0, 0, -clip_outer_d/2])
+    cuboid([clip_len+2, hinge_d*0.8, clip_outer_d], anchor=CENTER);
+```
+
+### General rule
+
+When a cylindrical arc or C-shape is printed face-down, the **opening must face the
+bed** (−Z) so the arc body is at the top (self-supporting). An opening facing +Z leaves
+the two arm tips as unsupported cantilevers.
+
+---
+
+## B4 — Glide lid ball catch: floating shell when ball_r > sl/2
+
+**Status:** Fixed in `RenderLid.scad` — commit `03068d4`
+**Severity:** High — balls detach from lid in print; no slicer warning
+**Reported:** 2026-06-07 (post-print: "balls fell wholesale, no warning")
+
+### Root cause
+
+Ball catch spheres were placed at `Z = sl/2` (mid-lid-height) with no connection spine.
+When `ball_r > sl/2` (common — e.g. 1.2mm radius, 0.8mm half-lid-height):
+
+- Bottom of sphere: `sl/2 − ball_r < 0` → clips below the print bed
+- Top of sphere: `sl/2 + ball_r > sl` → pokes above the lid top
+
+The upper portion of the ball (from where the lid wall ends to `sl + ball_r`) has **no
+lid-wall connection at those Z layers**. It prints as a floating shell that detaches.
+Slicer does not warn because the ball starts connected — only the top separates mid-print.
+
+```scad
+// BEFORE (wrong): bare sphere, no Z-spanning connection
+for (sx = [-1, 1])
+    translate([sx * (lid_w/2 + ball_r - ball_protr), ball_y, sl/2])
+        sphere(d=ball_d);
+```
+
+### Fix
+
+Add a full-height rib inset into the lid wall. The rib spans Z=0 to Z=sl, giving the
+ball solid attachment at every print layer. The rib stays inside the lid wall so it
+does not protrude into the groove channel. Box dimple geometry unchanged.
+
+```scad
+// AFTER: ball + full-height connection rib
+for (sx = [-1, 1]) {
+    translate([sx * (lid_w/2 + ball_r - ball_protr), ball_y, sl/2])
+        sphere(d=ball_d);
+    translate([sx * (lid_w/2 - ball_r/2), ball_y, sl/2])
+        cuboid([ball_r + EPS, ball_d * 0.7, sl + EPS], anchor=CENTER);
+}
+```
+
+### General rule
+
+Before placing any sphere or round feature at height `h/2` within a host body:
+**verify `ball_r ≤ h/2`**. If `ball_r > h/2`, the sphere escapes the host body in Z.
+Fix with a full-height connecting rib (preferred — preserves mating geometry) or by
+clamping diameter to `h` (requires updating all mating geometry too).
+
+---
+
+_Add new entries as B5, B6, … in order of discovery._

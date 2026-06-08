@@ -53,3 +53,30 @@ Wider Entry Gap: I opened the gap from 70% to 80% of the axle diameter (hinge_d 
 Smoothed Lead-in: The 45-degree angle wedge now extends slightly further out to ensure the axle hits a smooth ramp rather than a blunt corner when you push it in.
 
 
+---
+
+ISSUE: Flip lid C-clip printed as floating cantilever (2026-06-07)
+
+We did a full plate print with all lid variants and the Flip_Double half-lids (STL_12 and STL_13) came back with a Bambu Studio "floating cantilever" warning and the arms failed to print.
+
+The autopsy: the C-clip is a partial arc — a cylinder with a slot cut out to form the C-opening. The slot was placed at +clip_outer_d/2, meaning the opening faced upward. When you print the lid face-down (flat outer surface on bed), the top of the print is the C-clip. With the opening facing up, the two arm tips at the top have nothing below them — classic floating cantilever.
+
+The fix was one line: move the slot from +clip_outer_d/2 to −clip_outer_d/2. Opening now faces the bed. The arc body is at the top of the print and is fully self-supporting from below. The hinge pin enters from below when the lid is pressed onto the box, which is also more natural for the snap action.
+
+The lesson: when a C-shape or arc is printed face-down, the opening MUST face the bed. If it faces up, the arm tips are in mid-air. This seems obvious in hindsight but the original code had it backwards, and no slicer geometry check catches it automatically on every build — only when you render for print does Bambu flag it.
+
+
+ISSUE: Glide lid snap balls fell off in print — no warning (2026-06-07)
+
+After the cantilever fix we printed again. The flip lids printed fine but the glide lid balls ("fell wholesale" in testing) detached completely. No Bambu warning this time — it passed geometry checks.
+
+The autopsy: the ball center is placed at sl/2 (mid-lid-height). For a typical glide lid, sl ≈ 1.6mm and ball_r ≈ 1.2mm. That means ball_r > sl/2. The sphere clips below the print bed (below Z=0) and also pokes above the lid top (above Z=sl). The slicer clips the below-bed portion cleanly. But the above-lid portion — from where the lid wall ends to Z = sl + ball_r — has no wall behind it. Those layers of the ball are completely unsupported. The ball prints fine at the bottom (it starts touching the lid wall), but partway up it separates and the top portion becomes a free-floating shell that detaches mid-print or is just a loose lump when the print finishes.
+
+Why no warning? Because the ball DOES start connected. The slicer sees connection at the base and doesn't trace whether it disconnects higher up. Floating cantilever detection is not the same as "track every layer of every feature for connectivity loss."
+
+The fix: add a full-height rib on the lid wall for each ball. The rib (width = ball_r, height = sl) spans the entire lid thickness and is inset inside the lid wall so it doesn't stick out into the groove. The ball unions against the rib's outer face. Now the ball has solid attachment at every layer, Z=0 to Z=sl.
+
+The groove catch in the box is unchanged — ball_protr is the protrusion amount that the box dimple was sized for, and that doesn't change with the rib.
+
+The general lesson: whenever you place a sphere or round feature at h/2 inside a thin slab, check that ball_r ≤ h/2. If it isn't, the feature escapes the slab in Z and you get a floating shell. The slicer won't catch it.
+

@@ -76,24 +76,34 @@ from the orientation it ships in.
 
 ---
 
-## 0a. Optimal print orientation — never lay on side for extreme ratios
+## 0a. Optimal print orientation — design geometry for the print bed, not the assembly
 
-**Rule:** All primitives ship in their optimal FDM orientation. Users adjust in their
-slicer (brim, speed, enclosure temp) — we do not change orientation to compensate
-for extreme height/width ratios.
+**Rule:** All primitives ship in their optimal FDM orientation. Every factory renders
+geometry as it sits on the print bed — Z=0 is the bed surface, geometry builds upward.
+Users adjust slicer settings (brim, speed, enclosure temp); we never change orientation
+to compensate for extreme height/width ratios.
 
 | Primitive | Optimal orientation | Reason |
 |-----------|--------------------|----|
 | JAR | Upright (floor on bed) | Side needs supports under curved wall; diameter becomes oval |
 | TRAY / BOX | Flat (floor on bed) | Layer lines horizontal through floor = maximum strength |
-| LID (Screw) | Face-down (top surface on bed) | Full-circle adhesion; interior thread on vertical walls |
-| LID (Glide/Slip) | Face-down | Best surface finish on visible face |
-| GRID (built-in) | Part of tray — inherits tray orientation |
-| GRID (drop-in) | Flat (base on bed) | Flag if very long/thin — warp risk, slicer brim recommended |
+| LID (Screw) | Face-down (flat top on bed) | Full-circle adhesion; interior thread on vertical walls |
+| LID (Snap / Glide / Slip) | Face-down (flat outer surface on bed) | Best finish on visible face; retention features build upward |
+| LID (Flip_Single / Flip_Double) | Face-down | C-clip arc at top of print — self-supporting. **Opening must face −Z (toward bed).** |
+| PEG | Horizontal, flat-cut underside on bed | `yrot(90)` + flat cut prevents rolling, prints without supports |
+| GRID (built-in) | Part of container — inherits container orientation | |
+| GRID (drop-in) | Flat (base on bed) | Divider walls print vertically; flag very long/thin — warp risk |
+
+**Every factory's Z=0 = bed.** If you add a new factory, the lowest point of the
+geometry must sit at Z=0. Use `anchor=BOTTOM` on the outermost solid or `up(sf)` for
+floor-offset geometry. A factory that floats above Z=0 will print mid-air.
+
+**Flip lid critical rule:** C-clip arc opens **downward** (slot at `−clip_outer_d/2`).
+Opening at `+clip_outer_d/2` leaves arm tips unsupported at the top of the print —
+floating cantilever. See B3 in BUGS.md.
 
 **Extreme ratios:** A 49×140mm jar prints upright regardless. A 300×200×8mm tray
-prints flat regardless. Extreme geometry is a slicer concern (brim, slow first layer,
-enclosure), not an orientation concern.
+prints flat regardless. Extreme geometry is a slicer concern, not an orientation concern.
 
 **Never introduce supports** to enable a non-standard orientation. If a geometry
 requires supports in its natural orientation, fix the geometry.
@@ -151,6 +161,47 @@ right in preview and one that actually prints cleanly.
 **Desiccant containers** (S4 system) lock `HOLE_SPACING=1.2mm` explicitly — this
 overrides `min_sp` so airflow geometry is consistent regardless of printer wall-loop
 settings.
+
+---
+
+## 0d. Round features must fit within their host body's Z range
+
+**Rule:** Before placing any sphere, hemisphere, or rounded protrusion at height `h/2`
+within a host body of height `h`, verify: `feature_radius ≤ h/2`.
+
+If `feature_radius > h/2`, the feature escapes the host body:
+- Below Z=0 → clips the print bed (slicer truncates it)
+- Above Z=h → pokes past the top face with no wall support at those layers
+
+The top portion prints as a **floating shell** that detaches mid-print. The slicer
+may not warn — it only warns if the feature has *no* connection at all. A feature
+that starts connected but loses its wall attachment partway up passes slicer checks
+and fails in print.
+
+**Two confirmed failures (see BUGS.md B3, B4):**
+1. C-clip hinge arm tips — arc opening at +Z left tips floating above lid top
+2. Glide ball catch — sphere at sl/2 with ball_r > sl/2 → top of ball floats above lid
+
+**Fixes by case:**
+
+| Situation | Fix | Do not |
+|-----------|-----|--------|
+| Feature too tall for host Z | Add full-height connecting rib from feature back to host wall | Just move the ball — you'll break the mating geometry |
+| Arc/C-shape printed face-down | Opening faces −Z; arc at top = self-supporting | Opening at +Z = arm tips float |
+| Spherical snap catch on thin slab | Rib spans Z=0..sl, inset inside host wall boundary | Bare sphere at sl/2 |
+
+**Rib pattern for ball catches:**
+```scad
+// Ball at correct protrusion (mating geometry unchanged)
+translate([sx * (wall_edge + ball_r - ball_protr), y, sl/2])
+    sphere(d=ball_d);
+// Full-height rib — inset inside wall, no groove protrusion
+translate([sx * (wall_edge - ball_r/2), y, sl/2])
+    cuboid([ball_r + EPS, ball_d * 0.7, sl + EPS], anchor=CENTER);
+```
+
+**Flag immediately** any sphere, hemisphere, or cylindrical snap feature placed at the
+midpoint of a thin slab without verifying the Z-range containment condition.
 
 ---
 

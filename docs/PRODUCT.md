@@ -149,11 +149,36 @@ Tolerance components tracked separately:
 
 ## Print Orientations
 
+Every primitive is **designed to sit directly on the print bed** — Z=0 in the model
+is the bed surface. No re-orientation is required in the slicer. This is a system
+requirement, not a convenience: if any geometry requires supports in its shipped
+orientation, that is a geometry bug, not a slicer configuration issue.
+
 | Part | Orientation | Reason |
 |------|-------------|--------|
-| Tray / Box | Floor on bed | Layer lines horizontal through floor = maximum strength |
-| Jar | Upright | Accurate diameter; side-print needs supports (not allowed) |
-| Screw Lid | Face-down | Full-circle adhesion; interior thread on vertical walls |
-| Glide/Slip Lid | Face-down | Best surface finish on visible face |
-| Peg rod | Flat (underside on bed) | Flat cut prevents rolling; prints without supports |
-| Drop-in grid | Flat | Divider walls print vertically |
+| Tray / Box | Floor on bed, open top up | Layer lines horizontal through floor = maximum strength |
+| Jar | Upright (floor on bed) | Accurate diameter; side-print needs supports (not allowed) |
+| Snap / Glide / Slip Lid | Face-down (flat outer surface on bed) | Best finish on visible face; retention features build upward |
+| Flip_Single / Flip_Double Lid | Face-down — C-clip arc at top | Arc self-supporting. **C-clip opening must face −Z** (toward bed). See design note below. |
+| Screw Lid | Face-down (flat top on bed) | Full-circle adhesion; interior thread on vertical walls |
+| Peg rod | Horizontal, flat-cut underside on bed | `yrot(90)` + underside flat cut prevents rolling; no supports needed |
+| Drop-in grid | Flat (base on bed), dividers up | Divider walls print vertically; no overhangs |
+| Built-in grid | Part of container — inherits container orientation | Not a separate print piece |
+
+### Design rule: round features must fit within their host body's Z range
+
+Any spherical or rounded feature placed at height `h/2` must satisfy `feature_radius ≤ h/2`.
+If the feature exceeds the host body in Z:
+- The portion below Z=0 is clipped by the slicer (feature loses bed contact)
+- The portion above Z=h has no wall support → prints as a detached floating shell
+
+The slicer does not always warn — it only flags geometry with *zero* connection.
+A feature that starts connected but loses its wall partway up will pass slicer checks
+and fail in print. **Fix: add a full-height rib connecting the feature to the host wall.**
+
+### Design rule: C-clip arcs open toward the bed
+
+Flip lid C-clips are printed face-down. The arc slot must cut the **bottom** of the
+arc (`−clip_outer_d/2`) so the opening faces the bed. Slot at `+clip_outer_d/2`
+(opening faces up) leaves the two arm tips as floating cantilevers at the top of the
+print. The slicer warns; the arms detach or fail to print.
