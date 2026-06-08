@@ -90,7 +90,7 @@ module factory_render_box(data, opts, phys) {
             // Groove depth = sw/2 into the wall. Lid top is flush with box rim.
             rabbet_d = sw / 2;
             sl_glide_r = max(sl, ball_d);
-            rabbet_h = sl_glide_r + glide_tol;
+            rabbet_h = max(sl_glide_r + glide_tol, ball_d + glide_tol + noz * 4);
             int_w_r  = w - sw*2;
             int_l_r  = l - sw*2;
             // Lid dims — must match RenderLid Rabbet formula
@@ -123,10 +123,12 @@ module factory_render_box(data, opts, phys) {
         // ── External glide: groove on outer wall top ───────────────────────────
         groove_w   = w - sw + 0.6;
         groove_l   = l + EPS;
-        // sl_glide matches the lid formula: lid is thickened to embed the ball.
-        // groove_h must accommodate that thicker lid, not just the nominal sl.
         sl_glide_  = max(sl, ball_d);
-        groove_h   = sl_glide_ + glide_tol;
+        // groove_h must fit the thickened lid AND leave noz*2 wall above and below
+        // the ball dimple so it prints as a full circle, not a broken arc.
+        // The ball dimple sphere (diameter = ball_d + glide_tol) needs noz*2 of wall
+        // on each Z face to avoid cutting to the groove edge.
+        groove_h   = max(sl_glide_ + glide_tol, ball_d + glide_tol + noz * 4);
         // ceil() snaps the 1mm drop up to the nearest full layer boundary.
         // At 0.28mm lh: ceil(1.0/0.28)=4 layers → 1.12mm — groove sits on a clean layer.
         groove_z   = h - sl - m_lh(data) * ceil(1.0 / m_lh(data));
@@ -141,7 +143,7 @@ module factory_render_box(data, opts, phys) {
             // Groove channel for lid to slide into
             up(groove_z)
                 cuboid([groove_w, groove_l, groove_h], anchor=BOTTOM);
-            // Ball-catch dimples — X matches lid ball center; Z matches groove centre
+            // Ball-catch dimples — Z at groove centre so noz*2 wall exists above and below.
             if (glide_snap == "Ball")
                 for (sx = [-1, 1])
                     translate([sx * ball_x, ball_y, groove_z + groove_h / 2])
@@ -191,17 +193,19 @@ module factory_render_box(data, opts, phys) {
                         yrot(90) cyl(d=clip_od + clearance*4, h=clip_len+2, $fn=36);
             }
             // Hinge pillars, axle pin — suppressed if box too narrow for mechanism
+            // Pillars start at l/2-sw (flush with box inner wall face) so the
+            // corner between pillar and wall is solid, not an empty cavity.
             if (clip_len > 0) {
-            translate([-(w-sw*2)/2 + sw/2, l/2 - 0.5, sf])
-                cuboid([sw*3, hinge_y+1, axle_z+cc_z-sf], chamfer=m_chamf(data),
+            translate([-(w-sw*2)/2 + sw/2, l/2 - sw, sf])
+                cuboid([sw*3, hinge_y+sw+0.5, axle_z+cc_z-sf], chamfer=m_chamf(data),
                        edges=TOP, anchor=BOTTOM+FRONT);
-            translate([ (w-sw*2)/2 - sw/2, l/2 - 0.5, sf])
-                cuboid([sw*3, hinge_y+1, axle_z+cc_z-sf], chamfer=m_chamf(data),
+            translate([ (w-sw*2)/2 - sw/2, l/2 - sw, sf])
+                cuboid([sw*3, hinge_y+sw+0.5, axle_z+cc_z-sf], chamfer=m_chamf(data),
                        edges=TOP, anchor=BOTTOM+FRONT);
             if (cols > 1 && !skip_p)
                 for (i = [1 : cols-1])
-                    translate([-int_w/2 + i*(int_w/cols), l/2 - 0.5, sf])
-                        cuboid([div_t, hinge_y+1, axle_z+cc_z-sf], chamfer=m_chamf(data),
+                    translate([-int_w/2 + i*(int_w/cols), l/2 - sw, sf])
+                        cuboid([div_t, hinge_y+sw+0.5, axle_z+cc_z-sf], chamfer=m_chamf(data),
                                edges=TOP, anchor=BOTTOM+FRONT);
             // Axle pin
             translate([0, l/2 + hinge_y, axle_z])
