@@ -4,11 +4,13 @@
 // PURPOSE: Label plaque system for tray / box walls and lids.
 //
 // PLAQUE_TARGET:
-//   "Wall" — U-Clip + swivel face plate. Emits two pieces side by side.
-//            Clip grips the wall edge; face plate snaps onto pivot pin and
-//            swivels to face the user regardless of clip orientation.
-//   "Lid"  — Face plate only (flat back). Adhesive-mount on any flat lid or
-//            box surface. Single piece. No clip, no socket, no swivel.
+//   "Wall"     — U-Clip + swivel face plate. Two pieces side by side.
+//                Clip grips wall edge; plate snaps onto pin and swivels to face user.
+//   "Lid"      — Face plate only, flat back. Adhesive-mount on any flat lid surface.
+//                Single piece; no clip, no socket, no swivel.
+//   "Lid_Peg"  — Face plate with two press-fit pegs on the back.
+//                Pegs snap into holes in the lid surface (removable, reusable).
+//                Use plaque_get_peg_holes() to punch matching holes in the lid.
 //
 // CLIP_TYPE (Wall target only):
 //   "Vertical"   — grips thin vertical edge of a dropped tray wall.
@@ -19,12 +21,17 @@
 //                  Inner bridge ≈ sw+tol (2–4 mm) — within FDM bridging range.
 //                  Print: upright, no supports.
 //
-// Face plate (both targets):
+// Face plate (all targets):
 //   Print: UPRIGHT — stands on p_w × p_t_eff base, p_h tall in Z.
 //   All edges chamfered. Label surface for stick-on label or Bambu text modifier.
-//   Wall variant: C-clip socket on top, axis vertical → C-rings, zero overhang.
-//   Lid  variant: plain flat top — no socket needed.
-//   p_t_eff = max(p_t_nominal, socket_od) so the socket base is fully backed.
+//   Wall:    C-clip socket on top, axis vertical — prints as C-rings, zero overhang.
+//            p_t_eff = max(p_t_nominal, socket_od) — socket base fully backed.
+//   Lid:     Plain flat top, thinner (p_t nominal).
+//   Lid_Peg: Two pegs on back face, sized to snap-fit tolerance. Thinner (p_t nominal).
+//
+// Peg hole punch (Lid_Peg):
+//   module plaque_get_peg_holes(data, phys) — call inside a difference() in the lid
+//   factory to punch matching holes. Positioned for centred ±p_h/4 spacing in Z.
 //
 // All pieces print support-free in their shipped orientations.
 // ==============================================================================
@@ -37,6 +44,8 @@ _PL_CLIP_WALL_N = 4;    // clip / socket wall = N × nozzle (matches proven hing
 _PL_PIN_D       = 4.0;  // pivot pin diameter — matches hinge_d throughout the system
 _PL_ARM_D       = 12;   // vertical-clip arm depth (how far arms wrap the wall edge) mm
 _PL_GAP         = 4;    // platter separation between pieces mm
+_PL_PEG_D       = 4.0;  // lid-mount peg diameter mm — same as pin for tooling consistency
+_PL_PEG_H      = 5.0;  // peg protrusion from back face mm
 
 // ── Pivot pin (integral to clip, extends upward) ──────────────────────────────
 module _pl_pin(pin_d, pin_h) {
@@ -110,24 +119,57 @@ module _uclip_horizontal(sw, tol, clip_wall, clip_l, pin_d, pin_h, chamf) {
     }
 }
 
-// ── Face plate (shared by Wall and Lid targets) ───────────────────────────────
+// ── Lid-mount pegs (Lid_Peg variant) ─────────────────────────────────────────
+// Two chamfered pegs on back face, spaced ±p_h/4 in Z from centre.
+// Snap-fit: peg_d - tol×2 into matching hole. Chamfer tip aids insertion.
+// Print: pegs point in −Y (back of upright face plate) — no overhangs.
+module _pl_pegs(p_h, peg_tol) {
+    peg_d = _PL_PEG_D - peg_tol * 2;  // interference fit on insertion
+    spacing = p_h / 4;
+    for (sz = [-spacing, spacing])
+        translate([0, 0, p_h / 2 + sz])
+            rotate([90, 0, 0])  // peg extends in −Y from back face
+                cyl(d = peg_d, h = _PL_PEG_H,
+                    chamfer2 = peg_d * 0.2, anchor = BOTTOM, $fn = 24);
+}
+
+// ── Public: hole pattern to punch in a lid for Lid_Peg mount ─────────────────
+// Call inside difference() in the lid factory, positioned at the plaque location.
+// Holes are centred at X=0, Z = p_h/2 ± p_h/4, Y depth = peg_h + EPS.
+// Caller must translate to the desired XYZ position on the lid surface first.
+module plaque_get_peg_holes(data, phys) {
+    noz     = phys[3][1];
+    p_h     = get_val(PLAQUE_H, data, 40);
+    tol     = breathing_room(COMP_CCLIP, data);
+    hole_d  = _PL_PEG_D + tol * 2;
+    spacing = p_h / 4;
+    for (sz = [-spacing, spacing])
+        translate([0, 0, p_h / 2 + sz])
+            rotate([90, 0, 0])
+                cyl(d = hole_d, h = _PL_PEG_H + EPS2, anchor = BOTTOM, $fn = 24);
+}
+
+// ── Face plate (shared by all targets) ───────────────────────────────────────
 // Print: UPRIGHT — p_w × p_t_eff base, p_h tall. All edges chamfered.
-// Wall variant (has_socket=true):  C-clip socket on top, axis in Z.
-//   p_t_eff = max(p_t, socket_od) — socket base fully backed, no bridging.
-// Lid  variant (has_socket=false): plain flat top, thinner (p_t nominal only).
-module _face_plate(p_w, p_h, p_t, pin_d, socket_h, tol, noz, chamf, has_socket) {
+//   Wall:    socket on top (axis Z); p_t_eff = max(p_t, od) — socket fully backed.
+//   Lid:     plain flat top; p_t nominal.
+//   Lid_Peg: pegs on back face (−Y); p_t nominal; pegs print in −Y, no overhang.
+module _face_plate(p_w, p_h, p_t, pin_d, socket_h, tol, peg_tol, noz, chamf, mode) {
     clip_wall = noz * _PL_CLIP_WALL_N;
     od        = pin_d + tol * 2 + clip_wall * 2;
-    p_t_eff   = has_socket ? max(p_t, od) : p_t;
+    p_t_eff   = (mode == "Wall") ? max(p_t, od) : p_t;
 
-    echo(str("   Face Plate ", p_w, "×", p_t_eff, "×", p_h, "H",
-             has_socket ? str(" socket_od=", od, " socket_h=", socket_h) : " [Lid/flat]"));
+    echo(str("   Face Plate ", p_w, "×", p_t_eff, "×", p_h, "H mode=", mode,
+             (mode == "Wall") ? str(" socket_od=", od, " socket_h=", socket_h) : ""));
 
     union() {
         cuboid([p_w, p_t_eff, p_h], chamfer = chamf, anchor = BOTTOM);
-        if (has_socket)
+        if (mode == "Wall")
             translate([0, 0, p_h])
                 _pl_socket(pin_d, socket_h, tol, noz);
+        if (mode == "Lid_Peg")
+            translate([0, -p_t_eff / 2, 0])
+                _pl_pegs(p_h, peg_tol);
     }
 }
 
@@ -161,9 +203,11 @@ module factory_render_plaque(data, opts, phys) {
              " plate=", p_w, "×", p_h,
              " pin_d=", pin_d, " pin_h=", pin_h));
 
-    if (target == "Lid") {
-        // ── Lid variant: face plate only, flat back, adhesive mount ──────────
-        _face_plate(p_w, p_h, p_t, pin_d, socket_h, pivot_tol, noz, chamf, false);
+    peg_tol = breathing_room(COMP_CCLIP, data);  // press-fit peg — same tight-fit class
+
+    if (target == "Lid" || target == "Lid_Peg") {
+        // ── Lid variant: face plate only (adhesive or peg-mount) ─────────────
+        _face_plate(p_w, p_h, p_t, pin_d, socket_h, pivot_tol, peg_tol, noz, chamf, target);
 
     } else {
         // ── Wall variant: U-Clip + swivel face plate ──────────────────────────
@@ -176,6 +220,6 @@ module factory_render_plaque(data, opts, phys) {
             _uclip_vertical(sw, clip_tol, clip_wall, clip_h, pin_d, pin_h, chamf);
 
         translate([clip_outer_w / 2 + p_w / 2 + _PL_GAP, 0, 0])
-            _face_plate(p_w, p_h, p_t, pin_d, socket_h, pivot_tol, noz, chamf, true);
+            _face_plate(p_w, p_h, p_t, pin_d, socket_h, pivot_tol, peg_tol, noz, chamf, "Wall");
     }
 }

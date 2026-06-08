@@ -66,9 +66,10 @@ modify_wall = "None"; // ["None", "Dropped", "50%", "25%"]
 target_wall = "All Walls"; // ["All Walls", "Front", "Back", "Left", "Right"]
 
 /* [Plaque / Labels] */
-// "Wall" = U-Clip + swivel face plate (for tray/box wall edges).
-// "Lid"  = face plate only, flat back — adhesive-mount on any flat lid surface.
-plaque_target = "Wall"; // ["Wall", "Lid"]
+// "Wall"    = U-Clip + swivel face plate (for tray/box wall edges).
+// "Lid"     = face plate only, flat back — adhesive-mount on any flat lid surface.
+// "Lid_Peg" = face plate with two press-fit pegs on the back — snaps into lid holes.
+plaque_target = "Wall"; // ["Wall", "Lid", "Lid_Peg"]
 // Wall only: "Vertical" = clip grips thin dropped-wall vertical edge.
 //            "Horizontal" = clip straddles horizontal top rim of any wall or box.
 clip_type  = "Vertical"; // ["Vertical", "Horizontal"]
