@@ -38,8 +38,10 @@ module factory_render_lid(data, opts, phys) {
 
     if (lid_type == "Snap") {
         // Press-fit inside the box walls.
-        // Retention bead on two X sides (at lid top) clicks under box wall rim.
+        // Retention bead on two X sides clicks under box wall rim (External) or
+        // into inner-wall groove (Rabbet).
         clearance = breathing_room(COMP_GLIDE, data);
+        lid_style = get_val(LID_STYLE, data, "External");
         lid_w = w - sw * 2 - clearance;
         lid_l = l - sw * 2 - clearance;
         // Round up to nearest layer boundary, minimum 3 layers.
@@ -50,16 +52,28 @@ module factory_render_lid(data, opts, phys) {
         // clearance/2 closes the lid_w gap so bead starts at interior face,
         // then protrudes noz further — enough for tactile click without over-stressing wall.
         snap_protr = noz;
+        // External: bead bottom placed below apply_master_bounds TOP chamfer zone.
+        // apply_master_bounds clips with chamfer=m_chamf on TOP+BOTTOM; chamfer zone depth
+        // = m_chamf(data) from the lid top face. bead_z = sl - EPS would land inside that zone,
+        // causing complex geometry interactions between chamfered lid top and chamfered bead bottom.
+        // Fix: lower by m_chamf so bead root starts on the clean flat portion of the lid body.
+        // Bead height increases by m_chamf to keep bead-top protrusion unchanged.
+        // Rabbet: bead at sl−2·bead_h — aligns with groove at h−2·bead_h when seated.
+        chamf = m_chamf(data);
+        bead_z = (lid_style == "Rabbet") ? sl - 2 * bead_h - EPS : sl - chamf - EPS;
+        bead_h_ext = (lid_style == "Rabbet") ? bead_h + EPS : bead_h + chamf + EPS;
         union() {
-            apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data))
+            apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), chamf)
                 up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false,
                                         get_mesh_cfg(data, HOLE_LID, STRUT_LID));
-            // Retention beads on X sides — cam over box wall top rim and click under it.
-            // Bead outer face = box_interior_half + snap_protr (protrudes into wall).
-            // Lowered by EPS so bead base overlaps into lid body (prevents slicer separation).
+            // Retention beads on X sides.
+            // chamfer=bead_h/2 with height bead_h+EPS leaves only EPS of flat face — degenerate.
+            // bead_chamf computed to leave exactly m_lh of flat section (one clean print layer).
+            // Base overlaps into lid body — bead root sits on clean flat lid surface below chamfer zone.
+            bead_chamf = (bead_h_ext - m_lh(data)) / 2;
             for (sx = [-1, 1])
-                translate([sx * (lid_w/2 + clearance/2 + snap_protr - sw/2), 0, sl - EPS])
-                    cuboid([sw, lid_l - sw*2, bead_h + EPS], chamfer=bead_h/2,
+                translate([sx * (lid_w/2 + clearance/2 + snap_protr - sw/2), 0, bead_z])
+                    cuboid([sw, lid_l - sw*2, bead_h_ext], chamfer=bead_chamf,
                            edges="ALL", anchor=BOTTOM);
         }
 
@@ -101,6 +115,16 @@ module factory_render_lid(data, opts, phys) {
                     cuboid([lid_w * 0.4, tab_d, tab_h], chamfer=tab_d/2,
                            edges=FRONT, anchor=CENTER);
             }
+            // Pull tab on −Y face (trailing end when inserted): grip point to slide lid out.
+            // Height spans full lid thickness; depth = noz*4 past lid face.
+            pull_tab_d = noz * 4;
+            pull_tab_h = sl_glide * 0.7;
+            // Sunk EPS below Z=0 so bottom face doesn't share the lid face plane (non-manifold).
+            // +EPS toward lid body so the +Y face overlaps lid body by EPS — breaks Y coplanarity.
+            translate([0, -lid_l/2 - pull_tab_d/2 + EPS, -EPS])
+                cuboid([lid_w * 0.45, pull_tab_d, pull_tab_h + EPS],
+                       chamfer=pull_tab_d/2, edges=[FRONT+LEFT, FRONT+RIGHT, BOTTOM+FRONT],
+                       anchor=BOTTOM);
         }
 
     } else if (lid_type == "Flip_Single") {
@@ -115,9 +139,12 @@ module factory_render_lid(data, opts, phys) {
         clip_gap = (filament == "PLA") ? hinge_d * 0.90 : hinge_d * 0.80;
         cc_z       = clip_outer_d / 2;
         hinge_y_off = clip_outer_d / 2;
-        lid_w = w; lid_l = l; clip_len = lid_w - sw*6; clip_z = sl + cc_z;
+        // lid_l: body only — C-clip adds clip_outer_d on the +Y side, so the total
+        // assembly is exactly l (user's specified dimension, not l + clip_outer_d).
+        lid_w = w; lid_l = l - clip_outer_d; clip_len = lid_w - sw*6; clip_z = sl + cc_z;
         union() {
-            apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data))
+            // Flip lid body: minimum noz chamfer on all edges regardless of global chamfer_size=0.
+            apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), max(noz, m_chamf(data)))
                 up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false,
                                         get_mesh_cfg(data, HOLE_LID, STRUT_LID));
             // C-clip hinge on +Y face — suppressed if lid is too narrow for mechanism
@@ -126,37 +153,41 @@ module factory_render_lid(data, opts, phys) {
                     difference() {
                         union() {
                             intersection() {
-                                yrot(90) cyl(d=clip_outer_d, h=clip_len, chamfer=0.5, $fn=36);
+                                yrot(90) cyl(d=clip_outer_d, h=clip_len, chamfer=noz*3, $fn=36);
                                 cuboid([clip_len+2, clip_outer_d,
                                         clip_outer_d - flat_belly*2], anchor=CENTER);
                             }
                             translate([0, -hinge_y_off/2, -(clip_z-sl)/2 - 0.5])
-                                cuboid([clip_len, hinge_y_off+1.0, (clip_z-sl)+1.0], anchor=CENTER);
+                                cuboid([clip_len, hinge_y_off+1.0, (clip_z-sl)+1.0],
+                                       chamfer=1.0, edges=[TOP+FRONT, TOP+BACK], anchor=CENTER);
                         }
                         yrot(90) cyl(d=hinge_d + clearance*2, h=clip_len+2, $fn=36);
                         // C-opening faces DOWN (−Z) so arms point toward lid body.
                         // Printed face-down: arc is at top of print, fully self-supporting.
                         // Pin enters from below as the lid is pressed onto the box hinge.
+                        // Cutter top extends EPS past connection-block top (both land at local z=0).
+                        // Without EPS2: cutter face coplanar with block face → non-manifold edges.
                         translate([0, 0, -clip_outer_d/2])
-                            cuboid([clip_len+2, clip_gap, clip_outer_d], anchor=CENTER);
+                            cuboid([clip_len+2, clip_gap, clip_outer_d + EPS2], anchor=CENTER);
                     }
             }
-            // Diamond latch tab on −Y face (clicks into box latch recess).
-            // Shifted +EPS in Y so latch body overlaps into lid (prevents slicer separation).
-            translate([0, -lid_l/2 - 1.1 + EPS, sl/2])
-                cuboid([lid_w - sw*4, 2.2, sl], anchor=CENTER);
-            translate([0, -lid_l/2 - 2.2, sl + clasp_depth/2])
-                cuboid([lid_w - sw*4, 1.6, clasp_depth], anchor=CENTER);
+            // Diamond latch arm — one solid block from lid face to clasp top.
+            // Sunk EPS below Z=0 so the bottom face doesn't share the lid face plane (non-manifold).
+            translate([0, -lid_l/2 - 1.1 + EPS, -EPS])
+                cuboid([lid_w - sw*4, 2.2, sl + clasp_depth + EPS], anchor=BOTTOM);
             // Diamond tip — the snap click point.
             // Z-tips truncated to noz*1.05 (Arachne flat-top, no pressure pinch).
             // Z-offsets snapped to layer boundaries via layer_snap() — no micro-stepping.
             // Engagement Y-cuboid widened to noz*2 — was 0.1mm (sub-nozzle, unprintable).
             lz = layer_snap(0.8, m_lh(data));
+            // +EPS on hull cuboid X: latch arm and hull share the same X width (lid_w−sw*4).
+            // In the Z overlap zone their ±X faces are coplanar → non-manifold edges.
+            // Widening hull by EPS makes the latch arm X faces interior to the hull volume.
             translate([0, -lid_l/2 - 1.5, sl + clasp_depth])
                 hull() {
-                    translate([0, 0,   -lz]) cuboid([lid_w-sw*4, 0.1,   noz*1.05], anchor=CENTER);
-                    translate([0, 0.9,   0]) cuboid([lid_w-sw*4, noz*2, 0.1     ], anchor=CENTER);
-                    translate([0, 0,    lz]) cuboid([lid_w-sw*4, 0.1,   noz*1.05], anchor=CENTER);
+                    translate([0, 0,   -lz]) cuboid([lid_w-sw*4+EPS, 0.1,   noz*1.05], anchor=CENTER);
+                    translate([0, 0.9,   0]) cuboid([lid_w-sw*4+EPS, noz*2, 0.1     ], anchor=CENTER);
+                    translate([0, 0,    lz]) cuboid([lid_w-sw*4+EPS, 0.1,   noz*1.05], anchor=CENTER);
                 }
         }
 
@@ -177,7 +208,8 @@ module factory_render_lid(data, opts, phys) {
             union() {
                 up(sl / 2) framed_mesh(data, w, w, sl, true,
                                         get_mesh_cfg(data, HOLE_LID, STRUT_LID));
-                up(sl) cyl(d=w, h=cap_h, chamfer2=noz*4, anchor=BOTTOM);
+                // EPS sink: cylinder bottom would land at Z=sl — coplanar with lid plate top.
+                up(sl - EPS) cyl(d=w, h=cap_h + EPS, chamfer2=noz*4, anchor=BOTTOM);
             }
             // EPS pullback: cutter starts one boolean-epsilon below lid surface so the
             // thread is cleanly subtracted without a zero-thickness manifold edge.

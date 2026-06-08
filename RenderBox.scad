@@ -60,8 +60,9 @@ module factory_render_box(data, opts, phys) {
             bead_h = m_lh(data) * max(3, ceil(noz * 2 / m_lh(data)));
             glide_tol = breathing_room(COMP_GLIDE, data);
             // Ring groove on inner wall face: bead snaps into defined closed position.
-            // Groove top at h−sl (lid face flush with box rim when closed).
-            groove_z = h - sl - bead_h;
+            // Groove occupies h−2·bead_h to h−bead_h; bead_h wall above traps the bead.
+            // Lid bead at sl−2·bead_h → when seated (bottom at h−sl) bead aligns with groove.
+            groove_z = h - 2 * bead_h;
             difference() {
                 apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
                     core_tray_chassis(data_g);
@@ -148,6 +149,11 @@ module factory_render_box(data, opts, phys) {
                 for (sx = [-1, 1])
                     translate([sx * ball_x, ball_y, groove_z + groove_h / 2])
                         sphere(d=ball_d + glide_tol);
+            // Thumb notch at −Y groove mouth bottom — fingernail purchase under lid edge.
+            // Shifted EPS above groove_z so notch overlaps groove interior (avoids coplanar
+            // face with groove cutter bottom — would create non-manifold edges).
+            translate([0, -l/2, groove_z + EPS])
+                cuboid([groove_w * 0.5, sw + EPS*2, noz * 4 + EPS], anchor=TOP);
         }
         } // end External glide
 
@@ -187,29 +193,34 @@ module factory_render_box(data, opts, phys) {
             difference() {
                 apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
                     core_tray_chassis(data_g);
-                // Hinge bore recess on +Y face — only cut when hinge will exist
+                // Hinge bore recess — centred on axle, open at box top for C-clip entry.
+                // Axle sits at l/2−hinge_y so the C-clip outer edge is flush with l/2.
                 if (clip_len > 0)
-                    translate([0, l/2 + hinge_y, axle_z])
+                    translate([0, l/2 - hinge_y, axle_z])
                         yrot(90) cyl(d=clip_od + clearance*4, h=clip_len+2, $fn=36);
             }
-            // Hinge pillars, axle pin — suppressed if box too narrow for mechanism
-            // Pillars start at l/2-sw (flush with box inner wall face) so the
-            // corner between pillar and wall is solid, not an empty cavity.
+            // Hinge pillars — fill from l/2−clip_od to l/2, height up to axle crown.
+            // This keeps the full hinge assembly within the box's total footprint.
             if (clip_len > 0) {
-            translate([-(w-sw*2)/2 + sw/2, l/2 - sw, sf])
-                cuboid([sw*3, hinge_y+sw+0.5, axle_z+cc_z-sf], chamfer=m_chamf(data),
+            // EPS corrections: outer X face would land at ±w/2 (box outer wall) — coplanar.
+            // Back Y face would land at l/2 (box outer wall) — coplanar.
+            // Width  sw*3 - EPS → outer X face at ±w/2 + EPS/2 (inside wall material). ✓
+            // Depth clip_od - EPS → back Y face at l/2 - EPS (inside wall material). ✓
+            // Do NOT add EPS to depth — that protrudes past l/2, creating a new coplanar face.
+            translate([-(w-sw*2)/2 + sw/2, l/2 - clip_od, sf])
+                cuboid([sw*3 - EPS, clip_od - EPS, axle_z+cc_z-sf], chamfer=m_chamf(data),
                        edges=TOP, anchor=BOTTOM+FRONT);
-            translate([ (w-sw*2)/2 - sw/2, l/2 - sw, sf])
-                cuboid([sw*3, hinge_y+sw+0.5, axle_z+cc_z-sf], chamfer=m_chamf(data),
+            translate([ (w-sw*2)/2 - sw/2, l/2 - clip_od, sf])
+                cuboid([sw*3 - EPS, clip_od - EPS, axle_z+cc_z-sf], chamfer=m_chamf(data),
                        edges=TOP, anchor=BOTTOM+FRONT);
             if (cols > 1 && !skip_p)
                 for (i = [1 : cols-1])
-                    translate([-int_w/2 + i*(int_w/cols), l/2 - sw, sf])
-                        cuboid([div_t, hinge_y+sw+0.5, axle_z+cc_z-sf], chamfer=m_chamf(data),
+                    translate([-int_w/2 + i*(int_w/cols), l/2 - clip_od, sf])
+                        cuboid([div_t, clip_od, axle_z+cc_z-sf], chamfer=m_chamf(data),
                                edges=TOP, anchor=BOTTOM+FRONT);
-            // Axle pin
-            translate([0, l/2 + hinge_y, axle_z])
-                yrot(90) cyl(d=hinge_d, h=w - sw*2, chamfer=0.5, $fn=36);
+            // Axle pin — EPS2 so ends at ±(w/2−sw+EPS), past box inner wall face.
+            translate([0, l/2 - hinge_y, axle_z])
+                yrot(90) cyl(d=hinge_d, h=w - sw*2 + EPS2, chamfer=0.5, $fn=36);
             } // end clip_len > 0 guard
             // Diamond latch recess — cutter matches lid tab shape.
             // Z-tips widened to noz*1.05 to mirror the truncated lid tab (same extrusion width).
@@ -244,6 +255,7 @@ module factory_render_box(data, opts, phys) {
                      ? max(1, to_num(get_digits(str_split(tok_x[0], "xX")[0])))
                      : 1;
         skip_p     = get_val(SKIP_PILLARS, data, false);
+        spine_fill = get_val("SPINE_FILL", opts, false);
 
         assert(clip_len > 0, str(
             "Flip_Double requires w > ", sw*6, "mm. ",
@@ -254,31 +266,48 @@ module factory_render_box(data, opts, phys) {
             difference() {
                 apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
                     core_tray_chassis(data_g);
-                // Hinge bore recesses on both Y faces
-                hull() {
-                    translate([0, -hinge_y, axle_z])
-                        yrot(90) cyl(d=clip_od + clearance*4, h=clip_len+2, $fn=36);
-                    translate([0,  hinge_y, axle_z])
-                        yrot(90) cyl(d=clip_od + clearance*4, h=clip_len+2, $fn=36);
+                // Spine-fill variant: cut individual bore cylinders only.
+                // Hull variant: cut the full pill-shaped slab between hinges (original).
+                // Individual cuts leave spine material between the two hinges intact;
+                // hull removes everything between them (creating the visible open gap).
+                if (spine_fill) {
+                    for (sy = [-1, 1])
+                        translate([0, sy*hinge_y, axle_z])
+                            yrot(90) cyl(d=clip_od + clearance*4, h=clip_len+2, $fn=36);
+                } else {
+                    hull() {
+                        translate([0, -hinge_y, axle_z])
+                            yrot(90) cyl(d=clip_od + clearance*4, h=clip_len+2, $fn=36);
+                        translate([0,  hinge_y, axle_z])
+                            yrot(90) cyl(d=clip_od + clearance*4, h=clip_len+2, $fn=36);
+                    }
                 }
             }
-            // Spine pillars (centre, supports both hinges)
+            // Spine pillars (corner supports, both variants)
+            // EPS-shrunk width: outer X face would land at ±w/2 (box wall) — coplanar = non-manifold.
             translate([-(w-sw*2)/2 + sw/2, 0, sf])
-                cuboid([sw*3, spine_w, axle_z+cc_z-sf], chamfer=m_chamf(data),
+                cuboid([sw*3 - EPS, spine_w, axle_z+cc_z-sf], chamfer=m_chamf(data),
                        edges=TOP, anchor=BOTTOM);
             translate([ (w-sw*2)/2 - sw/2, 0, sf])
-                cuboid([sw*3, spine_w, axle_z+cc_z-sf], chamfer=m_chamf(data),
+                cuboid([sw*3 - EPS, spine_w, axle_z+cc_z-sf], chamfer=m_chamf(data),
                        edges=TOP, anchor=BOTTOM);
             if (cols > 1 && !skip_p)
                 for (i = [1 : cols-1])
                     translate([-int_w/2 + i*(int_w/cols), 0, sf])
                         cuboid([div_t, spine_w, axle_z+cc_z-sf], chamfer=m_chamf(data),
                                edges=TOP, anchor=BOTTOM);
-            // Two axle pins
+            // Spine fill — connects the two side pillars across the full spine width.
+            // Only for SPINE_FILL variant: individual bore cuts leave the chassis solid
+            // between hinges, so this block merges seamlessly with the retained material.
+            if (spine_fill && clip_len > 0)
+                translate([0, 0, sf])
+                    cuboid([int_w - sw*6, spine_w, axle_z+cc_z-sf],
+                           chamfer=m_chamf(data), edges=TOP, anchor=BOTTOM);
+            // Two axle pins — EPS2 so ends at ±(w/2−sw+EPS), past box inner wall face.
             translate([0, -hinge_y, axle_z])
-                yrot(90) cyl(d=hinge_d, h=w - sw*2, chamfer=0.5, $fn=36);
+                yrot(90) cyl(d=hinge_d, h=w - sw*2 + EPS2, chamfer=0.5, $fn=36);
             translate([0,  hinge_y, axle_z])
-                yrot(90) cyl(d=hinge_d, h=w - sw*2, chamfer=0.5, $fn=36);
+                yrot(90) cyl(d=hinge_d, h=w - sw*2 + EPS2, chamfer=0.5, $fn=36);
             // Diamond latch recesses on both Y faces — Z-tips truncated to match lid tab.
             for (sy = [-1, 1])
                 translate([0, sy * l/2, latch_z])

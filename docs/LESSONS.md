@@ -730,3 +730,385 @@ wasteful for small circles. `$fs = nozzle_d` scales correctly for every circle s
 The `0.6mm` offsets in Glide lid and Screw lid geometry are **mechanical clearance
 tolerances** — intentional fit values, not print-quality thresholds. Do not replace
 these with nozzle-parametric expressions.
+
+---
+
+## 11. Non-manifold edges — detection and avoidance
+
+### What causes non-manifold edges
+
+A mesh is non-manifold when two faces share more than one edge, or when faces share an
+edge with zero volume between them (coplanar coincident faces). OpenSCAD's CGAL kernel
+silently produces these in three situations:
+
+| Situation | Example |
+|-----------|---------|
+| `union()` addition's face is **exactly coplanar** with the chassis outer wall | Pillar outer X-face at exactly ±w/2 |
+| `union()` addition's face is **exactly coplanar** with another addition's face | Pull tab +Y at lid body -Y |
+| `difference()` cutter's face is **exactly flush** with the face it pierces (Z-fighting) | Groove cutter base at groove_z without EPS |
+
+Slicers (Bambu Studio, PrusaSlicer) warn "model has non-manifold edges" and attempt
+auto-repair. Repair sometimes creates floating islands that print as disconnected blobs.
+
+### The EPS rule
+
+**Any face added in `union()` that would land exactly on a chassis boundary must be
+nudged by `EPS` past that boundary so the solids genuinely interpenetrate.**
+
+```
+BAD:  pillar outer face at w/2  ← coplanar with box outer wall → non-manifold
+GOOD: pillar width sw*3 - EPS  ← outer face at w/2 - EPS/2 → no shared plane
+```
+
+```
+BAD:  pull tab +Y face at -lid_l/2  ← coplanar with lid body -Y face → non-manifold
+GOOD: translate Y += EPS            ← +Y face at -lid_l/2 + EPS → overlaps into body ✓
+```
+
+**Critical direction rule:** The EPS nudge must make the added solid's face land INSIDE
+the chassis material — not past it. A face nudged past the chassis creates a new
+coplanar junction at the chassis outer surface.
+
+```
+WRONG: pillar depth = clip_od + EPS → back face at l/2 + EPS (past outer wall)
+       Box wall outer face at l/2 is now flush with the pillar's base face → new non-manifold
+CORRECT: pillar depth = clip_od - EPS → back face at l/2 - EPS (inside wall material)
+```
+
+For difference() cutters the mirror rule applies — extend the cutter by EPS past every
+face it must pierce (Lesson 9 details this).
+
+### How to audit a new feature for coplanar faces
+
+For every solid added in `union()`, compute the extreme face coordinates and compare
+against the chassis outer wall coordinates:
+
+| Check | Outer wall at | Compare against |
+|-------|--------------|-----------------|
+| Left X face | `-w/2` | `center_x - width/2` |
+| Right X face | `+w/2` | `center_x + width/2` |
+| Front Y face | `-l/2` | `center_y - depth/2` |
+| Back Y face | `+l/2` | `center_y + depth/2` |
+| Bottom Z face | `sf` (floor top) | `translate_z + 0` |
+| Top Z face | `h` | `translate_z + height` |
+
+If any computed face coordinate equals the chassis wall coordinate exactly → add/subtract
+`EPS` on that dimension.
+
+**High-risk patterns** — always audit these:
+- Pillar/boss next to an outer wall (X or Y face may align with wall)
+- Feature at Z=0 added to a lid (`union()` at the flat face plane)
+- Feature at Z=sf (floor top) added to a box interior
+- Any `anchor=BOTTOM+FRONT/BACK/LEFT/RIGHT` cuboid placed with translate touching a wall
+
+### Confirmed instances in this codebase
+
+| Feature | File | Coplanar face | Fix |
+|---------|------|--------------|-----|
+| Flip_Single hinge pillars | `RenderBox.scad` | Left/right outer X at ±w/2; back Y at l/2 | `sw*3 - EPS` width, `clip_od - EPS` depth |
+| Flip_Double spine pillars | `RenderBox.scad` | Left/right outer X at ±w/2 | `sw*3 - EPS` width |
+| Glide lid pull tab | `RenderLid.scad` | +Y face at -lid_l/2 (lid body -Y) | translate Y += EPS |
+| Latch arm on Flip lid | `RenderLid.scad` | Bottom face at Z=0 (lid flat face) | translate Z -= EPS |
+| Thumb notch in box end wall | `RenderBox.scad` | Top face at groove_z (groove cutter bottom) | translate Z += EPS |
+| Snap lid retention bead (both styles) | `RenderLid.scad` | Degenerate EPS-thin flat face (chamfer = height/2) | `chamfer = (height - m_lh) / 2` (see §11c) |
+| Flip_Single lid C-opening cutter | `RenderLid.scad` | Cutter top coplanar with connection-block top at local z=0 | `clip_outer_d + EPS2` on cutter height (see §11d) |
+| Flip_Single lid diamond tip hull | `RenderLid.scad` | Hull cuboid X face coplanar with latch arm X face | Hull width `lid_w-sw*4+EPS` (see §11e) |
+| Flip_Single/Double axle pins | `RenderBox.scad` | Pin end cap at ±(w/2−sw) = inner wall X face | `h=w−sw*2+EPS2` (see §11g) |
+
+### Floating regions after non-manifold repair
+
+When a slicer auto-repairs non-manifold edges by capping the zero-thickness gap, it can
+create a paper-thin disconnected face that prints as a floating island. Symptom: slicer
+preview shows a small translucent blob separate from the main model. Root cause is always
+a coplanar union face — the fix is always the EPS nudge above, not a slicer setting.
+
+### Cantilever vs floating region — not the same
+
+A **cantilever** is a feature that overhangs with no support below it in the print
+orientation. This is a printability concern — addressed by chamfers and print orientation.
+
+A **floating region** is a disconnected volume in the mesh — the slicer sees it as a
+separate body with no connection to the main model. This is a geometry error — addressed
+by EPS overlaps.
+
+Lids print face-down (Z=0 on bed). The pull tab and latch arm both start at Z=0,
+attached to the bed via the lid body. They are vertical walls building upward — not
+cantilevers. If the slicer flagged them as floating regions, the root cause was the
+coplanar face (non-manifold), not the overhang geometry.
+
+---
+
+### 11a. Mathematical detection — catch coplanar faces before running OpenSCAD
+
+For any cuboid added in `union()`, the six face coordinates are pure arithmetic.
+Compare each against the chassis boundary coordinates. If any match exactly → non-manifold.
+
+**Step 1 — write down the chassis boundaries:**
+```
+left   X = -w/2          right  X = +w/2
+front  Y = -l/2          back   Y = +l/2
+bottom Z = 0 (or sf)     top    Z = h
+```
+
+**Step 2 — compute face coordinates of the added solid:**
+
+For `translate([cx, cy, cz]) cuboid([dx, dy, dz], anchor=BOTTOM)`:
+```
+left   = cx - dx/2        right  = cx + dx/2
+front  = cy - dy/2        back   = cy + dy/2
+bottom = cz               top    = cz + dz
+```
+
+For `anchor=BOTTOM+FRONT` (BOSL2: FRONT = −Y, BOTTOM = −Z):
+```
+left   = cx - dx/2        right  = cx + dx/2
+front  = cy               back   = cy + dy    ← FRONT face is at the translate Y
+bottom = cz               top    = cz + dz
+```
+
+**Step 3 — flag any match:**
+
+| Flip_Single left pillar | Math | Chassis | Match? |
+|------------------------|------|---------|--------|
+| left X | `-(w-sw*2)/2 + sw/2 - (sw*3)/2` = `-w/2` | `-w/2` | ✗ COPLANAR |
+| back Y | `(l/2 - clip_od) + clip_od` = `l/2` | `+l/2` | ✗ COPLANAR |
+
+No code needed — just algebra with the translate and dimension expressions.
+
+**Rule of thumb:** if a dimension expression can be simplified to `±w/2`, `±l/2`, `0`, or `h`,
+it is coplanar with a chassis face and needs an EPS adjustment.
+
+---
+
+### 11b. Why you can't just "EPS everywhere"
+
+The instinct is right but direction matters. EPS must push the face **into** the chassis
+(overlap = valid union), never **past** it (protrusion = new coplanar face on the other side).
+
+```
+Scenario: pillar back Y face must not land at l/2.
+
+Option A — make depth larger (clip_od + EPS):
+  back face = l/2 + EPS  ← protrudes past outer wall
+  New problem: the tiny EPS sliver has its BASE face at l/2 = outer wall face → NEW coplanar ✗
+
+Option B — make depth smaller (clip_od - EPS):
+  back face = l/2 - EPS  ← stays inside wall material
+  The outer wall at l/2 is uninterrupted. Union is clean. ✓
+```
+
+**The blanket rule that always works:**
+
+> When sizing geometry to fill a space up to a wall, make it `- EPS` on that dimension.
+> When positioning geometry to touch a face, offset the translate by `EPS` toward the interior.
+
+A one-liner way to remember: **shrink inward, never grow outward.**
+
+"EPS everywhere" works if you apply it consistently in the inward direction. The problem
+is that "inward" is different for each face:
+
+| Face | Safe direction | Expression |
+|------|---------------|------------|
+| Touches left wall (−X) | push right | `width - EPS` (shrink) |
+| Touches right wall (+X) | push left | `width - EPS` (shrink) |
+| Touches back wall (+Y) | pull forward | `depth - EPS` (shrink) |
+| Touches front wall (−Y) | pull back | `depth - EPS` (shrink) |
+| Touches bottom face (Z=0) | push up | `translate_z - EPS` (sink translate) |
+| Touches top face (Z=h) | push down | `height - EPS` (shrink) or `translate_z - EPS` |
+
+The `difference()` cutter direction is the **opposite**: extend the cutter **past** the face
+(cutter must pierce through, not stop flush). That's `+ EPS` on cutters, `- EPS` on additions.
+
+Summary table — two rules, cover everything:
+
+| Operation | Face must pierce | Face must stop flush | Rule |
+|-----------|-----------------|---------------------|------|
+| `difference()` cutter | yes | — | `+ EPS` (extend past) |
+| `union()` addition | — | yes | `- EPS` (shrink inward) |
+
+---
+
+### 11c. Degenerate flat face — `chamfer = height / 2`
+
+A BOSL2 `cuboid` with `chamfer = h/2` on both `TOP` and `BOTTOM` edges leaves exactly
+zero flat face: the two 45° chamfer planes meet at the midpoint and the remaining flat
+section has zero height. CGAL sees this as a degenerate edge where the chamfer surfaces
+intersect, producing non-manifold edges.
+
+**The formula:**
+```
+total height H, chamfer c on top and bottom
+flat face remaining = H - 2c
+```
+When `c = H/2`: flat face = 0 → degenerate.  
+When `c = H/4`: flat face = H/2 → marginal but usually OK.  
+**Target: flat face ≥ one layer height** (`m_lh`) so CGAL has real geometry to work with.
+
+**Fix:** Compute chamfer to leave exactly one layer height of flat section:
+```scad
+// BAD — degenerate when height is small (EPS-thick flat face)
+cuboid([w, d, bead_h + EPS], chamfer=bead_h/2, edges="ALL");
+// flat face = (bead_h + EPS) - 2*(bead_h/2) = EPS = 0.1mm → degenerate
+
+// GOOD — always leaves m_lh of flat face regardless of bead height
+bead_chamf = (bead_h_ext - m_lh(data)) / 2;
+cuboid([w, d, bead_h_ext], chamfer=bead_chamf, edges="ALL");
+// flat face = bead_h_ext - 2*bead_chamf = m_lh = 0.28mm ✓
+```
+
+**When `bead_h_ext` varies by style** (External adds `m_chamf` to the height, Rabbet
+keeps `bead_h + EPS`), the same `bead_chamf` formula still works — it adapts to whatever
+height each style produces.
+
+**Diagnostic:** if flat face < `EPS` (= 0.1mm), the geometry is almost certainly
+non-manifold. If flat face < `m_lh` (= 0.28mm), it may be borderline depending on
+how CGAL evaluates the face. Target ≥ `m_lh` for clean results.
+
+---
+
+### 11d. Cutter top coplanar with addition top inside `difference()`
+
+In a `difference()`, if a **cutter** (child 2+) has a face exactly coplanar with the
+**target solid's** (child 1) outer face, CGAL can produce non-manifold edges along the
+shared boundary. This is distinct from Lesson 9 (which addresses the face being cut
+itself) — here the cutter's terminating face lands on an addition's terminating face.
+
+**The C-clip hinge example:**
+
+```scad
+// In local frame (parent translate at clip_z world):
+// Connection block top face: local z = 0
+// C-opening cutter top face: also local z = 0
+//   → cutter terminates exactly at the solid's top face → non-manifold at boundary
+
+translate([0, 0, -clip_outer_d/2])
+    cuboid([clip_len+2, clip_gap, clip_outer_d], anchor=CENTER);
+// cutter top = -clip_outer_d/2 + clip_outer_d/2 = 0  ← coplanar with block top ✗
+
+// FIX: extend cutter by EPS2 so its top goes to local z = EPS
+translate([0, 0, -clip_outer_d/2])
+    cuboid([clip_len+2, clip_gap, clip_outer_d + EPS2], anchor=CENTER);
+// cutter top = -clip_outer_d/2 + (clip_outer_d + EPS2)/2 = EPS ✓
+```
+
+**Why `EPS2` and not `EPS`:** Adding `EPS` to the height moves the center by `EPS/2` and
+the top by `EPS/2 + EPS/2 = EPS/2` — only `EPS/2 = 0.05mm` past the face. Adding `EPS2`
+to the height with a fixed center moves the top by `EPS2/2 = EPS = 0.1mm`. Alternatively:
+`translate z += EPS/2` + `height += EPS` also gives top at `EPS`. Either is fine; using
+`clip_outer_d + EPS2` on a fixed-center cuboid is cleaner to read.
+
+**General rule:** For any `difference()` where the cutter has a face that might be
+coplanar with the solid's face (not just the bottom/entry face), extend that cutter
+face by EPS past the solid's face.
+
+---
+
+### 11e. Two additions sharing a face in `union()` — cross-addition coplanar faces
+
+Not all coplanar non-manifold edges involve the chassis boundary. Two additions in the
+same `union()` can have exactly matching faces in their overlap zone. CGAL sees this as
+a zero-thickness internal boundary and produces non-manifold edges along it.
+
+**The diamond tip / latch arm example:**
+
+```scad
+// Latch arm: width = lid_w - sw*4 → X faces at ±(lid_w - sw*4)/2
+cuboid([lid_w - sw*4, 2.2, sl + clasp_depth + EPS], anchor=BOTTOM);
+
+// Diamond tip hull — same X width:
+hull() {
+    cuboid([lid_w - sw*4, 0.1, noz*1.05], anchor=CENTER);  // ← same ±X faces
+    ...
+}
+```
+
+In the Z zone where latch arm and hull overlap, both solids have X faces at
+`±(lid_w - sw*4)/2`. CGAL sees a coplanar internal boundary at both ±X planes.
+
+**Fix:** Offset one solid's face by `EPS` so the other's face is interior to it:
+```scad
+// Make hull slightly wider — latch arm X faces are now interior to the hull volume
+hull() {
+    cuboid([lid_w - sw*4 + EPS, 0.1, noz*1.05], anchor=CENTER);
+    cuboid([lid_w - sw*4 + EPS, noz*2, 0.1],    anchor=CENTER);
+    cuboid([lid_w - sw*4 + EPS, 0.1, noz*1.05], anchor=CENTER);
+}
+```
+
+**Which direction?** Make the outer shape (`hull`) slightly LARGER so the inner
+shape (latch arm) is fully enclosed. If the inner shape were wider, the hull's faces
+would be interior to the latch arm in the overlap zone — same fix, different choice
+of which to offset.
+
+**Detection:** If two additions in the same `union()` have any matching face
+coordinate (even a non-chassis-boundary face), check whether they overlap in space.
+If they overlap AND share a face coordinate, add `EPS` to separate them.
+
+---
+
+### 11f. Slicer "floating cantilever" — when it's real vs expected
+
+The slicer warning "floating cantilever" (or "floating island") has two distinct causes:
+
+**Cause A — Non-manifold repair artifact (geometry bug):** The slicer auto-repairs
+non-manifold edges by capping zero-thickness gaps with paper-thin faces. These faces
+are disconnected from the main model and appear as floating blobs in the slicer preview.
+Root cause: a coplanar union face (see §11, §11c–§11e). Fix: apply the EPS rules and
+eliminate the non-manifold edges. The warning disappears once the geometry is clean.
+
+**Cause B — Geometric overhang at the slicer's 45° limit (expected):** Features
+printed at exactly 45° overhangs trigger the slicer's cantilever detector but print
+fine without supports. Examples in this codebase:
+
+| Feature | Geometry | Verdict |
+|---------|----------|---------|
+| Pull tab `BOTTOM+FRONT` chamfer | `chamfer=pull_tab_d/2` creates a 45° slope at the bed | Expected — self-supporting, no fix needed |
+| Ball dimple sphere pole caps | Tiny (<0.1mm) disconnected zone at sphere tips | Sub-layer; benign in practice at ball_d=1.4mm |
+| Flip lid C-clip arc opening | Faces downward (−Z) — correctly designed for face-down print | Expected — arc is self-supporting |
+
+**How to tell them apart:**
+
+1. Fix any non-manifold edges first (§11–§11e). Re-export the STL.
+2. If the cantilever warning remains on the clean STL: it is Cause B (expected overhang).
+   Accept it or redesign the overhang geometry.
+3. If the warning disappears after fixing non-manifolds: it was Cause A.
+
+**The pull tab 45° geometry is intentional.** The `chamfer=pull_tab_d/2` on the
+`BOTTOM+FRONT` edge makes the tab's base slope at exactly 45° as it exits the bed
+plane. This is the self-supporting FDM limit — the correct design. The slicer warning
+is informational.
+
+---
+
+### 11g. Axle pin coplanar with inner wall — span dimension equals interior width
+
+A cylinder spanning across the box interior with `h=w-sw*2` has half-length `(w-sw*2)/2 = w/2-sw`.
+The box inner wall X face is at `±(w/2-sw)`. They are exactly equal — the chamfered end cap of the
+axle pin lands exactly on the inner wall face → non-manifold.
+
+**The math:**
+```
+axle pin half-length = (w - sw*2) / 2 = w/2 - sw
+inner wall X face    = ±(w/2 - sw)
+difference          = 0  ← coplanar ✗
+```
+
+With typical values (w=40, sw=2.4): both = ±17.6mm.
+
+**Fix:** Add `EPS2` to the span so both ends protrude `EPS` past the inner wall faces into the wall
+material — the wall's solid body absorbs the tiny protrusion cleanly via `union()`:
+
+```scad
+// BAD — end cap coplanar with inner wall face
+yrot(90) cyl(d=hinge_d, h=w - sw*2, chamfer=0.5, $fn=36);
+
+// GOOD — ends at ±(w/2 − sw + EPS), inside wall material
+yrot(90) cyl(d=hinge_d, h=w - sw*2 + EPS2, chamfer=0.5, $fn=36);
+```
+
+**Detection rule:** Any cylinder or rod that spans the full interior width (or depth) with
+`h = w - sw*2` (or `h = l - sw*2`) has coplanar ends. Always add `EPS2` to these spans.
+
+**Applies to:** Flip_Single axle pin (1 pin), Flip_Double axle pins (2 pins). Both use the
+same formula. Each coplanar end cap produces multiple non-manifold edges at the circular
+boundary — a single `EPS2` fix on `h` resolves all of them.
