@@ -80,3 +80,23 @@ The groove catch in the box is unchanged — ball_protr is the protrusion amount
 
 The general lesson: whenever you place a sphere or round feature at h/2 inside a thin slab, check that ball_r ≤ h/2. If it isn't, the feature escapes the slab in Z and you get a floating shell. The slicer won't catch it.
 
+
+---
+
+DESIGN EVOLUTION: Ball auto-sizing, thickening, and the "embed, don't patch" rule (2026-06-07)
+
+The glide ball catch had two separate problems that happened to overlap:
+
+Problem 1 — wrong size on large lids. The ball diameter formula is:
+  ball_d = min(sw×2, max(noz×8, max(w,l)×0.03))
+
+The 3% footprint scaling ensures a 200mm lid gets a larger ball than a 60mm lid — retention force scales with the surface area the ball must hold. The noz×8 floor (3.2mm at 0.4mm nozzle) prevents balls from going below Arachne's small-perimeter speed clamp. The sw×2 ceiling is a hard geometric constraint: ball_r = sw is the point where the ball would punch through the box groove wall. No gain from going bigger. The formula is already self-correcting — tiny balls on massive lids can't happen as long as sw is appropriate for the part size.
+
+Problem 2 — ball floated above lid top. The rib fix we applied earlier was a patch: we added a full-height connecting rib to keep the ball attached at every layer. But the root cause was that the lid slab (sl ≈ 2mm) was thinner than the ball diameter (ball_d ≈ 3.2–4.8mm), so ball_r > sl/2 and the top of the ball had no support.
+
+The cleaner fix (applied now): sl_glide = max(sl, ball_d). The lid is made at least as thick as the ball diameter, so ball_r ≤ sl_glide/2 is always true. No rib needed. Side effect: a large glide lid on a big box is now noticeably thicker than the default 2mm lid. This is correct behavior — a 200mm glide lid at 2mm would flex under load; 4.8mm is more appropriate. The thickening is proportional to part size because ball_d is proportional to part size.
+
+The same logic was applied to the plaque face plate socket: p_t_eff = max(p_t, od). The face plate is widened to fully back the socket diameter, eliminating any bridging at the socket base.
+
+General rule captured: when a round feature (ball, socket, cylinder) doesn't fit within its host body, thicken the host rather than adding a rib or repositioning the feature. Ribs are the fallback when host geometry is constrained by mating parts.
+
