@@ -439,8 +439,13 @@ function layer_snap(z, lh) = round(z / lh) * lh;
 /// Capped at sw×2 so the ball never exceeds the groove wall depth.
 /// Minimum raised to noz*8 (3.2mm at 0.4mm nozzle) — keeps ball diameter above
 /// Arachne's small-perimeter speed clamp (~3mm), avoiding pressure-pinch slowdown.
+// groove_wall = (sw - 0.6) / 2 (External glide: groove leaves ~sw/2 wall each side).
+// Ball center at groove_w/2 + noz/2 — ball_r must not exceed groove_wall - noz/2
+// or the sphere cutter breaks through the outer box wall (visible holes from outside).
+// Cap: sw - 0.6 - noz ensures ball outer edge is flush with or inside the outer wall.
 function glide_ball_d(w, l, sw, noz) =
-    min(sw * 2, max(noz * 8, max(w, l) * 0.03));
+    let(wall_cap = max(noz * 2, sw - 0.6 - noz))
+    min(sw * 2, wall_cap, max(noz * 4, max(w, l) * 0.03));
 
 /// Glide lid — how deeply the ball center is recessed into the lid face.
 /// Positions ball center at noz/2 past the groove wall — gentle cam entry

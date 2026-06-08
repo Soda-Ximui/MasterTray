@@ -7,16 +7,16 @@
 Nozzle_Diameter = 0.4;  // [0.2, 0.4, 0.6, 0.8]
 Wall_Loops      = 2;    // [1 : 1 : 10]
 Layer_Height    = 0.28; // [0.12, 0.16, 0.20, 0.24, 0.28]
-Filament_Type   = "PETG"; // ["PLA", "PETG", "TPU", "ABS"]
+Filament_Type   = "PLA"; // ["PLA", "PETG", "TPU", "ABS"]
 Mechanical_Fit  = "Standard"; // ["Tighter", "Tight", "Standard", "Loose", "Looser"]
 
 /* [Build Selection] */
-Part_To_Build = "Grid"; // ["Box", "Pillbox Full Set", "Lid", "Simple Tray", "Jar", "Threaded Jar", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", "Plaque", "Grid", "Grid Test", "Lid Testing"]
+Part_To_Build = "Box"; // ["Box", "Pillbox Full Set", "Lid", "Simple Tray", "Jar", "Threaded Jar", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", "Plaque", "Grid", "Grid Test", "Lid Testing"]
 
 /* [Dimensions: W x L x H] */
-part_width  = 140;  // [10 : 0.5 : 300]
-part_length = 245;  // [10 : 0.5 : 300]
-part_height = 50;   // [5 : 0.5 : 300]
+part_width  = 40;   // [10 : 0.5 : 300]
+part_length = 80;   // [10 : 0.5 : 300]
+part_height = 30;   // [5 : 0.5 : 300]
 dimension_mode = "Total"; // ["Total", "Usable"]
 // Grid layout string — leave blank for no grid. When non-empty, container intents
 // auto-generate all variants: plain + built-in grid + drop-in (no base) + drop-in
@@ -100,7 +100,7 @@ stackable_peg_height = 80; // [20 : 10 : 200]
 //   Only affects square/slotted holes >~2.1mm; below that Arachne floor takes over.
 corner_radius       = 0.0; // [0 : 0.1 : 10.0]
 Corner_Round_Ratio  = 0.20; // [0.05:0.05:0.45]
-chamfer_size        = 0.0; // [0 : 0.1 : 3.0]
+chamfer_size        = 0.4; // [0 : 0.1 : 3.0]
 peg_socket_diameter = 8.0; // [4 : 0.5 : 16.0]
 nesting_ledge_depth = 2.0; // [1 : 0.5 : 8.0]
 peg_protrusion      = 0.0; // [0 : 0.5 : 20.0] — builtin peg height above tray, 0=auto

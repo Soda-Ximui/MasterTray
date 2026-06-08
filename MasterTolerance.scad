@@ -25,7 +25,10 @@ COMP_GLIDE = "glide_track";
 
 // --- BASELINE TOLERANCES (Breathing Room / Gap) ---
 // Smaller number = tighter fit
-ROOM_SPINE_PETG = 0.50; ROOM_SPINE_TPU = 0.20; ROOM_SPINE_PLA = 0.30;
+// ROOM_SPINE: gap between the two Flip_Double C-clip faces at box centre.
+// Must be ≥ clip_od/2 ≈ 3.85mm so each C-clip sweeps a full 90° without
+// colliding with the other during simultaneous opening (see HANDOFF physics).
+ROOM_SPINE_PETG = 4.00; ROOM_SPINE_TPU = 0.20; ROOM_SPINE_PLA = 4.00;
 ROOM_CCLIP_PETG = 0.25; ROOM_CCLIP_TPU = 0.10; ROOM_CCLIP_PLA = 0.15;
 ROOM_GLIDE_PETG = 0.40; ROOM_GLIDE_TPU = 0.60; ROOM_GLIDE_PLA = 0.20; 
 

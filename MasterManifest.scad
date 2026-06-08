@@ -73,7 +73,12 @@ function flip_hinge_y(data) =
 
 function flip_lid_l(data)      = get_val(LENGTH, data, LENGTH0) - flip_hinge_y(data);
 // Half-lid length for Flip_Double: spine is centred, each lid covers one half.
-function flip_half_lid_l(data) = get_val(LENGTH, data, LENGTH0) / 2 - flip_hinge_y(data);
+// Assembly requires flipping the lid 180° (C-clip faces spine). Latch lands at:
+//   hinge_y + lid_l + cc_z = l/2  →  flip_half_lid_l = l/2 - spine_gap
+// (l/2 - hinge_y was cc_z = 3.85mm short; latch missed the recess on every print.)
+function flip_half_lid_l(data) =
+  let(spine_gap = breathing_room(COMP_SPINE, data))
+  get_val(LENGTH, data, LENGTH0) / 2 - spine_gap;
 
 function compile_manifest(intent, data) =
 
@@ -545,8 +550,12 @@ function compile_manifest(intent, data) =
       // Flip Single — one lid, C-clip hinge +Y, diamond latch −Y
       ["BOX", data, [["LID_TYPE", "Flip_Single"]], phys],
       ["LID", data, [["LID_TYPE", "Flip_Single"]], phys],
-      // Flip Double — two lids opening from centre spine
+      // Flip Double — open spine (original)
       ["BOX", data, [["LID_TYPE", "Flip_Double"]], phys],
+      ["LID", concat([[LENGTH, lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys],
+      ["LID", concat([[LENGTH, lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys],
+      // Flip Double — solid filled spine (rigidity test)
+      ["BOX", data, [["LID_TYPE", "Flip_Double"], ["SPINE_FILL", true]], phys],
       ["LID", concat([[LENGTH, lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys],
       ["LID", concat([[LENGTH, lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys]
     ]

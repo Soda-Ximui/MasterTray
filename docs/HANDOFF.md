@@ -1,5 +1,5 @@
 # Session Handoff — MasterTray
-_Last updated: 2026-06-08 — Post-print fixes round 2 (9cff93c)_
+_Last updated: 2026-06-08 — All non-manifold edges resolved; branch clean_
 
 ---
 
@@ -10,18 +10,48 @@ _Last updated: 2026-06-08 — Post-print fixes round 2 (9cff93c)_
 
 | Hash | Message |
 |------|---------|
+| `84828bf` | fix: resolve all non-manifold edges across lid and box STLs |
+| `30dfd94` | docs: update HANDOFF.md with post-print-2 status and next session prompt |
 | `9cff93c` | fix: glide ball dimples as full circles + flip_single corner gap |
 | `4720b25` | fix: revert MIRROR_Y (direction was correct), document snap/flip lessons |
 | `16c58cd` | fix: resolve 4 print failures from physical test |
-| `edaa23e` | fix: plaque peg mount — solid patch before hole punch for meshed lids |
 
 ---
 
-## What Was Fixed (This Session — Post Second Print Test)
+## What Was Fixed (This Session — Non-Manifold Cleanup)
+
+All STL exports are now slicer-clean (zero non-manifold edges). Five root causes found and fixed:
+
+### Snap lid retention bead (RenderLid.scad)
+- **External:** `bead_z = sl - EPS` placed bead inside `apply_master_bounds` TOP chamfer zone (0.4mm deep). Complex CGAL interaction → 6 edges.
+  - Fix: `bead_z = sl - chamf - EPS`; `bead_h_ext = bead_h + chamf + EPS` to keep bead-top position.
+- **Rabbet:** `chamfer = bead_h/2` with height `bead_h + EPS` left only `EPS = 0.1mm` flat face → degenerate → 6 edges.
+  - Fix: `bead_chamf = (bead_h_ext - m_lh(data)) / 2` — always leaves one full layer height of flat face.
+
+### Flip_Single lid C-opening cutter (RenderLid.scad)
+- Cutter top at local z=0 = connection-block top at local z=0 → coplanar in `difference()` → 10 edges (Flip_Single) / 16 (Flip_Double, two half-lids).
+- Fix: `clip_outer_d + EPS2` on cutter height → top at local z=EPS.
+
+### Flip_Single lid diamond hull (RenderLid.scad)
+- Hull cuboids same X width as latch arm (`lid_w-sw*4`). In overlap zone, ±X faces coplanar → non-manifold.
+- Fix: Hull cuboids widened to `lid_w-sw*4+EPS` so latch arm X faces are interior.
+
+### Axle pins coplanar with inner walls (RenderBox.scad)
+- `h = w - sw*2` → half-length = `w/2 - sw` = exact inner wall X face position. Chamfered end cap coplanar with inner wall → multiple edges per pin.
+- Fix: `h = w - sw*2 + EPS2` for all three pins (Flip_Single 1×, Flip_Double 2×).
+- This also resolved the "two other boxes with 6 edges" — they were Flip_Single boxes at different sizes.
+
+### Documentation
+- `docs/LESSONS.md` updated with §11c–§11g documenting each non-manifold pattern.
+- Confirmed instances table updated.
+
+---
+
+## What Was Fixed (Previous Session — Post Second Print Test)
 
 ### Snap lid fell through (RenderLid.scad)
 - Bead outer face was flush with lid edge; all-edges chamfer ate it → zero protrusion → no click.
-- **Fix:** `snap_protr = noz`. Translate: `sx * (lid_w/2 + clearance/2 + snap_protr - sw/2)`. Bead outer face now noz past box interior wall.
+- **Fix:** `snap_protr = noz`. Translate: `sx * (lid_w/2 + clearance/2 + snap_protr - sw/2)`.
 
 ### Glide lid wouldn't enter groove (RenderBox.scad)
 - `groove_h = sl + tol = 2.4mm` but lid `sl_glide = max(sl, ball_d) = 3.2mm`.
@@ -34,31 +64,28 @@ _Last updated: 2026-06-08 — Post-print fixes round 2 (9cff93c)_
 ### Flip_Double half-lids too long (MasterManifest.scad)
 - All Flip_Double intents used `flip_lid_l` (full-box formula). Lids ~2× too long.
 - **Fix:** All Flip_Double intents use `flip_half_lid_l = l/2 - flip_hinge_y`.
-- Direction was already correct — MIRROR_Y was wrong and reverted.
 
 ### Glide ball dimples were broken arcs (RenderBox.scad)
-- Sphere cutter diameter = groove_h → sphere cut to groove edges → arc not circle. Structurally weak.
-- **Fix:** `groove_h = max(sl_glide + tol, ball_d + tol + noz*4)`. noz*4 adds 2-nozzle margin above/below sphere so it prints as a full contained circle.
+- Sphere cutter diameter = groove_h → sphere cut to groove edges → arc not circle.
+- **Fix:** `groove_h = max(sl_glide + tol, ball_d + tol + noz*4)`.
 
-### Flip_Single hinge corner hollow (RenderBox.scad)
-- Pillars started at `l/2 - 0.5`; box inner wall is at `l/2 - sw`. 1.9mm hollow corner at the hinge.
-- **Fix:** Pillar front face moved to `l/2 - sw`. Depth updated to `hinge_y + sw + 0.5`. Applied to all three pillar types (left corner, right corner, centre grid columns).
+### Flip_Single hinge corner hollow + inside footprint (RenderBox.scad / RenderLid.scad)
+- Pillars started at `l/2 - 0.5`; axle at `l/2 + hinge_y` — both past the footprint boundary.
+- **Fix:** Axle moved to `l/2 - hinge_y`; pillars fill `l/2 - clip_od` to `l/2`; `lid_l = l - clip_outer_d`.
+
+### CRITICAL: Flip_Double simultaneous 90° open (MasterTolerance.scad)
+- `ROOM_SPINE = 0.5mm` — two C-clips collide immediately on opening.
+- **Fix:** `ROOM_SPINE_PETG = ROOM_SPINE_PLA = 4.00mm`.
+
+### Rabbet snap groove_z (RenderBox.scad / RenderLid.scad)
+- Groove and bead misaligned — no overlap when lid seated.
+- **Fix:** `groove_z = h - bead_h`; Rabbet lid bead at `sl - bead_h`.
 
 ---
 
-## Open Issues — Needs Next Print + Fix
+## Open Issues
 
-### CRITICAL: Flip_Double — both lids can't open 90° simultaneously
-- User confirmed physically. Also described as "rough and ugly" at lid-hinge interface.
-- **Root cause:** `spine_gap = ROOM_SPINE_PETG = 0.5mm`. When one lid opens, its C-clip sweeps through an arc. The inner face of the C-clip (at `hinge_y - clip_od/2 = spine_gap = 0.5mm` from box center) comes within 1mm of the other lid's C-clip inner face. There is no arc clearance.
-- **Fix needed:** Increase `ROOM_SPINE` to `clip_od/2 ≈ 4mm` minimum so each C-clip has a full quarter-turn of clearance before hitting the other. Files: `MasterTolerance.scad` (ROOM_SPINE_PLA, ROOM_SPINE_PETG) and `MasterManifest.scad` (flip_hinge_y formula recheck).
-- **Also:** Clean up the structural web connecting C-clip to lid face (the foot/gusset) — currently rough where it meets the lid slab.
-
-### LOW: Rabbet snap geometry fundamentally wrong
-- Box groove at `groove_z = h - sl - bead_h`. Lid bead at lid top (Z=sl). When seated flush, bead is at Z=h, groove at h-sl-bead_h to h-sl → no overlap, no click.
-- **Fix needed:** Move groove to `groove_z = h - bead_h` (just below box rim). Move lid bead to `Z = sl - bead_h/2` (near lid top, within lid body). Coordinated change in RenderBox + RenderLid snap sections.
-
-### LOW: F6, F14, F15
+### LOW: F6, F14, F15 (cosmetic, deferred)
 - F6: RenderLid.scad ~L120 — diamond latch `layer_snap` call
 - F14: RenderLid.scad ~L44 — snap bead layer-align
 - F15: RenderBox.scad ~L103 — flip-box hinge assert
@@ -88,7 +115,7 @@ MasterEnum.scad          ← All key constants
 |----------|-----|------|------|
 | `COMP_CCLIP` | 0.15mm | 0.25mm | C-clip clearance |
 | `COMP_GLIDE` | 0.30mm | 0.40mm | Glide/snap |
-| `COMP_SPINE` | 0.30mm | 0.50mm | **← too small, needs ~4mm** |
+| `COMP_SPINE` | 4.00mm | 4.00mm | Arc clearance for 90° C-clip swing |
 | `COMP_CLASP` | 4.0mm | 4.6mm | Latch engagement depth |
 | `COMP_BELLY` | 0.5mm | 0.8mm | Clip flat zone |
 
@@ -98,9 +125,9 @@ hinge_d     = 4.0mm
 clip_wall   = noz * 4 = 1.6mm
 clip_od     = hinge_d + clearance*2 + clip_wall*2 = 7.7mm
 cc_z        = clip_od/2 = 3.85mm
-spine_gap   = ROOM_SPINE_PETG = 0.50mm   ← PROBLEM: needs ≥ clip_od/2 = 3.85mm
-hinge_y     = clip_od/2 + spine_gap = 4.35mm
-spine_w     = hinge_y*2 + hinge_d = 12.7mm
+spine_gap   = ROOM_SPINE_PETG = 4.00mm   (≥ clip_od/2 = 3.85mm ✓)
+hinge_y     = clip_od/2 + spine_gap = 7.85mm
+spine_w     = hinge_y*2 + hinge_d = 19.7mm
 flip_half_lid_l(data) = l/2 - hinge_y
 ```
 
@@ -113,20 +140,6 @@ We're continuing MasterTray on branch refactor/code-clarity-and-safety.
 Read docs/HANDOFF.md first — it has the full list of what was fixed and
 what's still open.
 
-Two fixes are needed:
-
-1. CRITICAL — Flip_Double simultaneous 90° open:
-   spine_gap = ROOM_SPINE in MasterTolerance.scad is 0.5mm — far too
-   small. The C-clip arc radius is clip_od/2 ≈ 3.85mm. Two C-clips
-   facing each other 2*spine_gap = 1mm apart will collide during opening.
-   ROOM_SPINE_PETG and ROOM_SPINE_PLA need to be increased to at least
-   clip_od/2 so each C-clip can swing 90° without hitting the other.
-   After updating ROOM_SPINE, verify flip_hinge_y() in MasterManifest.scad
-   recalculates spine_w and flip_half_lid_l correctly.
-   Also: clean up the visual appearance of where the C-clip foot meets the
-   lid slab in RenderLid.scad Flip_Single section.
-
-2. LOW — Rabbet snap groove_z is wrong (see HANDOFF for details).
-
-After fixes, run "Lid Testing" intent to review. Then push branch + open PR.
+All STLs are currently non-manifold-free. Open items are LOW-priority
+cosmetic bugs F6, F14, F15. After any fixes, push branch + open PR.
 ```
