@@ -113,18 +113,21 @@ module _uclip_horizontal(sw, tol, clip_wall, clip_l, pin_d, pin_h, chamf) {
 // Print: UPRIGHT — stands on p_w × p_t base, p_h tall in Z.
 // Socket sits on top (Z = p_h), axis vertical → prints as C-rings, no overhang.
 // Blank surface for stick-on label or Bambu Studio text modifier.
-// Socket base (first layer) bridges ≈(od−p_t)/2 per side in Y — within FDM range.
+// Slab thickness p_t bumped to max(p_t, od) so the socket is fully backed —
+// no bridging at the socket base, clean first layer across the full od width.
 module _face_plate(p_w, p_h, p_t, pin_d, socket_h, tol, noz, chamf) {
     clip_wall = noz * _PL_CLIP_WALL_N;
     od        = pin_d + tol * 2 + clip_wall * 2;
+    // Embed the socket: face plate must be at least as thick as the socket diameter.
+    p_t_eff   = max(p_t, od);
 
-    echo(str("   Face Plate ", p_w, "×", p_t, "×", p_h, "H",
+    echo(str("   Face Plate ", p_w, "×", p_t_eff, "×", p_h, "H",
              " socket_od=", od, " socket_h=", socket_h));
 
     union() {
-        // Slab: p_w wide, p_t thick, p_h tall
-        cuboid([p_w, p_t, p_h], chamfer = chamf, edges = "Z", anchor = BOTTOM);
-        // Socket on top — axis in Z, C-opening at +X
+        // Slab: p_w wide, p_t_eff thick (≥ od), p_h tall
+        cuboid([p_w, p_t_eff, p_h], chamfer = chamf, edges = "Z", anchor = BOTTOM);
+        // Socket on top — axis in Z, C-opening at +X, fully supported at base
         translate([0, 0, p_h])
             _pl_socket(pin_d, socket_h, tol, noz);
     }
