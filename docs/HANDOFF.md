@@ -1,5 +1,5 @@
 # Session Handoff — MasterTray
-_Last updated: 2026-06-07 — Pre-Print Test codebase committed (51487cb)_
+_Last updated: 2026-06-07 — Post-print fixes: C-clip cantilever + glide ball floating shell (03068d4)_
 
 ---
 
@@ -18,14 +18,14 @@ _(Root-level `HANDOFF.md` is a one-line stub that points here — Claude will fi
 ## Branch & State
 
 **Branch:** `refactor/code-clarity-and-safety`
-**Last commit:** `51487cb` — Pre-Print Test snapshot. All files committed, NOT pushed.
+**Last commit:** `03068d4` — Glide ball rib fix. All files committed, NOT pushed.
 
 ```
+03068d4 fix: glide ball rib — prevent floating shell when ball_r > sl/2
+cd1bc33 docs: session handoff — Pre-Print Test codebase (51487cb)
 51487cb feat: FrankenTray v2 + private box intents + cantilever fix — Pre-Print Test
 c018d82 docs: add handoff history tracking + Astro nav for Status and FrankenTray
 1adaffb docs: FrankenTray v2 spec + updated handoff
-c429fe5 docs: grid layout quick reference in STATUS.md
-79f8370 feat: cycling per-ray heights + fix drop-in grid not generated
 ```
 
 **Untracked (leave alone):**
@@ -38,7 +38,34 @@ c429fe5 docs: grid layout quick reference in STATUS.md
 
 ---
 
-## What This Session Did
+## Post-Print Bug Fixes (this session)
+
+### BUG 1 — C-clip hinge: floating cantilever (Bambu STL_12, STL_13)
+**Symptom:** Bambu Studio warning "floating cantilever". Flip_Double half-lids failed.
+**Root cause:** The C-clip slot was at `+clip_outer_d/2` — cutting the TOP of the arc.
+Printed face-down, the two arm tips at the top of the print had nothing below them.
+**Fix:** Move slot to `-clip_outer_d/2` — arc opens downward, arms point toward lid body.
+Arms are self-supporting. Pin enters from below when lid is pressed onto box hinge.
+**File:** `RenderLid.scad` — Flip_Single C-clip hinge block. Commit `51487cb`.
+
+### BUG 2 — Glide ball: floating shell, no slicer warning, print detachment
+**Symptom:** Balls fell off wholesale in print. No Bambu warning fired.
+**Root cause:** Ball center at `sl/2` but `ball_r > sl/2` (e.g. 1.2mm radius, 0.8mm half-thickness).
+Sphere clipped below bed when printed face-down. Top portion of ball (above `sl`) had
+no lid-wall support — a floating shell. Slicer missed it because ball *starts* connected;
+only the top detaches mid-print.
+**Fix:** Add full-height rib (`cuboid([ball_r+EPS, ball_d*0.7, sl+EPS])`) inset into the lid
+wall at `lid_w/2 - ball_r/2`. Rib gives the ball solid attachment at every layer.
+Box dimple geometry unchanged.
+**File:** `RenderLid.scad` — Glide Ball branch. Commit `03068d4`.
+
+### LESSON: Spheres/round features must fit within host body Z range
+Before placing any sphere at `h/2`, verify `ball_r <= h/2`. If not, the sphere clips
+the bed or top face. Slicer may not warn. Fix: rib (preferred) or clamp diameter.
+
+---
+
+## What Earlier Sessions Did
 
 ### 1. Private box intent architecture
 `MasterManifest.scad` restructured so each lid variant is a self-contained private intent.
