@@ -66,9 +66,16 @@ modify_wall = "None"; // ["None", "Dropped", "50%", "25%"]
 target_wall = "All Walls"; // ["All Walls", "Front", "Back", "Left", "Right"]
 
 /* [Plaque / Labels] */
-plaque_style = "None"; // ["None", "Embedded", "Standalone"]
-plaque_text = "";
-plaque_text_size = 6; // [4:1:20]
+// "Label" = blank surface for a stick-on label. "Text" = text engraved into face.
+plaque_style     = "Label"; // ["Label", "Text"]
+plaque_text      = "";
+plaque_text_size = 8; // [4:1:24]
+// "Vertical" = clip grips thin vertical edge of dropped tray wall.
+// "Horizontal" = clip straddles horizontal top rim of any wall.
+clip_type  = "Vertical"; // ["Vertical", "Horizontal"]
+plaque_w   = 0;  // [0 : 5 : 120]   face plate width mm; 0 = auto from text
+plaque_h   = 35; // [15 : 5 : 100]  face plate height mm
+clip_h     = 20; // [10 : 5 : 60]   clip body height mm
 
 /* [Core Engineering (R&D Exposed)] */
 floor_thickness = 2.0;
@@ -157,9 +164,13 @@ ui_payload = [
     [WALL_MODIFY,        modify_wall], 
     [WALL_TARGET,        target_wall], 
     [GRID_LAYOUT,        grid_layout],
-    [PLAQUE_STYLE,       plaque_style], 
-    [PLAQUE_TEXT,        plaque_text], 
+    [PLAQUE_STYLE,       plaque_style],
+    [PLAQUE_TEXT,        plaque_text],
     [PLAQUE_TEXT_SIZE,   plaque_text_size],
+    [CLIP_TYPE,          clip_type],
+    [PLAQUE_W,           plaque_w],
+    [PLAQUE_H,           plaque_h],
+    [CLIP_H,             clip_h],
     [THICK_FLOOR,        floor_thickness], 
     [THICK_LID,          lid_thickness], 
     [THICK_WALL,         wall_thickness], 
