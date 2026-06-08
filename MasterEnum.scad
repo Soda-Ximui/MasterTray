@@ -23,9 +23,13 @@ STRUT_LID    = "STRUT_LID";
 GRID_LAYOUT = "GRID_LAYOUT";
 GRID_HAS_BASE = "GRID_HAS_BASE";
 GRID_TYPE = "GRID_TYPE";
-PLAQUE_STYLE = "PLAQUE_STYLE";
+PLAQUE_STYLE = "PLAQUE_STYLE";   // "Label" | "Text"
 PLAQUE_TEXT = "PLAQUE_TEXT";
 PLAQUE_TEXT_SIZE = "PLAQUE_TEXT_SIZE";
+PLAQUE_W    = "PLAQUE_W";       // face plate width mm (0 = auto-size from text)
+PLAQUE_H    = "PLAQUE_H";       // face plate height mm
+CLIP_TYPE   = "CLIP_TYPE";      // "Vertical" | "Horizontal"
+CLIP_H      = "CLIP_H";         // clip body height mm
 WALL_MODIFY = "WALL_MODIFY";
 WALL_TARGET = "WALL_TARGET";
 THICK_FLOOR = "THICK_FLOOR";
