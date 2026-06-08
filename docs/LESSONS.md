@@ -805,8 +805,9 @@ If any computed face coordinate equals the chassis wall coordinate exactly → a
 
 | Feature | File | Coplanar face | Fix |
 |---------|------|--------------|-----|
-| Flip_Single hinge pillars | `RenderBox.scad` | Left/right outer X at ±w/2; back Y at l/2 | `sw*3 - EPS` width, `clip_od - EPS` depth |
-| Flip_Double spine pillars | `RenderBox.scad` | Left/right outer X at ±w/2 | `sw*3 - EPS` width |
+| Flip_Single hinge pillars | `RenderBox.scad` | Left/right outer X at ±w/2; back Y at l/2; bottom at Z=sf | `sw*3-EPS` width, `clip_od-EPS` depth, `sf-EPS` Z, height`+EPS` |
+| Flip_Double spine pillars | `RenderBox.scad` | Left/right outer X at ±w/2; bottom at Z=sf | `sw*3-EPS` width, `sf-EPS` Z, height`+EPS` |
+| Flip_Single/Double diamond latch hull (box) | `RenderBox.scad` | Hull root face at outer wall Y face (±l/2) | `translate([0, ±(l/2-EPS), latch_z])` (see §11i) |
 | Glide lid pull tab | `RenderLid.scad` | +Y face at -lid_l/2 (lid body -Y) | translate Y += EPS |
 | Latch arm on Flip lid | `RenderLid.scad` | Bottom face at Z=0 (lid flat face) | translate Z -= EPS |
 | Thumb notch in box end wall | `RenderBox.scad` | Top face at groove_z (groove cutter bottom) | translate Z += EPS |
@@ -1162,3 +1163,39 @@ functional dimension.
 **Detection rule:** Any two `union()` additions that use the same dimension expression for the same
 axis — check their end faces. If both end at ±X, ±Y, or ±Z with the same arithmetic result, one
 needs `− EPS` on that dimension.
+
+### §11i — Addition translated to exact container wall face
+
+When a `union()` addition (diamond latch, boss, pull tab) is translated so its root face lands
+**exactly** on the container's outer wall face, CGAL sees two co-planar boundary faces at that
+plane and produces non-manifold edges along the perimeter of the overlap.
+
+```scad
+// BAD — hull root (relative y=0) at absolute y = -l/2 = front wall outer face ✗
+translate([0, -l/2, latch_z])
+    hull() {
+        translate([0, 0, 0.8]) cuboid([w-sw*4, 0.1, ...]);  // y=0 → absolute y=-l/2 ✗
+        translate([0, -0.8, 0]) cuboid([...]);
+    }
+
+// GOOD — root face at -l/2+EPS = just inside wall material ✓
+translate([0, -l/2 + EPS, latch_z])
+    hull() { ... }  // same geometry, +EPS offset so root is interior, not coplanar
+```
+
+For bilateral features (Flip_Double, ±Y symmetric): `translate([0, sy * (l/2 - EPS), latch_z])`.
+
+**Also applies to the floor**: any pillar or boss with `anchor=BOTTOM` placed at Z=sf (floor top
+face) is coplanar with the floor top. Fix: translate to `sf - EPS`, increase height by `EPS` to
+keep the top at the same position.
+
+```scad
+// BAD — pillar bottom at sf = floor top face ✗
+translate([x, y, sf]) cuboid([w, d, h], anchor=BOTTOM);
+
+// GOOD — pillar sunk EPS into floor, height += EPS so top stays at axle crown ✓
+translate([x, y, sf - EPS]) cuboid([w, d, h + EPS], anchor=BOTTOM);
+```
+
+**Detection rule:** Any `translate([..., sf])` with `anchor=BOTTOM` placing a feature on the
+floor top — add `- EPS` to the Z translation and `+ EPS` to the height.
