@@ -29,9 +29,11 @@
 //   Lid:     Plain flat top, thinner (p_t nominal).
 //   Lid_Peg: Two pegs on back face, sized to snap-fit tolerance. Thinner (p_t nominal).
 //
-// Peg hole punch (Lid_Peg):
-//   module plaque_get_peg_holes(data, phys) — call inside a difference() in the lid
-//   factory to punch matching holes. Positioned for centred ±p_h/4 spacing in Z.
+// Peg mount integration (Lid_Peg) — two-step pattern for meshed lids:
+//   1. union()      → plaque_peg_patch(data, phys, lid_depth)  — solid fill at peg sites
+//   2. difference() → plaque_get_peg_holes(data, phys)         — punch holes through patch
+//   Patch is required because mesh lids have open cells; a hole in empty air grips nothing.
+//   Both modules take the same translate() to position the plaque on the lid surface.
 //
 // All pieces print support-free in their shipped orientations.
 // ==============================================================================
@@ -133,12 +135,37 @@ module _pl_pegs(p_h, peg_tol) {
                     chamfer2 = peg_d * 0.2, anchor = BOTTOM, $fn = 24);
 }
 
-// ── Public: hole pattern to punch in a lid for Lid_Peg mount ─────────────────
-// Call inside difference() in the lid factory, positioned at the plaque location.
-// Holes are centred at X=0, Z = p_h/2 ± p_h/4, Y depth = peg_h + EPS.
-// Caller must translate to the desired XYZ position on the lid surface first.
-module plaque_get_peg_holes(data, phys) {
+// ── Public: solid patch for Lid_Peg mount ────────────────────────────────────
+// Lids may be meshed. A peg hole punched into an open mesh cell has nothing to
+// grip. Call plaque_peg_patch() in the lid factory's union() BEFORE the mesh
+// subtraction to guarantee solid material at every peg location.
+//
+// Usage pattern in a lid factory:
+//   difference() {
+//     union() {
+//       apply_master_bounds(...) up(sl/2) framed_mesh(...);  // meshed slab
+//       translate([px, py, 0]) plaque_peg_patch(data, phys, sl); // solid patch
+//     }
+//     translate([px, py, 0]) plaque_get_peg_holes(data, phys);   // hole cutter
+//   }
+//
+// px, py = desired plaque centre on the lid surface (in lid's local XY).
+// Patch is a solid cuboid, full lid depth, slightly larger than each hole.
+module plaque_peg_patch(data, phys, lid_depth) {
     noz     = phys[3][1];
+    p_h     = get_val(PLAQUE_H, data, 40);
+    patch_w = _PL_PEG_D + noz * 6;   // generous margin — covers any mesh cell
+    spacing = p_h / 4;
+    for (sz = [-spacing, spacing])
+        translate([0, 0, p_h / 2 + sz])
+            cuboid([patch_w, lid_depth + EPS2, patch_w], anchor = CENTER);
+}
+
+// ── Public: hole pattern to punch in a lid for Lid_Peg mount ─────────────────
+// Call inside difference() after plaque_peg_patch() has filled the mesh.
+// Holes centred at X=0, Z = p_h/2 ± p_h/4. Depth = _PL_PEG_H + EPS.
+// Caller translates to desired XYZ position on the lid surface.
+module plaque_get_peg_holes(data, phys) {
     p_h     = get_val(PLAQUE_H, data, 40);
     tol     = breathing_room(COMP_CCLIP, data);
     hole_d  = _PL_PEG_D + tol * 2;
