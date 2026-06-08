@@ -1,5 +1,5 @@
 # Session Handoff — MasterTray
-_Last updated: 2026-06-06 — FrankenTray v2 implemented (A/[...] syntax, hub shapes, wall/angle/anchor-to-anchor connections)_
+_Last updated: 2026-06-07 — Pre-Print Test codebase committed (51487cb)_
 
 ---
 
@@ -10,7 +10,7 @@ cd C:\repos\3D\MasterTray
 claude
 ```
 
-Tell Claude: "Read HANDOFF.md and continue."
+Tell Claude: **"Read HANDOFF.md and continue."**
 _(Root-level `HANDOFF.md` is a one-line stub that points here — Claude will find it immediately.)_
 
 ---
@@ -18,113 +18,66 @@ _(Root-level `HANDOFF.md` is a one-line stub that points here — Claude will fi
 ## Branch & State
 
 **Branch:** `refactor/code-clarity-and-safety`
-**Last commit:** `7900ac6` (see `git log --oneline -5` for current)
-**Status:** All committed, NOT pushed.
+**Last commit:** `51487cb` — Pre-Print Test snapshot. All files committed, NOT pushed.
 
 ```
-7900ac6 docs: session handoff — mesh fixes, min_margin next step
-bcc83d6 fix: jar floor strut% now relative to visible inner diameter
-87cf6a1 test: set defaults for strut% visual verification
-4559f87 docs: clarify strut% vs hole spacing semantics in engine comments
-1b38d52 refactor: remove needs_margin — container geometry owns the solid edge
+51487cb feat: FrankenTray v2 + private box intents + cantilever fix — Pre-Print Test
+c018d82 docs: add handoff history tracking + Astro nav for Status and FrankenTray
+1adaffb docs: FrankenTray v2 spec + updated handoff
+c429fe5 docs: grid layout quick reference in STATUS.md
+79f8370 feat: cycling per-ray heights + fix drop-in grid not generated
 ```
 
-**This session also added (uncommitted):**
-- `HANDOFF.md` root stub → points to `docs/HANDOFF.md`
-- `astro/src/pages/index.astro` — Status + FrankenTray Spec added to nav
-
----
-
-## What Was Done This Session
-
-### 1. Mesh min_margin (`34d84a8`)
-- `mesh_params` now returns `min_m = noz × wall_loops` as `cfg[5]`
-- `framed_mesh`: `eff_w/eff_l = w/l − 2×min_m` before strut% applies
-- `cylindrical_mesh_wall`: `eff_h = h − 2×min_m`, `z_offset = min_m + centred strut gap`
-- Guarantees solid structural ring at jar neck, box lip, floor/wall bond — even at strut=0%
-
-### 2. Radial poke-through height (`3b39703`)
-- `R4/80` or `R4/150%` — spokes extend above jar mouth (pencil holder use case)
-- `C15%/120%` — hub height independent of spoke height
-- Clamped for threaded jars and closed containers; allowed for open jars
-- Fixed pre-existing `is_closed` bug: TYPE defaulted to BOX in jar context → was silently clamping all jar grid heights
-
-### 3. Per-ray cycling heights + drop-in grid fix (`79f8370`)
-- `R4/80,55` — alternating tall/short spokes (crown effect); cycles `heights[i % len]`
-- `cfg[1][3]` is now always a list of heights
-- Drop-in grid was never added to main intents — fixed with `maybe_dropin_grid()` helper
-  - Wired into: Open Jar, Jar with Lid, Threaded Jar, Simple Jar, Box, Standalone Box, Simple Tray, Flip Box, Double Flip Box
-  - Invalid grid_layout strings (`"Hello world"`) silently produce no grid
-  - W≠L jar builds emit one correctly-sized grid per jar diameter
-
-### 4. Render colorscheme
-- All render commands switched from `Tomorrow` to `DeepOcean`
-- Back-faces (inner surfaces through mesh holes) render red — inverted normals immediately visible
-
-### 5. FrankenTray v2 spec written
-- `docs/FRANKENTRAY_SPEC.md` — full design spec, ready for implementation
-- NOT implemented yet — spec only
-
----
-
-## IMMEDIATE NEXT STEP
-
-FrankenTray v2 is **done** (commit `d1328f5`). All primitives complete.
-
-Open items: see Open Code Items table below, or look at known bugs in `docs/BUGS.md`.
-
----
-
-## Test Defaults (leave in MasterBuilder.scad)
-
-```scad
-part_width = 54.5;  part_length = 54;  part_height = 55;
-mesh_hole_size = 1.6;   mesh_hole_spacing = 1.2;
-strut_wall_perc  =  0;
-strut_floor_perc = 25;
-strut_lid_perc   = 75;
+**Untracked (leave alone):**
+```
+?? .claude/settings.json
+?? astro/.vscode/
+?? build.pl
+?? output/
 ```
 
-**Render command (PowerShell):**
-```powershell
-$o = "C:\Program Files\OpenSCAD\openscad.com"
-& $o -o output/test.png --render --camera=80,0,30,55,0,20,500 --colorscheme=DeepOcean -D 'Part_To_Build="Jar with Lid"' MasterBuilder.scad
-```
-
-**Color guide (DeepOcean):** blue = outer faces (correct), red = inner faces through holes (normal), magenta = geometry problem.
-
 ---
 
-## Key Architecture Rules
+## What This Session Did
 
-| Rule | Where |
-|------|-------|
-| strut% applies within safe zone (after min_margin) | RenderMesh.scad header |
-| min_margin = noz × wall_loops, guaranteed at every structural edge | RenderMesh.scad `mesh_params` |
-| Container geometry owns the structural edge (not the mesh) | MasterEngine.scad `get_mesh_cfg` |
-| Jar floor mesh uses inner_d (w − sw×2), not outer w | RenderJar.scad |
-| ray_heights in cfg[1][3] is always a LIST (even single value) | GridLayout.scad `get_grid_config` |
-| maybe_dropin_grid() is the single place drop-in grids enter the manifest | MasterManifest.scad |
-| Factory IS the implementation — opts drive variants | LESSONS.md §1 |
-| All circle dims are diameters | LESSONS.md §0b |
-| Support-free always | LESSONS.md §0c |
+### 1. Private box intent architecture
+`MasterManifest.scad` restructured so each lid variant is a self-contained private intent.
+Public aggregators (Box, Jar) read checkbox flags and fan out via `compile_manifest()`.
 
----
+Private box intents:
+- `Snap Box (External)` / `Snap Box (Internal)`
+- `Glide Box (External)` / `Glide Box (Internal)`
+- `Flip Box (Single)` / `Flip Box (Double)`
 
-## Key Files
+`Flip Box (Double)` uses `flip_half_lid_l(data) = LENGTH/2 - flip_hinge_y` — half-lids.
+Single-flip and pill boxes use `flip_lid_l(data) = LENGTH - flip_hinge_y`.
 
-| File | Purpose |
-|------|---------|
-| `MasterBuilder.scad` | Customizer UI — USE THIS |
-| `MasterManifest.scad` | Intent → component list; `maybe_dropin_grid()` helper |
-| `MasterEngine.scad` | Physics getters, `get_mesh_cfg`, `get_grid_step` |
-| `GridLayout.scad` | Grid string parser — all token types including FrankenTray v2 (pending) |
-| `RenderMesh.scad` | `framed_mesh` + `cylindrical_mesh_wall` with min_margin |
-| `RenderGrid.scad` | Grid factories; `_render_radial_core` with cycling heights |
-| `RenderRib.scad` | FrankenTray renderer — v1 exists, v2 pending |
-| `docs/FRANKENTRAY_SPEC.md` | FrankenTray v2 design spec |
-| `docs/STATUS.md` | Human-readable project status + grid layout quick reference |
-| `docs/BUGS.md` | B1 (sqrt scaling), B2 (screw lid height) |
+### 2. New MasterEnum constants
+`SNAP_EXTERNAL`, `SNAP_INTERNAL`, `GLIDE_EXTERNAL`, `GLIDE_INTERNAL`,
+`BUILD_FLIP_SINGLE`, `BUILD_FLIP_DOUBLE` — replaced deleted `BUILD_GLIDE`.
+
+### 3. MasterBuilder ui_payload fixed
+Old references to deleted variables (`Glide`, `lid_glide_direction`, `lid_glide_snap`,
+`lid_style`) replaced with new variables.
+
+### 4. % coordinates in FrankenTray v2
+`parse_anchor_def` extended to 8 elements with `x_is_perc` / `y_is_perc` flags.
+Helpers `_anchor_sw_mm(val, is_perc, int_dim)` and `_anchor_center_mm(val, is_perc, int_dim)`.
+All 4 RenderRib.scad + 1 RenderGrid.scad call sites updated from `_sw_to_mm` to `_anchor_center_mm`.
+
+### 5. Grid bounds validation
+`grid_bounds_ok(g_str, data)` added to GridLayout.scad.
+`has_grid(data)` now calls it — if any anchor is outside container interior, returns false.
+Console echo: `*** GRID SPECIFICATION OUT OF BOUNDS — anchor(s) [...] exceed interior (...). NO GRID WILL BE GENERATED. ***`
+
+### 6. EPS overlap fixes (slicer shell separation)
+- Snap lid bead: lowered to `sl - EPS`, height increased by EPS.
+- Flip lid diamond latch: Y-shifted by `+EPS` so latch body overlaps into lid.
+
+### 7. C-clip hinge cantilever fix
+Slot changed from `translate([0, 0, +clip_outer_d/2])` → `translate([0, 0, -clip_outer_d/2])`.
+Arc now opens downward → arms point toward lid body → self-supporting when printed face-down.
+Fixes Bambu Studio floating cantilever warning on STL_12 and STL_13 (Flip_Double half-lids).
 
 ---
 
@@ -141,6 +94,19 @@ $o = "C:\Program Files\OpenSCAD\openscad.com"
 
 ---
 
+## Immediate Next Step
+
+**Wait for print results.** The full plate (21 items — 5 box types × box+lid+builtin variants,
+Flip_Double 2 half-lids, 2 drop-in grids) was sent to Bambu A1.
+
+After print:
+1. Evaluate lid retention forces, hinge snap, latch click.
+2. Push branch + open PR.
+3. Fix open items (F15, F6, F14 — see table below).
+4. UI polish: expose SNAP_EXTERNAL/INTERNAL etc. as Customizer checkboxes.
+
+---
+
 ## Open Code Items
 
 | ID | File | Issue |
@@ -151,12 +117,60 @@ $o = "C:\Program Files\OpenSCAD\openscad.com"
 
 ---
 
-## Uncommitted / Untracked
+## Test Defaults (leave in MasterBuilder.scad)
 
+```scad
+part_width = 54.5;  part_length = 54;  part_height = 55;
+mesh_hole_size = 1.6;   mesh_hole_spacing = 1.2;
+strut_wall_perc  =  0;
+strut_floor_perc = 25;
+strut_lid_perc   = 75;
 ```
- M gemini               ← leave alone (unrelated)
-?? .claude/settings.json
-?? astro/.vscode/
-?? build.pl
-?? output/             ← render outputs, not tracked
+
+**Render command (PowerShell):**
+```powershell
+$o = "C:\Program Files\OpenSCAD\openscad.com"
+& $o -o output/test.png --render --camera=80,0,30,55,0,20,500 --colorscheme=DeepOcean -D 'Part_To_Build="Box"' MasterBuilder.scad
 ```
+
+**Color guide (DeepOcean):** blue = outer faces (correct), red = inner faces through holes (normal), magenta = geometry problem.
+
+---
+
+## Key Architecture Rules
+
+| Rule | Where |
+|------|-------|
+| Private intents are self-contained; aggregators fan out | MasterManifest.scad |
+| Drop-in grids emitted once by aggregator, never inside private intents | MasterManifest.scad |
+| Threaded Jar: no drop-in grids (screw neck blocks access) | MasterManifest.scad |
+| `flip_half_lid_l` for Double half-lids only; `flip_lid_l` for all others | MasterManifest.scad |
+| EPS overlap on all boolean union geometry — face-to-face = slicer shells | RenderLid.scad |
+| C-clip slot at -Z (bottom of arc) → self-supporting face-down | RenderLid.scad |
+| `_anchor_center_mm(val, is_perc, int_dim)` at all anchor call sites | RenderRib, RenderGrid |
+| `grid_bounds_ok` called from `has_grid` — bad bounds = no grid + CAPS echo | GridLayout.scad |
+| strut% applies within safe zone (after min_margin) | RenderMesh.scad header |
+| Container geometry owns the structural edge (not the mesh) | MasterEngine.scad |
+| ray_heights in cfg[1][3] is always a LIST | GridLayout.scad |
+| Factory IS the implementation — opts drive variants | LESSONS.md §1 |
+| All circle dims are diameters | LESSONS.md §0b |
+| Support-free always | LESSONS.md §0c |
+
+---
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `MasterBuilder.scad` | Customizer UI — USE THIS |
+| `MasterManifest.scad` | Intent compiler; private intents + aggregators |
+| `MasterEngine.scad` | Physics getters, `get_mesh_cfg`, `get_grid_step` |
+| `MasterEnum.scad` | All string constants |
+| `GridLayout.scad` | Grid string parser — cartesian, span, radial, FrankenTray v2 |
+| `RenderMesh.scad` | `framed_mesh` + `cylindrical_mesh_wall` with min_margin |
+| `RenderGrid.scad` | Grid factories; radial with cycling heights |
+| `RenderRib.scad` | FrankenTray v2 renderer |
+| `RenderLid.scad` | All lid types — Snap, Glide, Flip_Single, Screw, Slip |
+| `docs/FRANKENTRAY_SPEC.md` | FrankenTray v2 design spec |
+| `docs/STATUS.md` | Human-readable project status + grid layout quick reference |
+| `docs/BUGS.md` | B1 (sqrt scaling), B2 (screw lid height) |
