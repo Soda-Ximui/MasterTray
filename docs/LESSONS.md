@@ -1135,16 +1135,29 @@ Both have X end faces at exactly ±clip_len/2. In the overlap region in YZ, the 
 After the outer `difference()` subtracts the bore and C-opening, the remaining connection block
 still has X faces at ±clip_len/2 coplanar with the cylinder's chamfered ends.
 
-**Fix:** Shrink the connection block by `EPS` so its ends are inside the cylinder ends:
+**Fix:** Extend the cylinder by `EPS2` so it protrudes `EPS` past the block on each side, burying
+the block X face inside the cylinder solid:
 
 ```scad
-cuboid([clip_len - EPS, ...], anchor=CENTER);  // X extent: ±(clip_len/2 − EPS/2) ✓
+// BAD — block and cylinder both end at ±clip_len/2 → coplanar ✗
+yrot(90) cyl(d=clip_outer_d, h=clip_len, chamfer=noz*3, $fn=36);
+cuboid([clip_len, ...], anchor=CENTER);
+
+// GOOD — cylinder ends at ±(clip_len/2+EPS); block face at ±clip_len/2 is interior ✓
+yrot(90) cyl(d=clip_outer_d, h=clip_len+EPS2, chamfer=noz*3, $fn=36);
+cuboid([clip_len, ...], anchor=CENTER);
 ```
 
-The cylinder ends at ±clip_len/2 are now EPS/2 outside the block. No coplanar face.
+The block X face at ±clip_len/2 is now inside the cylinder solid → interior to the union → not on
+the boundary → no coplanar issue.
 
-**Which to shrink?** Shrink the STRUCTURAL piece (the foot), not the functional piece (the cylinder
-whose length determines the hinge gap and must match the box boss spacing).
+**Direction matters — DO NOT shrink the block instead.** Shrinking to `clip_len - EPS` leaves an
+EPS/2 = 0.05mm sliver between block end and cylinder end. CGAL treats near-zero-thickness geometry
+as degenerate and produces MORE non-manifold edges, not fewer. Always extend the OUTER shape
+(cylinder) so the inner shape (block) is fully enclosed.
+
+**Which to extend?** Extend the outer/larger piece. Keep the structural piece (the block) at its
+functional dimension.
 
 **Detection rule:** Any two `union()` additions that use the same dimension expression for the same
 axis — check their end faces. If both end at ±X, ±Y, or ±Z with the same arithmetic result, one
