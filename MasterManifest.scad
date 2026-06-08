@@ -228,7 +228,7 @@ function compile_manifest(intent, data) =
     concat(
       [["BOX", d0,                               [["LID_TYPE", "Flip_Double"]], phys],
        ["LID", concat([[LENGTH, lid_l]], dl),    [["LID_TYPE", "Flip_Single"]], phys],
-       ["LID", concat([[LENGTH, lid_l]], dl),    [["LID_TYPE", "Flip_Single"], ["MIRROR_Y", true]], phys]],
+       ["LID", concat([[LENGTH, lid_l]], dl),    [["LID_TYPE", "Flip_Single"]], phys]],
       hg ? [["BOX", d1, [["LID_TYPE", "Flip_Double"]], phys]] : []
     )
   :
@@ -254,7 +254,7 @@ function compile_manifest(intent, data) =
     [
       ["BOX", box_d,                                                                    [["LID_TYPE", "Flip_Double"]], phys],
       ["LID", concat([[LENGTH, lid_l], [WIDTH, w - 0.6], [PLAQUE_TEXT, "AM"]], data),  [["LID_TYPE", "Flip_Single"]], phys],
-      ["LID", concat([[LENGTH, lid_l], [WIDTH, w - 0.6], [PLAQUE_TEXT, "PM"]], data),  [["LID_TYPE", "Flip_Single"], ["MIRROR_Y", true]], phys]
+      ["LID", concat([[LENGTH, lid_l], [WIDTH, w - 0.6], [PLAQUE_TEXT, "PM"]], data),  [["LID_TYPE", "Flip_Single"]], phys]
     ]
   :
   (intent == "1-Day 2-Compartment (Single Lid)") ?
@@ -290,7 +290,7 @@ function compile_manifest(intent, data) =
       [for (i = [0:6])
         ["LID", concat([[WIDTH, cw - 0.6], [LENGTH, lid_l], [PLAQUE_TEXT, str(days[i], " AM")]], data), [["LID_TYPE", "Flip_Single"]], phys]],
       [for (i = [0:6])
-        ["LID", concat([[WIDTH, cw - 0.6], [LENGTH, lid_l], [PLAQUE_TEXT, str(days[i], " PM")]], data), [["LID_TYPE", "Flip_Single"], ["MIRROR_Y", true]], phys]]
+        ["LID", concat([[WIDTH, cw - 0.6], [LENGTH, lid_l], [PLAQUE_TEXT, str(days[i], " PM")]], data), [["LID_TYPE", "Flip_Single"]], phys]]
     )
   :
   (intent == "Pillbox Set (Double Lid)") ?
@@ -545,10 +545,10 @@ function compile_manifest(intent, data) =
       // Flip Single — one lid, C-clip hinge +Y, diamond latch −Y
       ["BOX", data, [["LID_TYPE", "Flip_Single"]], phys],
       ["LID", data, [["LID_TYPE", "Flip_Single"]], phys],
-      // Flip Double — two lids opening from centre spine; second lid is mirror of first
+      // Flip Double — two lids opening from centre spine
       ["BOX", data, [["LID_TYPE", "Flip_Double"]], phys],
       ["LID", concat([[LENGTH, lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys],
-      ["LID", concat([[LENGTH, lid_l]], data), [["LID_TYPE", "Flip_Single"], ["MIRROR_Y", true]], phys]
+      ["LID", concat([[LENGTH, lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys]
     ]
   :
 

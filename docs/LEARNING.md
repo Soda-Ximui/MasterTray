@@ -100,3 +100,20 @@ The same logic was applied to the plaque face plate socket: p_t_eff = max(p_t, o
 
 General rule captured: when a round feature (ball, socket, cylinder) doesn't fit within its host body, thicken the host rather than adding a rib or repositioning the feature. Ribs are the fallback when host geometry is constrained by mating parts.
 
+
+---
+
+ISSUE: Snap bead hung by a thread — printed but didn't click (2026-06-08)
+
+Physical print test: the snap lid bead printed but was barely there, "hanging on edge by a thread." The lid fell through.
+
+The autopsy: bead center at `lid_w/2 - sw/2`, bead width `sw`. Bead outer face at exactly `lid_w/2` (lid body edge). With `chamfer=bead_h/2` on ALL edges, the chamfer cuts the outer-X faces inward by bead_h/2 at the top and bottom of the bead. At mid-height the bead reaches `lid_w/2` but the lid body's top chamfer (`m_chamf`) has already inset the lid edge there. The bead never truly protrudes past the lid body — it was a thin strip at the exact edge, barely connected, with zero cam-over protrusion. No click was geometrically possible.
+
+The fix: `snap_protr = noz`. Bead translate: `sx * (lid_w/2 + clearance/2 + snap_protr - sw/2)`. The `clearance/2` term offsets lid_w's built-in tolerance gap so the bead's inner face starts at the box interior wall; `snap_protr = noz` extends it a further nozzle-width into the box wall. Bead outer face = `(w-sw*2)/2 + noz`, protruding `noz` past the box interior face. The all-edges chamfer provides cam-over action on both press-in and pull-out.
+
+Note: the snap bead must protrude past the lid body edge by at LEAST the chamfer radius (bead_h/2) or it will vanish into the chamfer geometry and produce zero retention.
+
+ISSUE: Flip_Double half-lid length — used full-box formula (2026-06-08)
+
+Physical print: Flip_Double half-lids were the correct direction but "exceeded by a big margin." The manifest used `flip_lid_l = l - hinge_y` (nearly full box length) for half-lids. The correct formula is `flip_half_lid_l = l/2 - hinge_y` — each lid covers from its inner axle to the outer wall. Fixed in all Flip_Double intents (Double Flip Box, 1-Day AM/PM, 14-Day AM/PM, Lid Testing).
+

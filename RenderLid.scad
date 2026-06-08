@@ -25,13 +25,9 @@ module factory_render_lid(data, opts, phys) {
     lid_type  = get_val("LID_TYPE",  opts, "Slip");
     glide_dir = get_val(GLIDE_DIR,   data, "H");
     glide_snap = get_val(GLIDE_SNAP, data, "Ball");
-    mirror_y  = get_val("MIRROR_Y",  opts, false);
     filament  = get_val("FILAMENT_TYPE", data, "PETG");
 
-    echo(str("-> Factory [LID] | type=", lid_type, " glide_dir=", glide_dir, " snap=", glide_snap,
-             mirror_y ? " [MIRROR_Y]" : ""));
-
-    scale([1, mirror_y ? -1 : 1, 1]) {
+    echo(str("-> Factory [LID] | type=", lid_type, " glide_dir=", glide_dir, " snap=", glide_snap));
 
     // Ball catch shared dims (Snap + Glide Ball modes).
     // Scales with box footprint so large lids get proportionally stronger retention.
@@ -198,5 +194,4 @@ module factory_render_lid(data, opts, phys) {
                                     get_mesh_cfg(data, HOLE_LID, STRUT_LID));
     }
 
-    } // end scale([1, mirror_y ? -1 : 1, 1])
 }
