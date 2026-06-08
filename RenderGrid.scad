@@ -172,9 +172,14 @@ module render_box_grid_core(data, is_builtin=false) {
     cfg       = get_grid_config(data);
     cols      = cfg[0][0]; rows = cfg[0][1];
     spans     = cfg[2];
-    // Base only for drop-in — built-in grids sit on the tray floor already
+    // Base only for drop-in — built-in grids sit on the tray floor already.
+    // "No base" still gets one layer of thickness so all ribs weld into a single
+    // manifold body — prevents the slicer from splitting disconnected ribs into
+    // separate objects when the user does "split to parts".
     has_base  = !is_builtin && cfg[3];
-    base_t    = has_base ? cfg[4] : 0;
+    // EPS-thin skin fuses disconnected ribs into one manifold body in the STL.
+    // Sub-layer thickness → slicer discards it silently, nothing prints.
+    base_t    = has_base ? cfg[4] : (is_builtin ? 0 : EPS);
     default_h = is_builtin ? get_val(GRID_WALL_H, data, bh - sf)
               : (dim_mode == "Usable") ? bh - tf - tl - tol
               : cfg[5];
@@ -224,9 +229,10 @@ module render_jar_grid_core(data, is_builtin=false) {
     int_h = round(int_h_raw / lh) * lh;   // force layer alignment on the result
     int_d = (dim_mode == "Usable") ? bw - tw*2 - tol : bw - sw*2 - tol;
     cfg      = get_grid_config(data);
-    // Base only for drop-in jar grids
+    // Base only for drop-in jar grids. "No base" still gets one layer so all
+    // radial spokes weld into a single manifold body in the slicer.
     has_base = !is_builtin && cfg[3];
-    base_t   = has_base ? cfg[4] : 0;
+    base_t   = has_base ? cfg[4] : (is_builtin ? 0 : EPS);
     ray_heights_di = len(cfg[1]) > 3 ? cfg[1][3] : [int_h];
     clip_h = max(concat([int_h], ray_heights_di));
     union() {
@@ -242,23 +248,68 @@ module render_jar_grid_core(data, is_builtin=false) {
 // factory_render_grid — drop-in grid factory (called from manifest).
 // Standalone printable piece — outer dims shrunk by GRID_DROP_IN_TOL.
 // IS_JAR_GRID in opts → rectangular grid clipped to jar cylinder.
+// When GRID_MOD_HINTS is true, emits thin marker discs above shaped hub tops so
+// the slicer "split to objects" workflow can select them as modifier volumes.
+// Discs are topologically disconnected (float at hub_h + EPS) so they don't fuse.
 module factory_render_grid(data, opts, phys) {
-    g_str  = get_val(GRID_LAYOUT, data, "");
-    rays   = parse_radial_rays(g_str);
-    is_jar = get_val(IS_JAR_GRID, opts, false);
-    // Inject IS_JAR_GRID into data so render_box_grid_core can read it
-    d = is_jar ? concat([[IS_JAR_GRID, true]], data) : data;
+    g_str    = get_val(GRID_LAYOUT, data, "");
+    rays     = parse_radial_rays(g_str);
+    is_jar   = get_val(IS_JAR_GRID, opts, false);
+    mod_hint = get_val(GRID_MOD_HINTS, data, true);
+    // Inject IS_JAR_GRID and TYPE so render_box_grid_core + _resolve_height see correct type.
+    // TYPE=BOX_GRID / JAR_GRID → is_closed=false → poke-through heights NOT clamped to max_h.
+    d = is_jar
+        ? concat([[IS_JAR_GRID, true], [TYPE, JAR_GRID]], data)
+        : concat([[TYPE, BOX_GRID]], data);
     echo(str("-> Factory [GRID] | layout='", g_str, "' rays=", rays, " jar=", is_jar));
     if (rays > 0 && !is_jar)
         echo(str("WARNING: layout '", g_str, "' contains radial tokens (R/C) but this is",
                  " not a jar grid — radial dividers ignored. Add IS_JAR_GRID flag or",
                  " remove R/C tokens for box/tray grids."));
-    up(m_safe_floor(d)) {
+    sf = m_safe_floor(d);
+    up(sf) {
         if (rays > 0 && is_jar)
             render_jar_grid_core(d, false);
         else
             render_box_grid_core(d, false);
         cfg = get_grid_config(d);
         up(cfg[4]) render_franken_ribs(d);
+        if (mod_hint) _render_grid_mod_hints(d, sf);
+    }
+}
+
+// _render_grid_mod_hints — thin marker discs floating just above shaped hub tops.
+// Co-located in the same STL as the grid; topologically disconnected so the slicer
+// can "split to objects" and select them as modifier volumes.
+// Discs mark XY footprint and height of each circular hub (C/S/D/T shapes only).
+module _render_grid_mod_hints(data, sf) {
+    sw      = m_safe_wall(data);
+    bw      = m_bw(data); bl = m_bl(data); bh = m_bh(data);
+    tol     = GRID_DROP_IN_TOL;
+    dim_mode = get_val(DIMENSION_MODE, data, "Total");
+    tw      = get_val(THICK_WALL, data, 2.4);
+    tf      = get_val(THICK_FLOOR, data, 2.0);
+    tl      = get_val(THICK_LID,   data, 2.0);
+    int_w   = (dim_mode == "Usable") ? bw - tw*2 - tol : bw - sw*2 - tol;
+    int_l   = (dim_mode == "Usable") ? bl - tw*2 - tol : bl - sw*2 - tol;
+    int_h   = (dim_mode == "Usable") ? bh - tf - tl - tol : bh - sf;
+
+    g_str  = get_val(GRID_LAYOUT, data, "");
+    a_raw  = parse_anchor_tokens(g_str);
+    a_defs = [for (ac = a_raw) parse_anchor_def(ac)];
+
+    for (adef = a_defs) {
+        shape_str  = adef[3];
+        height_str = adef[4];
+        is_center  = adef[5];
+        clip_r = _hub_clip_r(shape_str, sw);
+        if (clip_r > 0) {
+            hub_h = _resolve_height(height_str, int_h, int_h, false);
+            ax = is_center ? 0 : _anchor_center_mm(adef[1], adef[6], int_w);
+            ay = is_center ? 0 : _anchor_center_mm(adef[2], adef[7], int_l);
+            // Disc floats at hub_h + EPS: separate shell from hub top face → slicer splits cleanly
+            translate([ax, ay, hub_h + EPS])
+                cyl(d=clip_r*2 + sw, h=sw*2, anchor=BOTTOM);
+        }
     }
 }

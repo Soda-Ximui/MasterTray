@@ -21,6 +21,27 @@ include <MasterEngine.scad>
 include <RenderMesh.scad>
 include <RenderGrid.scad>
 
+// render_wall_face — wall mesh slab with mandatory solid top margin.
+// Replaces a bare framed_mesh call for walls: splits into meshed lower band
+// and solid upper band so lid-mechanism zones are always hole-free.
+// face_w: span of wall face (container width or length).
+// face_h: height of wall face.
+// wall_t: wall thickness.
+// Called after xrot(90)/zrot(90) already applied by the parent translate.
+module render_wall_face(data, face_w, face_h, wall_t) {
+    top_margin = get_val(MESH_TOP_MARGIN, data, 0);
+    mesh_cfg   = get_mesh_cfg(data, HOLE_WALL, STRUT_WALL);
+    h_mesh = max(0, face_h - top_margin);
+    // Lower meshed band
+    if (h_mesh > 0)
+        translate([0, -face_h/2 + h_mesh/2, 0])
+            framed_mesh(data, face_w, h_mesh, wall_t, false, mesh_cfg);
+    // Upper solid band — always solid regardless of strut_wall_perc
+    if (top_margin > 0 && top_margin <= face_h)
+        translate([0, face_h/2 - top_margin/2, 0])
+            framed_mesh(data, face_w, top_margin, wall_t, false);
+}
+
 // core_tray_chassis — hollow floor + four walls. No corner clipping.
 // Called by factory_render_tray and by RenderBox (which applies its own bounds).
 module core_tray_chassis(data) {
@@ -37,13 +58,13 @@ module core_tray_chassis(data) {
         up(sf / 2)
             framed_mesh(data, w, l, sf, false, get_mesh_cfg(data, HOLE_FLOOR, STRUT_FLOOR));
         translate([0, -l/2 + sw/2, sf + h_front/2])
-            xrot(90) framed_mesh(data, w, h_front, sw, false, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL));
+            xrot(90) render_wall_face(data, w, h_front, sw);
         translate([0,  l/2 - sw/2, sf + h_back/2])
-            xrot(90) framed_mesh(data, w, h_back,  sw, false, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL));
+            xrot(90) render_wall_face(data, w, h_back,  sw);
         translate([-w/2 + sw/2, 0, sf + h_left/2])
-            zrot(90) xrot(90) framed_mesh(data, l, h_left,  sw, false, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL));
+            zrot(90) xrot(90) render_wall_face(data, l, h_left,  sw);
         translate([ w/2 - sw/2, 0, sf + h_right/2])
-            zrot(90) xrot(90) framed_mesh(data, l, h_right, sw, false, get_mesh_cfg(data, HOLE_WALL, STRUT_WALL));
+            zrot(90) xrot(90) render_wall_face(data, l, h_right, sw);
         // Built-in grid — fused to chassis, height capped by GRID_WALL_H in data
         render_internal_grid(data);
     }

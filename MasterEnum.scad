@@ -54,6 +54,7 @@ JAR_SHAPE    = "JAR_SHAPE";
 JAR_SIDES    = "JAR_SIDES";
 GLIDE_DIR      = "GLIDE_DIR";   // "H" (horizontal) | "V" (vertical)
 GLIDE_SNAP     = "GLIDE_SNAP"; // "Ball" (default) | "Tab"
+LID_STYLE      = "LID_STYLE";  // "External" (default) | "Rabbet" (inside groove, flush top)
 GRID_WALL_H    = "GRID_WALL_H";  // injected by factory — max divider height
 IS_JAR_GRID    = "IS_JAR_GRID"; // clip cartesian grid to circular jar boundary
 STACKABLE      = "STACKABLE";
@@ -64,6 +65,17 @@ PEG_SOCKET_D   = "PEG_SOCKET_D";  // mm — peg/socket hole diameter
 LEDGE_DEPTH    = "LEDGE_DEPTH";   // mm — nesting ledge height below floor
 PEG_PROTRUSION = "PEG_PROTRUSION"; // mm — builtin peg height above tray top (0=auto)
 HAS_BUILTIN_GRID = "HAS_BUILTIN_GRID";
+GRID_MOD_HINTS   = "GRID_MOD_HINTS";  // emit modifier-hint bodies alongside drop-in grids
+MESH_TOP_MARGIN  = "MESH_TOP_MARGIN"; // injected by factory — mm of solid at top of box walls
+SNAP_EXTERNAL    = "SNAP_EXTERNAL";   // Box intent: generate Snap lid, external (default style)
+SNAP_INTERNAL    = "SNAP_INTERNAL";   // Box intent: generate Snap lid, internal (Rabbet/flush style)
+GLIDE_EXTERNAL   = "GLIDE_EXTERNAL";  // Box intent: generate Glide lid, external
+GLIDE_INTERNAL   = "GLIDE_INTERNAL";  // Box intent: generate Glide lid, internal (Rabbet/flush style)
+BUILD_FLIP_SINGLE = "BUILD_FLIP_SINGLE"; // Box intent: also generate Flip_Single box+lid
+BUILD_FLIP_DOUBLE = "BUILD_FLIP_DOUBLE"; // Box intent: also generate Flip_Double box+lids
+STACK_NESTING    = "STACK_NESTING";   // Simple Tray intent: also generate nesting (Snap) variant
+STACK_PEG        = "STACK_PEG";       // Simple Tray intent: also generate peg-stackable variant
+JAR_WITH_LID     = "JAR_WITH_LID";    // Jar intent checkbox: true = threaded jar + screw lid
 
 BOX = "BOX";
 LID = "LID";

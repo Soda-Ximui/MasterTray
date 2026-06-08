@@ -23,7 +23,7 @@ include <GridLayout.scad>
 // has_grid — true when grid_layout is non-empty and valid.
 function has_grid(data) =
   let(g = m_grid_layout(data))
-  g != "" && is_valid_grid_layout(g);
+  g != "" && is_valid_grid_layout(g) && grid_bounds_ok(g, data);
 
 // grid_variants — when grid_layout is present, returns two drop-in GRID entries:
 //   one without a base plate and one with.
@@ -71,98 +71,20 @@ function flip_hinge_y(data) =
       spine_gap  = breathing_room(COMP_SPINE, data))
   (4.0 + clearance*2 + get_val(NOZZLE_DIAMETER, data, 0.4)*8) / 2 + spine_gap;
 
-function flip_lid_l(data) = get_val(LENGTH, data, LENGTH0) - flip_hinge_y(data);
+function flip_lid_l(data)      = get_val(LENGTH, data, LENGTH0) - flip_hinge_y(data);
+// Half-lid length for Flip_Double: spine is centred, each lid covers one half.
+function flip_half_lid_l(data) = get_val(LENGTH, data, LENGTH0) / 2 - flip_hinge_y(data);
 
 function compile_manifest(intent, data) =
 
-  // ── JAR INTENTS ─────────────────────────────────────────────────────────────
-  // Grid behaviour: when grid_layout is present, every jar intent emits:
-  //   JAR (no built-in grid)  +  JAR (fused built-in grid)
-  //   + GRID (drop-in, no base)  +  GRID (drop-in, with base)
-  // For W≠L jars each group is duplicated per diameter.
-  // The lid is only emitted once — it is the same regardless of grid variant.
+  // ── JAR PRIVATE INTENTS ─────────────────────────────────────────────────────
+  // "Open Jar"    — accessible top: plain + built-in grid + drop-in grids.
+  // "Threaded Jar" — screw lid always on: plain + built-in grid. NO drop-in
+  //                  (insert can't be accessed through the screw neck).
+  // W≠L: both diameters built. Screw lid is diameter-independent → emitted once.
 
-  (intent == "Threaded Jar") ?
-    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0),
-        phys = get_physics_profile(data),
-        hg   = has_grid(data),
-        d0   = concat([[HAS_BUILTIN_GRID, false]], data),
-        d1   = concat([[HAS_BUILTIN_GRID, true]],  data))
-    concat(
-      (w == l) ? [
-        ["JAR", d0,                       jar_opts([["IS_THREADED", true]], data), phys],
-        ["LID", data,                     [["LID_TYPE", "Screw"]],                 phys]
-      ] : [
-        ["JAR", concat([[WIDTH, w]], d0), jar_opts([["IS_THREADED", true]], data), phys],
-        ["JAR", concat([[WIDTH, l]], d0), jar_opts([["IS_THREADED", true]], data), phys]
-      ],
-      hg ? (w == l ? [
-        ["JAR", d1,                       jar_opts([["IS_THREADED", true]], data), phys]
-      ] : [
-        ["JAR", concat([[WIDTH, w]], d1), jar_opts([["IS_THREADED", true]], data), phys],
-        ["JAR", concat([[WIDTH, l]], d1), jar_opts([["IS_THREADED", true]], data), phys]
-      ]) : [],
-      w == l
-        ? grid_variants(data, phys, true)
-        : concat(grid_variants(concat([[WIDTH, w]], data), phys, true),
-                 grid_variants(concat([[WIDTH, l]], data), phys, true))
-    )
-  :
-  (intent == "Jar with Lid") ?
-    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0),
-        phys = get_physics_profile(data),
-        hg   = has_grid(data),
-        d0   = concat([[HAS_BUILTIN_GRID, false]], data),
-        d1   = concat([[HAS_BUILTIN_GRID, true]],  data))
-    concat(
-      (w == l) ? [
-        ["JAR", d0,   jar_opts([["IS_THREADED", true]], data), phys],
-        ["LID", data, [["LID_TYPE", "Screw"]],                 phys]
-      ] : [
-        ["JAR", concat([[WIDTH, w]], d0),   jar_opts([["IS_THREADED", true]], data), phys],
-        ["LID", concat([[WIDTH, w]], data), [["LID_TYPE", "Screw"]],                phys],
-        ["JAR", concat([[WIDTH, l]], d0),   jar_opts([["IS_THREADED", true]], data), phys],
-        ["LID", concat([[WIDTH, l]], data), [["LID_TYPE", "Screw"]],                phys]
-      ],
-      hg ? (w == l ? [
-        ["JAR", d1, jar_opts([["IS_THREADED", true]], data), phys]
-      ] : [
-        ["JAR", concat([[WIDTH, w]], d1), jar_opts([["IS_THREADED", true]], data), phys],
-        ["JAR", concat([[WIDTH, l]], d1), jar_opts([["IS_THREADED", true]], data), phys]
-      ]) : [],
-      w == l
-        ? grid_variants(data, phys, true)
-        : concat(grid_variants(concat([[WIDTH, w]], data), phys, true),
-                 grid_variants(concat([[WIDTH, l]], data), phys, true))
-    )
-  :
-  (intent == "Simple Jar") ?
-    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0),
-        phys = get_physics_profile(data),
-        hg   = has_grid(data),
-        d0   = concat([[HAS_BUILTIN_GRID, false]], data),
-        d1   = concat([[HAS_BUILTIN_GRID, true]],  data))
-    concat(
-      (w == l) ? [
-        ["JAR", d0, jar_opts([], data), phys]
-      ] : [
-        ["JAR", concat([[WIDTH, l]], d0), jar_opts([], data), phys],
-        ["JAR", concat([[WIDTH, w]], d0), jar_opts([], data), phys]
-      ],
-      hg ? (w == l ? [
-        ["JAR", d1, jar_opts([], data), phys]
-      ] : [
-        ["JAR", concat([[WIDTH, l]], d1), jar_opts([], data), phys],
-        ["JAR", concat([[WIDTH, w]], d1), jar_opts([], data), phys]
-      ]) : [],
-      w == l
-        ? grid_variants(data, phys, true)
-        : concat(grid_variants(concat([[WIDTH, l]], data), phys, true),
-                 grid_variants(concat([[WIDTH, w]], data), phys, true))
-    )
-  :
   (intent == "Open Jar") ?
-    let(w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0),
+    let(w    = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0),
         phys = get_physics_profile(data),
         hg   = has_grid(data),
         d0   = concat([[HAS_BUILTIN_GRID, false]], data),
@@ -180,43 +102,147 @@ function compile_manifest(intent, data) =
         ["JAR", concat([[WIDTH, w]], d1), jar_opts([["IS_THREADED", false]], data), phys],
         ["JAR", concat([[WIDTH, l]], d1), jar_opts([["IS_THREADED", false]], data), phys]
       ]) : [],
+      // Drop-in circular clip grids — open top means inserts are usable
       w == l
         ? grid_variants(data, phys, true)
         : concat(grid_variants(concat([[WIDTH, w]], data), phys, true),
                  grid_variants(concat([[WIDTH, l]], data), phys, true))
     )
   :
-
-  // ── BOX / TRAY INTENTS ──────────────────────────────────────────────────────
-  // Grid behaviour: when grid_layout is present, emits:
-  //   Container (no built-in grid)  +  Container (fused built-in grid)
-  //   + GRID (drop-in, no base)  +  GRID (drop-in, with base)
-  // The lid is emitted once — unchanged by grid variant.
-
-  (intent == "Flip Box") ?
-    let(phys = get_physics_profile(data),
+  (intent == "Threaded Jar") ?
+    let(w    = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0),
+        phys = get_physics_profile(data),
         hg   = has_grid(data),
         d0   = concat([[HAS_BUILTIN_GRID, false]], data),
         d1   = concat([[HAS_BUILTIN_GRID, true]],  data))
     concat(
-      [["BOX", d0,   [["LID_TYPE", "Flip_Single"]], phys],
-       ["LID", data, [["LID_TYPE", "Flip_Single"]], phys]],
-      hg ? [["BOX", d1, [["LID_TYPE", "Flip_Single"]], phys]] : [],
-      grid_variants(data, phys)
+      (w == l) ? [
+        ["JAR", d0,   jar_opts([["IS_THREADED", true]], data), phys],
+        ["LID", data, [["LID_TYPE", "Screw"]],                 phys]
+      ] : [
+        ["JAR", concat([[WIDTH, w]], d0), jar_opts([["IS_THREADED", true]], data), phys],
+        ["JAR", concat([[WIDTH, l]], d0), jar_opts([["IS_THREADED", true]], data), phys],
+        ["LID", data,                     [["LID_TYPE", "Screw"]],                phys]
+      ],
+      hg ? (w == l ? [
+        ["JAR", d1, jar_opts([["IS_THREADED", true]], data), phys]
+      ] : [
+        ["JAR", concat([[WIDTH, w]], d1), jar_opts([["IS_THREADED", true]], data), phys],
+        ["JAR", concat([[WIDTH, l]], d1), jar_opts([["IS_THREADED", true]], data), phys]
+      ]) : []
+      // No drop-in grids — screw lid blocks insert access
     )
   :
-  (intent == "Double Flip Box") ?
-    let(phys  = get_physics_profile(data),
-        lid_l = flip_lid_l(data),
-        hg    = has_grid(data),
-        d0    = concat([[HAS_BUILTIN_GRID, false]], data),
-        d1    = concat([[HAS_BUILTIN_GRID, true]],  data))
+
+  // ── JAR PUBLIC AGGREGATOR ────────────────────────────────────────────────────
+  // "Jar" dispatches to the private intent based on the Jar_Lid checkbox.
+  // Legacy names forward cleanly.
+  (intent == "Jar") ?
+    get_val(JAR_WITH_LID, data, false)
+      ? compile_manifest("Threaded Jar", data)
+      : compile_manifest("Open Jar",     data)
+  :
+  // Legacy aliases
+  (intent == "Jar with Lid" || intent == "Simple Jar") ?
+    compile_manifest("Threaded Jar", data)
+  :
+
+  // ── BOX / TRAY PRIVATE INTENTS ─────────────────────────────────────────────
+  // Each is self-contained: box + lid + built-in grid variant (if grid_layout set).
+  // Drop-in grid variants are NOT emitted here — they are shared decoration and
+  // emitted once by the public aggregator intents (Box, Simple Tray).
+  // These may be exposed in the Customizer dropdown individually in the future.
+
+  // --- Snap box variants ---
+  (intent == "Snap Box (External)") ?
+    let(phys = get_physics_profile(data), hg = has_grid(data),
+        ext  = [LID_STYLE, "External"],
+        d0   = concat([[HAS_BUILTIN_GRID, false], ext], data),
+        d1   = concat([[HAS_BUILTIN_GRID, true],  ext], data),
+        dl   = concat([ext], data))
     concat(
-      [["BOX", d0,                              [["LID_TYPE", "Flip_Double"]],   phys],
-       ["LID", concat([[LENGTH, lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys],
-       ["LID", concat([[LENGTH, lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys]],
-      hg ? [["BOX", d1, [["LID_TYPE", "Flip_Double"]], phys]] : [],
-      grid_variants(data, phys)
+      [["BOX", d0, [["LID_TYPE", "Snap"]], phys],
+       ["LID", dl, [["LID_TYPE", "Snap"]], phys]],
+      hg ? [["BOX", d1, [["LID_TYPE", "Snap"]], phys]] : []
+    )
+  :
+  (intent == "Snap Box (Internal)") ?
+    let(phys = get_physics_profile(data), hg = has_grid(data),
+        rab  = [LID_STYLE, "Rabbet"],
+        d0   = concat([[HAS_BUILTIN_GRID, false], rab], data),
+        d1   = concat([[HAS_BUILTIN_GRID, true],  rab], data),
+        dl   = concat([rab], data))
+    concat(
+      [["BOX", d0, [["LID_TYPE", "Snap"]], phys],
+       ["LID", dl, [["LID_TYPE", "Snap"]], phys]],
+      hg ? [["BOX", d1, [["LID_TYPE", "Snap"]], phys]] : []
+    )
+  :
+
+  // --- Glide box variants ---
+  (intent == "Glide Box (External)") ?
+    let(phys = get_physics_profile(data), hg = has_grid(data),
+        ext  = [LID_STYLE, "External"],
+        d0   = concat([[HAS_BUILTIN_GRID, false], ext], data),
+        d1   = concat([[HAS_BUILTIN_GRID, true],  ext], data),
+        dl   = concat([ext], data))
+    concat(
+      [["BOX", d0, [["LID_TYPE", "Glide"]], phys],
+       ["LID", dl, [["LID_TYPE", "Glide"]], phys]],
+      hg ? [["BOX", d1, [["LID_TYPE", "Glide"]], phys]] : []
+    )
+  :
+  (intent == "Glide Box (Internal)") ?
+    let(phys = get_physics_profile(data), hg = has_grid(data),
+        rab  = [LID_STYLE, "Rabbet"],
+        d0   = concat([[HAS_BUILTIN_GRID, false], rab], data),
+        d1   = concat([[HAS_BUILTIN_GRID, true],  rab], data),
+        dl   = concat([rab], data))
+    concat(
+      [["BOX", d0, [["LID_TYPE", "Glide"]], phys],
+       ["LID", dl, [["LID_TYPE", "Glide"]], phys]],
+      hg ? [["BOX", d1, [["LID_TYPE", "Glide"]], phys]] : []
+    )
+  :
+
+  // --- Flip box variants ---
+  (intent == "Flip Box" || intent == "Flip Box (Single)") ?
+    let(phys = get_physics_profile(data), hg = has_grid(data),
+        ext  = [LID_STYLE, "External"],
+        d0   = concat([[HAS_BUILTIN_GRID, false], ext], data),
+        d1   = concat([[HAS_BUILTIN_GRID, true],  ext], data),
+        dl   = concat([ext], data))
+    concat(
+      [["BOX", d0, [["LID_TYPE", "Flip_Single"]], phys],
+       ["LID", dl, [["LID_TYPE", "Flip_Single"]], phys]],
+      hg ? [["BOX", d1, [["LID_TYPE", "Flip_Single"]], phys]] : []
+    )
+  :
+  (intent == "Double Flip Box" || intent == "Flip Box (Double)") ?
+    let(phys  = get_physics_profile(data), hg = has_grid(data),
+        ext   = [LID_STYLE, "External"],
+        lid_l = flip_half_lid_l(data),
+        d0    = concat([[HAS_BUILTIN_GRID, false], ext], data),
+        d1    = concat([[HAS_BUILTIN_GRID, true],  ext], data),
+        dl    = concat([ext], data))
+    concat(
+      [["BOX", d0,                               [["LID_TYPE", "Flip_Double"]], phys],
+       ["LID", concat([[LENGTH, lid_l]], dl),    [["LID_TYPE", "Flip_Single"]], phys],
+       ["LID", concat([[LENGTH, lid_l]], dl),    [["LID_TYPE", "Flip_Single"]], phys]],
+      hg ? [["BOX", d1, [["LID_TYPE", "Flip_Double"]], phys]] : []
+    )
+  :
+
+  // --- Stackable tray variants ---
+  (intent == "Stackable Tray (Nesting)") ?
+    let(phys = get_physics_profile(data))
+    [["TRAY", data, [[STACKABLE, true], [STACK_MODE, "Snap"]], phys]]
+  :
+  (intent == "Stackable Tray (Peg)") ?
+    let(phys = get_physics_profile(data))
+    concat(
+      [["TRAY", data, [[STACKABLE, true], [STACK_MODE, "Peg"]], phys]],
+      [for (i = [0:3]) ["PEG", data, [], phys]]
     )
   :
   // --- PILL BOX INTENTS ---
@@ -276,58 +302,69 @@ function compile_manifest(intent, data) =
   (intent == "Pillbox Full Set") ?
     concat(compile_manifest("14-Day AM/PM Box", data), compile_manifest("7-Day Pill Box", data), compile_manifest("1-Day AM/PM Box", data))
   :
-  (intent == "Box") ?
-    let(phys = get_physics_profile(data),
-        hg   = has_grid(data),
-        d0   = concat([[HAS_BUILTIN_GRID, false]], data),
-        d1   = concat([[HAS_BUILTIN_GRID, true]],  data))
+  // ── BOX / TRAY PUBLIC AGGREGATORS ──────────────────────────────────────────
+  // Each checkbox = one compile_manifest call to the matching private intent.
+  // Drop-in grids are decoration — emitted once here, not inside the private intents.
+
+  (intent == "Box" || intent == "Standalone Box") ?
+    let(phys     = get_physics_profile(data),
+        snap_ext = get_val(SNAP_EXTERNAL,     data, true),
+        snap_rab = get_val(SNAP_INTERNAL,     data, false),
+        glide_ext= get_val(GLIDE_EXTERNAL,    data, true),
+        glide_rab= get_val(GLIDE_INTERNAL,    data, false),
+        do_flip1 = get_val(BUILD_FLIP_SINGLE, data, true),
+        do_flip2 = get_val(BUILD_FLIP_DOUBLE, data, true))
     concat(
-      [["BOX", d0,   [["LID_TYPE", "Snap"]], phys],
-       ["LID", data, [["LID_TYPE", "Snap"]], phys]],
-      hg ? [["BOX", d1, [["LID_TYPE", "Snap"]], phys]] : [],
-      grid_variants(data, phys)
-    )
-  :
-  (intent == "Standalone Box") ?
-    let(phys = get_physics_profile(data),
-        hg   = has_grid(data),
-        d0   = concat([[HAS_BUILTIN_GRID, false]], data),
-        d1   = concat([[HAS_BUILTIN_GRID, true]],  data))
-    concat(
-      [["BOX", d0,   [["LID_TYPE", "Glide"]], phys],
-       ["LID", data, [["LID_TYPE", "Glide"]], phys]],
-      hg ? [["BOX", d1, [["LID_TYPE", "Glide"]], phys]] : [],
+      snap_ext  ? compile_manifest("Snap Box (External)",  data) : [],
+      snap_rab  ? compile_manifest("Snap Box (Internal)",  data) : [],
+      glide_ext ? compile_manifest("Glide Box (External)", data) : [],
+      glide_rab ? compile_manifest("Glide Box (Internal)", data) : [],
+      do_flip1  ? compile_manifest("Flip Box (Single)",    data) : [],
+      do_flip2  ? compile_manifest("Flip Box (Double)",    data) : [],
       grid_variants(data, phys)
     )
   :
   (intent == "Simple Tray") ?
-    let(phys = get_physics_profile(data),
-        hg   = has_grid(data),
-        d0   = concat([[HAS_BUILTIN_GRID, false]], data),
-        d1   = concat([[HAS_BUILTIN_GRID, true]],  data))
+    let(phys    = get_physics_profile(data),
+        hg      = has_grid(data),
+        d0      = concat([[HAS_BUILTIN_GRID, false]], data),
+        d1      = concat([[HAS_BUILTIN_GRID, true]],  data),
+        do_nest = get_val(STACK_NESTING, data, true),
+        do_peg  = get_val(STACK_PEG,    data, true))
     concat(
       [["TRAY", d0, [], phys]],
       hg ? [["TRAY", d1, [], phys]] : [],
-      grid_variants(data, phys)
+      grid_variants(data, phys),
+      do_nest ? compile_manifest("Stackable Tray (Nesting)", data) : [],
+      do_peg  ? compile_manifest("Stackable Tray (Peg)",    data) : []
     )
   :
 
   // ── STANDALONE DROP-IN GRID ─────────────────────────────────────────────────
   // Pure insert — no container. Set grid_layout; LWH are the container dims the
   // grid is sized to fit inside (Total mode) or the desired interior (Usable mode).
+  // Always emits: GRID + GRID(base) [rectangular].
+  // Square (w==l): + JAR_GRID + JAR_GRID(base)         → 4 total
+  // Non-square:   + JAR_GRID(w) + JAR_GRID(w,base)
+  //               + JAR_GRID(l) + JAR_GRID(l,base)     → 6 total
+  // ── STANDALONE DROP-IN GRID ─────────────────────────────────────────────────
+  // Pure rectangular drop-in insert — no base and with base.
+  // Jar grid variants are intentionally excluded: for typical rectangular containers
+  // the jar clip radius (= w or l) is too large to produce useful circular grids.
+  // Jar grids are generated by jar intents (Threaded Jar, Jar with Lid, etc.).
   (intent == "Grid") ?
     let(phys = get_physics_profile(data))
     grid_variants(data, phys)
   :
 
-  (intent == "Nesting Tray (Short)") ? [
-    ["TRAY", data, [[STACKABLE, true], [STACK_MODE, "Snap"]], get_physics_profile(data)]
-  ] :
+  // Legacy aliases — forward to Simple Tray with only the relevant stack flag set.
+  (intent == "Nesting Tray (Short)") ?
+    compile_manifest("Simple Tray",
+      concat([[STACK_NESTING, true], [STACK_PEG, false]], data))
+  :
   (intent == "Modular Peg Tray (Long)") ?
-    concat(
-      [["TRAY", data, [[STACKABLE, true], [STACK_MODE, "Peg"]], get_physics_profile(data)]],
-      [for (i = [0:3]) ["PEG", data, [], get_physics_profile(data)]]
-    )
+    compile_manifest("Simple Tray",
+      concat([[STACK_NESTING, false], [STACK_PEG, true]], data))
   :
   // --- GRID TEST INTENTS ---
   // Not exposed in the Customizer individually — exercised via "Grid Test".
@@ -475,6 +512,38 @@ function compile_manifest(intent, data) =
       compile_manifest("S4 Wedge", data)
     )
   :
+  // ── LID TESTING ─────────────────────────────────────────────────────────────
+  // Generates all lid type × style combinations + their matching boxes on one platter.
+  // Snap Rabbet, Snap External, Glide External, Glide Rabbet, Flip Single, Flip Double.
+  // Use LWH from Customizer; lid_glide_direction and lid_glide_snap apply to Glide pairs.
+  (intent == "Lid Testing") ?
+    let(phys  = get_physics_profile(data),
+        ext   = concat([[LID_STYLE, "External"]], data),
+        rab   = concat([[LID_STYLE, "Rabbet"]],   data),
+        lid_l = flip_lid_l(data))
+    [
+      // Snap External — lid cams past wall rim
+      ["BOX", ext, [["LID_TYPE", "Snap"]], phys],
+      ["LID", ext, [["LID_TYPE", "Snap"]], phys],
+      // Snap Rabbet — lid bead clicks into inner-wall groove
+      ["BOX", rab, [["LID_TYPE", "Snap"]], phys],
+      ["LID", rab, [["LID_TYPE", "Snap"]], phys],
+      // Glide External — lid rides in outer-wall groove
+      ["BOX", ext, [["LID_TYPE", "Glide"]], phys],
+      ["LID", ext, [["LID_TYPE", "Glide"]], phys],
+      // Glide Rabbet — lid drops into inner-wall groove, flush top
+      ["BOX", rab, [["LID_TYPE", "Glide"]], phys],
+      ["LID", rab, [["LID_TYPE", "Glide"]], phys],
+      // Flip Single — one lid, C-clip hinge +Y, diamond latch −Y
+      ["BOX", data, [["LID_TYPE", "Flip_Single"]], phys],
+      ["LID", data, [["LID_TYPE", "Flip_Single"]], phys],
+      // Flip Double — two lids opening from centre spine
+      ["BOX", data, [["LID_TYPE", "Flip_Double"]], phys],
+      ["LID", concat([[LENGTH, lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys],
+      ["LID", concat([[LENGTH, lid_l]], data), [["LID_TYPE", "Flip_Single"]], phys]
+    ]
+  :
+
   // Unrecognised intent — fall back to a plain tray and warn in console.
   // TODO: add manifest entries for remaining intents.
   let(_ = echo(str("WARNING: Unknown intent '", intent, "' — rendering as Simple Tray")))

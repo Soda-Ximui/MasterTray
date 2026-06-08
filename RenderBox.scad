@@ -35,28 +35,97 @@ module factory_render_box(data, opts, phys) {
     clip_od_  = hinge_d_ + breathing_room(COMP_CCLIP, data)*2 + noz*8;
     axle_z_   = h - clip_od_ / 2;
     grid_wall_h = is_flip ? axle_z_ : (h - sf - sl);
-    data_g = concat([[GRID_WALL_H, grid_wall_h]], data);
 
-    if (lid_type == "Snap" || lid_type == "Slip") {
+    // Mandatory solid zone at top of walls — keeps mesh holes out of lid-mechanism area.
+    // Overrides strut_wall_perc regardless of user setting. See MasterEnum MESH_TOP_MARGIN.
+    lh = m_lh(data);
+    top_margin =
+        (lid_type == "Slip")   ? 0 :
+        (lid_type == "Glide")  ? sl + lh * (ceil(1.0 / lh) + 1) :
+        sl + lh * 3;
+
+    data_g = concat([[GRID_WALL_H, grid_wall_h], [MESH_TOP_MARGIN, top_margin]], data);
+
+    if (lid_type == "Slip") {
         // ── Plain box: chassis + corner rounding only ──────────────────────────
         apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
             core_tray_chassis(data_g);
 
+    } else if (lid_type == "Snap") {
+        // ── Snap box ───────────────────────────────────────────────────────────
+        // External (default): plain chassis — lid bead cams past wall top rim.
+        // Rabbet: groove on inner wall face at closed position — positive click stop.
+        lid_style  = get_val(LID_STYLE, data, "External");
+        if (lid_style == "Rabbet") {
+            bead_h = m_lh(data) * max(3, ceil(noz * 2 / m_lh(data)));
+            glide_tol = breathing_room(COMP_GLIDE, data);
+            // Ring groove on inner wall face: bead snaps into defined closed position.
+            // Groove top at h−sl (lid face flush with box rim when closed).
+            groove_z = h - sl - bead_h;
+            difference() {
+                apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
+                    core_tray_chassis(data_g);
+                up(groove_z)
+                    difference() {
+                        cuboid([w-sw*2 + bead_h*2 + EPS, l-sw*2 + bead_h*2 + EPS,
+                                bead_h + EPS], anchor=BOTTOM);
+                        cuboid([w-sw*2 - EPS, l-sw*2 - EPS, bead_h*2], anchor=BOTTOM);
+                    }
+            }
+        } else {
+            apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
+                core_tray_chassis(data_g);
+        }
+
     } else if (lid_type == "Glide") {
         // ── Glide box: groove channel + ball-catch dimples ─────────────────────
+        lid_style  = get_val(LID_STYLE, data, "External");
         glide_tol  = breathing_room(COMP_GLIDE, data);
+        ball_d     = glide_ball_d(w, l, sw, noz);
+        ball_r     = ball_d / 2;
+        ball_protr = glide_ball_protr(ball_r, glide_tol, noz);
+
+        if (lid_style == "Rabbet") {
+            // ── Rabbet glide: groove on inner wall face, lid drops inside ──────
+            // Groove depth = sw/2 into the wall. Lid top is flush with box rim.
+            rabbet_d = sw / 2;
+            rabbet_h = sl + glide_tol;
+            int_w_r  = w - sw*2;
+            int_l_r  = l - sw*2;
+            // Lid dims — must match RenderLid Rabbet formula
+            lid_w_r  = (glide_dir == "H") ? w - sw - glide_tol : l - sw/2;
+            lid_l_r  = (glide_dir == "H") ? l - sw/2           : w - sw - glide_tol;
+            ball_y   = lid_l_r/2 - ball_r*2.5;
+            ball_x_r = lid_w_r/2 + ball_r - ball_protr;
+            difference() {
+                apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
+                    core_tray_chassis(data_g);
+                if (glide_dir == "H") {
+                    for (sx = [-1, 1])
+                        translate([sx * (int_w_r/2 + rabbet_d/2), 0, h - rabbet_h])
+                            cuboid([rabbet_d + EPS, int_l_r + EPS, rabbet_h + EPS], anchor=BOTTOM);
+                    if (glide_snap == "Ball")
+                        for (sx = [-1, 1])
+                            translate([sx * ball_x_r, ball_y, h - rabbet_h/2])
+                                sphere(d=ball_d + glide_tol);
+                } else {
+                    for (sy = [-1, 1])
+                        translate([0, sy * (int_l_r/2 + rabbet_d/2), h - rabbet_h])
+                            cuboid([int_w_r + EPS, rabbet_d + EPS, rabbet_h + EPS], anchor=BOTTOM);
+                    if (glide_snap == "Ball")
+                        for (sy = [-1, 1])
+                            translate([ball_y, sy * ball_x_r, h - rabbet_h/2])
+                                sphere(d=ball_d + glide_tol);
+                }
+            }
+        } else {
+        // ── External glide: groove on outer wall top ───────────────────────────
         groove_w   = w - sw + 0.6;
         groove_l   = l + EPS;
         groove_h   = sl + glide_tol;
         // ceil() snaps the 1mm drop up to the nearest full layer boundary.
         // At 0.28mm lh: ceil(1.0/0.28)=4 layers → 1.12mm — groove sits on a clean layer.
         groove_z   = h - sl - m_lh(data) * ceil(1.0 / m_lh(data));
-        // Ball dimple geometry — must match lid ball bumps exactly.
-        // ball_protr: how deeply the ball center is recessed into the lid face.
-        // Formula ensures ball center sits noz/2 past the groove wall — gentle cam entry.
-        ball_d     = glide_ball_d(w, l, sw, noz);
-        ball_r     = ball_d / 2;
-        ball_protr = glide_ball_protr(ball_r, glide_tol, noz);
         lid_w      = groove_w - glide_tol;       // must match RenderLid lid_w formula
         lid_l      = l - sw / 2;
         ball_y     = lid_l / 2 - ball_r * 2.5;  // same formula as in RenderLid
@@ -74,6 +143,7 @@ module factory_render_box(data, opts, phys) {
                     translate([sx * ball_x, ball_y, groove_z + groove_h / 2])
                         sphere(d=ball_d + glide_tol);
         }
+        } // end External glide
 
     } else if (lid_type == "Flip_Single") {
         // ── Single flip-hinge box: hinge boss on +Y, latch recess on −Y ────────

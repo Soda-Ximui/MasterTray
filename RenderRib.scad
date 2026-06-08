@@ -117,25 +117,31 @@ function _ray_exits_circle_t(ax, ay, dx, dy, hx, hy, r) =
 
 // Earliest t at which rib (ax,ay)→(bx,by) enters any non-source hub.
 // Returns undef if no hub is hit before the endpoint.
-function _end_clip_t(anchor_defs, from_name, ax, ay, bx, by, int_w, int_l, sw) =
+// Effective clip radius: shrink by div_t/2 so the rib overlaps half a wall-thickness
+// into the hub. Without this, the rib centerline is tangent to the hub surface and
+// the off-angle corner of the rib end falls outside — producing a one-sided loose joint.
+// Clamped to 0 so tiny nubs don't produce negative radii.
+function _clip_r(shape_str, sw, div_t) = max(0, _hub_clip_r(shape_str, sw) - div_t/2);
+
+function _end_clip_t(anchor_defs, from_name, ax, ay, bx, by, int_w, int_l, sw, div_t) =
     let(dx = bx-ax, dy = by-ay,
         ts = [for (adef = anchor_defs)
               if (adef[0] != from_name && adef[3] != "")
-              let(r  = _hub_clip_r(adef[3], sw),
-                  hx = adef[5] ? 0 : _sw_to_mm(adef[1], int_w),
-                  hy = adef[5] ? 0 : _sw_to_mm(adef[2], int_l),
+              let(r  = _clip_r(adef[3], sw, div_t),
+                  hx = adef[5] ? 0 : _anchor_center_mm(adef[1], adef[6], int_w),
+                  hy = adef[5] ? 0 : _anchor_center_mm(adef[2], adef[7], int_l),
                   t  = (r > 0) ? _ray_enters_circle_t(ax, ay, dx, dy, hx, hy, r) : undef)
               if (t != undef) t])
     len(ts) > 0 ? min(ts) : undef;
 
 // t at which rib exits the source anchor's own hub (start offset).
 // Returns undef if source has no hub or rib starts outside it.
-function _start_clip_t(from_def, ax, ay, bx, by, int_w, int_l, sw) =
+function _start_clip_t(from_def, ax, ay, bx, by, int_w, int_l, sw, div_t) =
     (from_def[3] == "") ? undef :
-    let(r = _hub_clip_r(from_def[3], sw))
+    let(r = _clip_r(from_def[3], sw, div_t))
     (r <= 0) ? undef :
-    let(hx = from_def[5] ? 0 : _sw_to_mm(from_def[1], int_w),
-        hy = from_def[5] ? 0 : _sw_to_mm(from_def[2], int_l),
+    let(hx = from_def[5] ? 0 : _anchor_center_mm(from_def[1], from_def[6], int_w),
+        hy = from_def[5] ? 0 : _anchor_center_mm(from_def[2], from_def[7], int_l),
         dx = bx-ax, dy = by-ay)
     _ray_exits_circle_t(ax, ay, dx, dy, hx, hy, r);
 
@@ -149,7 +155,8 @@ function _resolve_to(to_str, ax, ay, anchor_defs, int_w, int_l, is_jar, int_d) =
             : _angle_endpoint_rect(to_num(get_digits(to_str)), ax, ay, int_w, int_l)) :
     let(adef = _find_anchor_def(anchor_defs, to_str))
     (adef != undef) ? (adef[5] ? [0, 0]
-                                : [_sw_to_mm(adef[1], int_w), _sw_to_mm(adef[2], int_l)]) :
+                                : [_anchor_center_mm(adef[1], adef[6], int_w),
+                                   _anchor_center_mm(adef[2], adef[7], int_l)]) :
     [ax, ay];
 
 // Render hub shape at current position (caller must translate).
@@ -213,8 +220,8 @@ module _render_hub(shape_str, h, div_t, sw) {
 // Clipping uses inscribed-circle approximation for S/D/T, exact for C.
 module _franken_v2_geom(anchor_defs, conn_defs, int_w, int_l, default_h, max_h, is_closed, is_jar, int_d, div_t, sw) {
     for (adef = anchor_defs) {
-        ax = adef[5] ? 0 : _sw_to_mm(adef[1], int_w);
-        ay = adef[5] ? 0 : _sw_to_mm(adef[2], int_l);
+        ax = adef[5] ? 0 : _anchor_center_mm(adef[1], adef[6], int_w);
+        ay = adef[5] ? 0 : _anchor_center_mm(adef[2], adef[7], int_l);
         ah = _resolve_height(adef[4], default_h, max_h, is_closed);
         translate([ax, ay, 0]) _render_hub(adef[3], ah, div_t, sw);
     }
@@ -233,8 +240,8 @@ module _franken_v2_geom(anchor_defs, conn_defs, int_w, int_l, default_h, max_h, 
                 : to_pt;
             bx = capped_pt[0]; by = capped_pt[1];
             // Clip start out of source hub; clip end before entering any other hub.
-            st = _start_clip_t(from_def,    ax, ay, bx, by, int_w, int_l, sw);
-            et = _end_clip_t(anchor_defs, cdef[0], ax, ay, bx, by, int_w, int_l, sw);
+            st = _start_clip_t(from_def,    ax, ay, bx, by, int_w, int_l, sw, div_t);
+            et = _end_clip_t(anchor_defs, cdef[0], ax, ay, bx, by, int_w, int_l, sw, div_t);
             ax2 = (st != undef) ? ax + st*(bx-ax) : ax;
             ay2 = (st != undef) ? ay + st*(by-ay) : ay;
             bx2 = (et != undef) ? ax + et*(bx-ax) : bx;
@@ -255,10 +262,9 @@ module render_franken_ribs(data) {
     g_str = get_val(GRID_LAYOUT, data, "");
 
     if (has_franken_v2(g_str)) {
-        // ── v2 path: A(...) anchor + [...] connection syntax ──────────────
-        v2          = parse_franken_v2(g_str);
-        anchor_defs = v2[0];
-        conn_defs   = v2[1];
+        // ── v2 path: A(...) anchor + [...] connection + (WW/WE/WN/WS) wall syntax ──
+        v2        = parse_franken_v2(g_str);
+        wall_defs = v2[2];
 
         bh    = m_bh(data);
         sf    = m_safe_floor(data);
@@ -277,6 +283,30 @@ module render_franken_ribs(data) {
         int_h     = bh - sf - (is_closed ? sl : 0);
         max_h     = int_h;
         default_h = max_h;
+
+        // Wall tokens: inject 4 virtual corner anchors (no shape, no hub) and
+        // expand (WW/WE/WN/WS,h) into connections between them.
+        // Corner anchors are inset div_t/2 from each edge so the outer face of
+        // the wall rib is flush with the interior boundary — full div_t inside,
+        // no apply_master_bounds clipping needed.
+        // The EPS weld skin (no-base) or base plate both touch the rib bottom → fused.
+        corner_anchors = (len(wall_defs) > 0) ? [
+            ["_SW", div_t/2,          div_t/2,          "", "", false],
+            ["_SE", int_w - div_t/2,  div_t/2,          "", "", false],
+            ["_NW", div_t/2,          int_l - div_t/2,  "", "", false],
+            ["_NE", int_w - div_t/2,  int_l - div_t/2,  "", "", false]
+        ] : [];
+        anchor_defs = concat(v2[0], corner_anchors);
+
+        wall_conn_defs = [for (wd = wall_defs)
+            let(side = wd[0], h = wd[1])
+            (side == "WW") ? ["_SW", "_NW", h, ""] :
+            (side == "WE") ? ["_SE", "_NE", h, ""] :
+            (side == "WN") ? ["_NW", "_NE", h, ""] :
+            (side == "WS") ? ["_SW", "_SE", h, ""] :
+            ["_SW", "_SE", h, ""]
+        ];
+        conn_defs = concat(v2[1], wall_conn_defs);
 
         // Poke-through: hubs may specify heights taller than int_h.
         // apply_master_bounds clips to its h argument, so use the tallest

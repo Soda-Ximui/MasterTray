@@ -192,6 +192,33 @@ module debug_grid_parser(data) {
 }
 
 // --- GRID STRING VALIDATION ---
+
+// grid_bounds_ok — returns true when all v2 anchor positions fit inside the
+// container interior. Cartesian / radial tokens fill by proportion so they are
+// always in bounds and return true immediately.
+// Any out-of-bounds anchor name is collected and reported via a loud echo.
+// Called by has_grid in MasterManifest so no grid is generated on mismatch.
+function grid_bounds_ok(g_str, data) =
+  !has_franken_v2(g_str) ? true :
+  let(
+    adefs = parse_franken_v2(g_str)[0],
+    int_w = m_bw(data) - 2 * m_safe_wall(data),
+    int_l = m_bl(data) - 2 * m_safe_wall(data),
+    bad   = [for (a = adefs)
+               if (!a[5] && (
+                 _anchor_sw_mm(a[1], a[6], int_w) > int_w ||
+                 _anchor_sw_mm(a[2], a[7], int_l) > int_l))
+               a[0]],
+    _     = len(bad) > 0
+              ? echo(str(
+                  "*** GRID SPECIFICATION OUT OF BOUNDS — ",
+                  "anchor(s) ", bad, " exceed interior (",
+                  int_w, " x ", int_l, " mm). ",
+                  "NO GRID WILL BE GENERATED. ***"))
+              : 0
+  )
+  len(bad) == 0;
+
 // Token classifiers used by is_valid_grid_layout and MasterValidation.
 function is_cartesian_token(tok) = len(search("x", tok)) > 0 || len(search("X", tok)) > 0;
 function is_radial_token(tok)    = len(tok) > 0 && (tok[0] == "R" || tok[0] == "r");
@@ -315,6 +342,18 @@ function parse_connection_tokens(raw) =
         substr(s, i+1, close - i - 1)
     ];
 
+// True if a (...) content string is a wall shorthand: WW/WE/WN/WS followed by comma.
+function _is_wall_tok(content) =
+    len(content) >= 3 && content[0] == "W" &&
+    (content[1]=="W" || content[1]=="E" || content[1]=="N" || content[1]=="S") &&
+    content[2] == ",";
+
+// Parse wall token content "WW,<height>" → [side_str, height_str].
+function _parse_wall_def(content) =
+    let(parts = str_split(content, ","))
+    [(len(parts) > 0) ? parts[0] : "",
+     (len(parts) > 1) ? parts[1] : ""];
+
 // True if token is a hub shape specifier: C<n>, S<n>, or T<n> (len > 1).
 // len >= 1 so bare "C"/"S"/"T"/"D" (no size = nub) is recognised.
 function _is_shape_tok(s) =
@@ -325,27 +364,38 @@ function _is_height_tok(s) =
     len(s) > 0 && (s[len(s)-1] == "%" || (ord(s[0]) >= 48 && ord(s[0]) <= 57));
 
 // Parse anchor content string: "name,x,y[,shape][,height]" or "name,C[,shape][,height]"
-// Coordinates are mm from the SW (bottom-left) interior corner.
+// Coordinates are mm from the SW (bottom-left) interior corner, or % of that dimension.
 // C means tray centre (resolved in the renderer — no mm value needed).
-// Returns [name, x_mm_sw, y_mm_sw, shape_str, height_str, is_center]
+// Returns [name, x_val, y_val, shape_str, height_str, is_center, x_is_perc, y_is_perc]
+// x_val/y_val hold the raw number; call _anchor_sw_mm() / _anchor_center_mm() to resolve.
 function parse_anchor_def(content) =
     let(
         parts     = str_split(content, ","),
         np        = len(parts),
         name      = (np > 0) ? parts[0] : "",
         is_center = (np > 1) && (parts[1] == "C"),
-        x_mm      = is_center ? 0 : ((np > 1) ? to_num(get_digits(parts[1])) : 0),
-        y_mm      = is_center ? 0 : ((np > 2) ? to_num(get_digits(parts[2])) : 0),
+        x_str     = is_center ? "" : ((np > 1) ? parts[1] : ""),
+        y_str     = is_center ? "" : ((np > 2) ? parts[2] : ""),
+        x_is_perc = len(x_str) > 0 && x_str[len(x_str)-1] == "%",
+        y_is_perc = len(y_str) > 0 && y_str[len(y_str)-1] == "%",
+        x_val     = is_center ? 0 : to_num(get_digits(x_str)),
+        y_val     = is_center ? 0 : to_num(get_digits(y_str)),
         // Optional fields start after position args
         opt_start = is_center ? 2 : 3,
         opt0      = (np > opt_start)   ? parts[opt_start]   : "",
         opt1      = (np > opt_start+1) ? parts[opt_start+1] : "",
-        // opt0 is shape if it starts with C/S/T and len>1; otherwise it may be height
         shape_str  = _is_shape_tok(opt0) ? opt0 : "",
         height_str = _is_shape_tok(opt0) ? opt1 :
                      (_is_height_tok(opt0) ? opt0 : "")
     )
-    [name, x_mm, y_mm, shape_str, height_str, is_center];
+    [name, x_val, y_val, shape_str, height_str, is_center, x_is_perc, y_is_perc];
+
+// Resolve an anchor coordinate to mm from SW corner.
+// val: raw value from parse_anchor_def. is_perc: flag from same. int_dim: interior width or length.
+function _anchor_sw_mm(val, is_perc, int_dim) = is_perc ? val / 100 * int_dim : val;
+
+// Resolve an anchor coordinate to mm from container centre (OpenSCAD/BOSL2 origin).
+function _anchor_center_mm(val, is_perc, int_dim) = _anchor_sw_mm(val, is_perc, int_dim) - int_dim / 2;
 
 // Parse connection content string: "from,to[,height[,length]]"
 // Returns [from_name, to_str, height_str, length_str]
@@ -373,15 +423,20 @@ function has_franken_v2(g_str) =
     len(search("(", s)) > 0;
 
 // Parse all v2 tokens from g_str.
-// Returns [anchor_defs, connection_defs]
-//   anchor_defs:     [[name, x_pct, y_pct, shape_str, height_str], ...]
-//   connection_defs: [[from_name, to_str, height_str], ...]
+// Returns [anchor_defs, connection_defs, wall_defs]
+//   anchor_defs:     [[name, x_mm, y_mm, shape_str, height_str, is_center], ...]
+//   connection_defs: [[from_name, to_str, height_str, length_str], ...]
+//   wall_defs:       [[side_str, height_str], ...]  — WW/WE/WN/WS tokens
+// Wall tokens use (WW,n) syntax — filtered from anchor_defs before parsing.
 function parse_franken_v2(g_str) =
     let(
-        a_raw = parse_anchor_tokens(g_str),
-        c_raw = parse_connection_tokens(g_str)
+        a_raw  = parse_anchor_tokens(g_str),
+        c_raw  = parse_connection_tokens(g_str),
+        w_raw  = [for (ac = a_raw) if ( _is_wall_tok(ac)) ac],
+        ak_raw = [for (ac = a_raw) if (!_is_wall_tok(ac)) ac]
     )
     [
-        [for (ac = a_raw) parse_anchor_def(ac)],
-        [for (cc = c_raw) parse_connection_def(cc)]
+        [for (ac = ak_raw) parse_anchor_def(ac)],
+        [for (cc = c_raw)  parse_connection_def(cc)],
+        [for (wc = w_raw)  _parse_wall_def(wc)]
     ];

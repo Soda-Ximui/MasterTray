@@ -49,21 +49,29 @@ module factory_render_lid(data, opts, phys) {
             apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), m_chamf(data))
                 up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false,
                                         get_mesh_cfg(data, HOLE_LID, STRUT_LID));
-            // Retention beads on X sides — click under box wall top rim
+            // Retention beads on X sides — click under box wall top rim.
+            // Lowered by EPS so bead base overlaps into lid body (prevents slicer separation).
             for (sx = [-1, 1])
-                translate([sx * (lid_w/2 - sw/2), 0, sl])
-                    cuboid([sw, lid_l - sw*2, bead_h], chamfer=bead_h/2,
+                translate([sx * (lid_w/2 - sw/2), 0, sl - EPS])
+                    cuboid([sw, lid_l - sw*2, bead_h + EPS], chamfer=bead_h/2,
                            edges="ALL", anchor=BOTTOM);
         }
 
     } else if (lid_type == "Glide") {
-        glide_tol = breathing_room(COMP_GLIDE, data);
-        // H: lid slides along Y (front-to-back). Grooves in X walls.
-        // V: lid slides along X (side-to-side). Grooves in Y walls.
-        lid_w = (glide_dir == "H") ? (w - sw + 0.6) - glide_tol : l - sw / 2;
-        lid_l = (glide_dir == "H") ? l - sw / 2                  : (w - sw + 0.6) - glide_tol;
+        glide_tol  = breathing_room(COMP_GLIDE, data);
+        lid_style  = get_val(LID_STYLE, data, "External");
 
-        // Ball positions: near the closed end (far end when inserted)
+        // Rabbet: lid steps into inner-wall groove — slightly narrower than External.
+        // External: lid rides in outer-wall groove — slightly wider than interior.
+        // Must match box groove formulas in RenderBox exactly.
+        rabbet_d = sw / 2;
+        lid_w = (lid_style == "Rabbet")
+            ? ((glide_dir == "H") ? w - sw - glide_tol      : l - sw / 2)
+            : ((glide_dir == "H") ? (w - sw + 0.6) - glide_tol : l - sw / 2);
+        lid_l = (lid_style == "Rabbet")
+            ? ((glide_dir == "H") ? l - sw / 2      : w - sw - glide_tol)
+            : ((glide_dir == "H") ? l - sw / 2      : (w - sw + 0.6) - glide_tol);
+
         ball_y = lid_l / 2 - ball_r * 2.5;
 
         union() {
@@ -72,18 +80,15 @@ module factory_render_lid(data, opts, phys) {
                                         get_mesh_cfg(data, HOLE_LID, STRUT_LID));
 
             if (glide_snap == "Ball") {
-                // Two sphere bumps on X sides near the closed end.
-                // They ride in the groove and click into matching dimples in the box.
                 for (sx = [-1, 1])
                     translate([sx * (lid_w/2 + ball_r - ball_protr), ball_y, sl/2])
                         sphere(d=ball_d);
             } else {
-                // Tab snap: small flexible tab at the open end (−Y face)
                 tab_h = sl * 0.6;
                 tab_d = noz * 3;
                 translate([0, -lid_l/2, tab_h/2])
                     cuboid([lid_w * 0.4, tab_d, tab_h], chamfer=tab_d/2,
-                           edges="FRONT", anchor=CENTER);
+                           edges=FRONT, anchor=CENTER);
             }
         }
 
@@ -115,12 +120,16 @@ module factory_render_lid(data, opts, phys) {
                                 cuboid([clip_len, hinge_y_off+1.0, (clip_z-sl)+1.0], anchor=CENTER);
                         }
                         yrot(90) cyl(d=hinge_d + clearance*2, h=clip_len+2, $fn=36);
-                        translate([0, 0, clip_outer_d/2])
+                        // C-opening faces DOWN (−Z) so arms point toward lid body.
+                        // Printed face-down: arc is at top of print, fully self-supporting.
+                        // Pin enters from below as the lid is pressed onto the box hinge.
+                        translate([0, 0, -clip_outer_d/2])
                             cuboid([clip_len+2, hinge_d*0.8, clip_outer_d], anchor=CENTER);
                     }
             }
-            // Diamond latch tab on −Y face (clicks into box latch recess)
-            translate([0, -lid_l/2 - 1.1, sl/2])
+            // Diamond latch tab on −Y face (clicks into box latch recess).
+            // Shifted +EPS in Y so latch body overlaps into lid (prevents slicer separation).
+            translate([0, -lid_l/2 - 1.1 + EPS, sl/2])
                 cuboid([lid_w - sw*4, 2.2, sl], anchor=CENTER);
             translate([0, -lid_l/2 - 2.2, sl + clasp_depth/2])
                 cuboid([lid_w - sw*4, 1.6, clasp_depth], anchor=CENTER);
