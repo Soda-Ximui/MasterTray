@@ -1,203 +1,132 @@
 # Session Handoff — MasterTray
-_Last updated: 2026-06-07 — Post-print fixes: C-clip cantilever + glide ball floating shell (03068d4)_
+_Last updated: 2026-06-08 — Post-print fixes round 2 (9cff93c)_
 
 ---
 
-## How to Resume
+## Branch
+`refactor/code-clarity-and-safety`
 
-```
-cd C:\repos\3D\MasterTray
-claude
-```
+## Recent Commits (newest first)
 
-Tell Claude: **"Read HANDOFF.md and continue."**
-_(Root-level `HANDOFF.md` is a one-line stub that points here — Claude will find it immediately.)_
-
----
-
-## Branch & State
-
-**Branch:** `refactor/code-clarity-and-safety`
-**Last commit:** `03068d4` — Glide ball rib fix. All files committed, NOT pushed.
-
-```
-03068d4 fix: glide ball rib — prevent floating shell when ball_r > sl/2
-cd1bc33 docs: session handoff — Pre-Print Test codebase (51487cb)
-51487cb feat: FrankenTray v2 + private box intents + cantilever fix — Pre-Print Test
-c018d82 docs: add handoff history tracking + Astro nav for Status and FrankenTray
-1adaffb docs: FrankenTray v2 spec + updated handoff
-```
-
-**Untracked (leave alone):**
-```
-?? .claude/settings.json
-?? astro/.vscode/
-?? build.pl
-?? output/
-```
-
----
-
-## Post-Print Bug Fixes (this session)
-
-### BUG 1 — C-clip hinge: floating cantilever (Bambu STL_12, STL_13)
-**Symptom:** Bambu Studio warning "floating cantilever". Flip_Double half-lids failed.
-**Root cause:** The C-clip slot was at `+clip_outer_d/2` — cutting the TOP of the arc.
-Printed face-down, the two arm tips at the top of the print had nothing below them.
-**Fix:** Move slot to `-clip_outer_d/2` — arc opens downward, arms point toward lid body.
-Arms are self-supporting. Pin enters from below when lid is pressed onto box hinge.
-**File:** `RenderLid.scad` — Flip_Single C-clip hinge block. Commit `51487cb`.
-
-### BUG 2 — Glide ball: floating shell, no slicer warning, print detachment
-**Symptom:** Balls fell off wholesale in print. No Bambu warning fired.
-**Root cause:** Ball center at `sl/2` but `ball_r > sl/2` (e.g. 1.2mm radius, 0.8mm half-thickness).
-Sphere clipped below bed when printed face-down. Top portion of ball (above `sl`) had
-no lid-wall support — a floating shell. Slicer missed it because ball *starts* connected;
-only the top detaches mid-print.
-**Fix:** Add full-height rib (`cuboid([ball_r+EPS, ball_d*0.7, sl+EPS])`) inset into the lid
-wall at `lid_w/2 - ball_r/2`. Rib gives the ball solid attachment at every layer.
-Box dimple geometry unchanged.
-**File:** `RenderLid.scad` — Glide Ball branch. Commit `03068d4`.
-
-### LESSON: Spheres/round features must fit within host body Z range
-Before placing any sphere at `h/2`, verify `ball_r <= h/2`. If not, the sphere clips
-the bed or top face. Slicer may not warn. Fix: rib (preferred) or clamp diameter.
-
----
-
-## What Earlier Sessions Did
-
-### 1. Private box intent architecture
-`MasterManifest.scad` restructured so each lid variant is a self-contained private intent.
-Public aggregators (Box, Jar) read checkbox flags and fan out via `compile_manifest()`.
-
-Private box intents:
-- `Snap Box (External)` / `Snap Box (Internal)`
-- `Glide Box (External)` / `Glide Box (Internal)`
-- `Flip Box (Single)` / `Flip Box (Double)`
-
-`Flip Box (Double)` uses `flip_half_lid_l(data) = LENGTH/2 - flip_hinge_y` — half-lids.
-Single-flip and pill boxes use `flip_lid_l(data) = LENGTH - flip_hinge_y`.
-
-### 2. New MasterEnum constants
-`SNAP_EXTERNAL`, `SNAP_INTERNAL`, `GLIDE_EXTERNAL`, `GLIDE_INTERNAL`,
-`BUILD_FLIP_SINGLE`, `BUILD_FLIP_DOUBLE` — replaced deleted `BUILD_GLIDE`.
-
-### 3. MasterBuilder ui_payload fixed
-Old references to deleted variables (`Glide`, `lid_glide_direction`, `lid_glide_snap`,
-`lid_style`) replaced with new variables.
-
-### 4. % coordinates in FrankenTray v2
-`parse_anchor_def` extended to 8 elements with `x_is_perc` / `y_is_perc` flags.
-Helpers `_anchor_sw_mm(val, is_perc, int_dim)` and `_anchor_center_mm(val, is_perc, int_dim)`.
-All 4 RenderRib.scad + 1 RenderGrid.scad call sites updated from `_sw_to_mm` to `_anchor_center_mm`.
-
-### 5. Grid bounds validation
-`grid_bounds_ok(g_str, data)` added to GridLayout.scad.
-`has_grid(data)` now calls it — if any anchor is outside container interior, returns false.
-Console echo: `*** GRID SPECIFICATION OUT OF BOUNDS — anchor(s) [...] exceed interior (...). NO GRID WILL BE GENERATED. ***`
-
-### 6. EPS overlap fixes (slicer shell separation)
-- Snap lid bead: lowered to `sl - EPS`, height increased by EPS.
-- Flip lid diamond latch: Y-shifted by `+EPS` so latch body overlaps into lid.
-
-### 7. C-clip hinge cantilever fix
-Slot changed from `translate([0, 0, +clip_outer_d/2])` → `translate([0, 0, -clip_outer_d/2])`.
-Arc now opens downward → arms point toward lid body → self-supporting when printed face-down.
-Fixes Bambu Studio floating cantilever warning on STL_12 and STL_13 (Flip_Double half-lids).
-
----
-
-## Primitives Status
-
-| # | Primitive | Status |
-|---|-----------|--------|
-| 1 | TRAY | ✅ Done |
-| 2 | JAR | ✅ Done |
-| 3 | LID | ✅ Done |
-| 3b | BOX | ✅ Done |
-| 4 | GRID | ✅ Done |
-| 5 | RIB / FrankenTray v2 | ✅ Done |
-
----
-
-## Immediate Next Step
-
-**Wait for print results.** The full plate (21 items — 5 box types × box+lid+builtin variants,
-Flip_Double 2 half-lids, 2 drop-in grids) was sent to Bambu A1.
-
-After print:
-1. Evaluate lid retention forces, hinge snap, latch click.
-2. Push branch + open PR.
-3. Fix open items (F15, F6, F14 — see table below).
-4. UI polish: expose SNAP_EXTERNAL/INTERNAL etc. as Customizer checkboxes.
-
----
-
-## Open Code Items
-
-| ID | File | Issue |
-|----|------|-------|
-| F15 | RenderBox.scad ~L103 | flip-box hinge assert |
-| F6 | RenderLid.scad ~L120 | diamond latch layer_snap |
-| F14 | RenderLid.scad ~L44 | snap bead layer-align |
-
----
-
-## Test Defaults (leave in MasterBuilder.scad)
-
-```scad
-part_width = 54.5;  part_length = 54;  part_height = 55;
-mesh_hole_size = 1.6;   mesh_hole_spacing = 1.2;
-strut_wall_perc  =  0;
-strut_floor_perc = 25;
-strut_lid_perc   = 75;
-```
-
-**Render command (PowerShell):**
-```powershell
-$o = "C:\Program Files\OpenSCAD\openscad.com"
-& $o -o output/test.png --render --camera=80,0,30,55,0,20,500 --colorscheme=DeepOcean -D 'Part_To_Build="Box"' MasterBuilder.scad
-```
-
-**Color guide (DeepOcean):** blue = outer faces (correct), red = inner faces through holes (normal), magenta = geometry problem.
-
----
-
-## Key Architecture Rules
-
-| Rule | Where |
-|------|-------|
-| Private intents are self-contained; aggregators fan out | MasterManifest.scad |
-| Drop-in grids emitted once by aggregator, never inside private intents | MasterManifest.scad |
-| Threaded Jar: no drop-in grids (screw neck blocks access) | MasterManifest.scad |
-| `flip_half_lid_l` for Double half-lids only; `flip_lid_l` for all others | MasterManifest.scad |
-| EPS overlap on all boolean union geometry — face-to-face = slicer shells | RenderLid.scad |
-| C-clip slot at -Z (bottom of arc) → self-supporting face-down | RenderLid.scad |
-| `_anchor_center_mm(val, is_perc, int_dim)` at all anchor call sites | RenderRib, RenderGrid |
-| `grid_bounds_ok` called from `has_grid` — bad bounds = no grid + CAPS echo | GridLayout.scad |
-| strut% applies within safe zone (after min_margin) | RenderMesh.scad header |
-| Container geometry owns the structural edge (not the mesh) | MasterEngine.scad |
-| ray_heights in cfg[1][3] is always a LIST | GridLayout.scad |
-| Factory IS the implementation — opts drive variants | LESSONS.md §1 |
-| All circle dims are diameters | LESSONS.md §0b |
-| Support-free always | LESSONS.md §0c |
-
----
-
-## Key Files
-
-| File | Purpose |
+| Hash | Message |
 |------|---------|
-| `MasterBuilder.scad` | Customizer UI — USE THIS |
-| `MasterManifest.scad` | Intent compiler; private intents + aggregators |
-| `MasterEngine.scad` | Physics getters, `get_mesh_cfg`, `get_grid_step` |
-| `MasterEnum.scad` | All string constants |
-| `GridLayout.scad` | Grid string parser — cartesian, span, radial, FrankenTray v2 |
-| `RenderMesh.scad` | `framed_mesh` + `cylindrical_mesh_wall` with min_margin |
-| `RenderGrid.scad` | Grid factories; radial with cycling heights |
-| `RenderRib.scad` | FrankenTray v2 renderer |
-| `RenderLid.scad` | All lid types — Snap, Glide, Flip_Single, Screw, Slip |
-| `docs/FRANKENTRAY_SPEC.md` | FrankenTray v2 design spec |
-| `docs/STATUS.md` | Human-readable project status + grid layout quick reference |
-| `docs/BUGS.md` | B1 (sqrt scaling), B2 (screw lid height) |
+| `9cff93c` | fix: glide ball dimples as full circles + flip_single corner gap |
+| `4720b25` | fix: revert MIRROR_Y (direction was correct), document snap/flip lessons |
+| `16c58cd` | fix: resolve 4 print failures from physical test |
+| `edaa23e` | fix: plaque peg mount — solid patch before hole punch for meshed lids |
+
+---
+
+## What Was Fixed (This Session — Post Second Print Test)
+
+### Snap lid fell through (RenderLid.scad)
+- Bead outer face was flush with lid edge; all-edges chamfer ate it → zero protrusion → no click.
+- **Fix:** `snap_protr = noz`. Translate: `sx * (lid_w/2 + clearance/2 + snap_protr - sw/2)`. Bead outer face now noz past box interior wall.
+
+### Glide lid wouldn't enter groove (RenderBox.scad)
+- `groove_h = sl + tol = 2.4mm` but lid `sl_glide = max(sl, ball_d) = 3.2mm`.
+- **Fix:** `groove_h = max(sl_glide + tol, ball_d + tol + noz*4)`.
+
+### C-clip broke on PLA (RenderLid.scad)
+- Gap hardcoded `hinge_d * 0.80` regardless of material.
+- **Fix:** `clip_gap = (filament=="PLA") ? hinge_d*0.90 : hinge_d*0.80`.
+
+### Flip_Double half-lids too long (MasterManifest.scad)
+- All Flip_Double intents used `flip_lid_l` (full-box formula). Lids ~2× too long.
+- **Fix:** All Flip_Double intents use `flip_half_lid_l = l/2 - flip_hinge_y`.
+- Direction was already correct — MIRROR_Y was wrong and reverted.
+
+### Glide ball dimples were broken arcs (RenderBox.scad)
+- Sphere cutter diameter = groove_h → sphere cut to groove edges → arc not circle. Structurally weak.
+- **Fix:** `groove_h = max(sl_glide + tol, ball_d + tol + noz*4)`. noz*4 adds 2-nozzle margin above/below sphere so it prints as a full contained circle.
+
+### Flip_Single hinge corner hollow (RenderBox.scad)
+- Pillars started at `l/2 - 0.5`; box inner wall is at `l/2 - sw`. 1.9mm hollow corner at the hinge.
+- **Fix:** Pillar front face moved to `l/2 - sw`. Depth updated to `hinge_y + sw + 0.5`. Applied to all three pillar types (left corner, right corner, centre grid columns).
+
+---
+
+## Open Issues — Needs Next Print + Fix
+
+### CRITICAL: Flip_Double — both lids can't open 90° simultaneously
+- User confirmed physically. Also described as "rough and ugly" at lid-hinge interface.
+- **Root cause:** `spine_gap = ROOM_SPINE_PETG = 0.5mm`. When one lid opens, its C-clip sweeps through an arc. The inner face of the C-clip (at `hinge_y - clip_od/2 = spine_gap = 0.5mm` from box center) comes within 1mm of the other lid's C-clip inner face. There is no arc clearance.
+- **Fix needed:** Increase `ROOM_SPINE` to `clip_od/2 ≈ 4mm` minimum so each C-clip has a full quarter-turn of clearance before hitting the other. Files: `MasterTolerance.scad` (ROOM_SPINE_PLA, ROOM_SPINE_PETG) and `MasterManifest.scad` (flip_hinge_y formula recheck).
+- **Also:** Clean up the structural web connecting C-clip to lid face (the foot/gusset) — currently rough where it meets the lid slab.
+
+### LOW: Rabbet snap geometry fundamentally wrong
+- Box groove at `groove_z = h - sl - bead_h`. Lid bead at lid top (Z=sl). When seated flush, bead is at Z=h, groove at h-sl-bead_h to h-sl → no overlap, no click.
+- **Fix needed:** Move groove to `groove_z = h - bead_h` (just below box rim). Move lid bead to `Z = sl - bead_h/2` (near lid top, within lid body). Coordinated change in RenderBox + RenderLid snap sections.
+
+### LOW: F6, F14, F15
+- F6: RenderLid.scad ~L120 — diamond latch `layer_snap` call
+- F14: RenderLid.scad ~L44 — snap bead layer-align
+- F15: RenderBox.scad ~L103 — flip-box hinge assert
+
+---
+
+## Architecture Quick Reference
+
+```
+MasterBuilder.scad       ← Layer 4: Customizer UI + dispatcher
+MasterManifest.scad      ← Layer 3: compile_manifest() + intent logic
+  flip_half_lid_l()      ← MUST use for Flip_Double half-lids (not flip_lid_l)
+  flip_hinge_y()         ← clip_od/2 + spine_gap
+RenderBox.scad           ← Factory: boxes with all lid variants
+RenderLid.scad           ← Factory: all lid types
+  factory_render_lid(data, opts, phys)
+  opts["LID_TYPE"]       ← "Snap" | "Glide" | "Flip_Single" | "Screw" | "Slip"
+  data["FILAMENT_TYPE"]  ← "PLA" | "PETG" — affects clip_gap
+RenderPlaque.scad        ← Factory: label plaques (Wall/Lid/Lid_Peg)
+MasterTolerance.scad     ← breathing_room(), engagement_depth(), COMP_* constants
+MasterEngine.scad        ← Pure functions: glide_ball_d(), flip_latch_z(), etc.
+MasterEnum.scad          ← All key constants
+```
+
+### Key tolerance constants (MasterTolerance.scad)
+| Constant | PLA | PETG | Note |
+|----------|-----|------|------|
+| `COMP_CCLIP` | 0.15mm | 0.25mm | C-clip clearance |
+| `COMP_GLIDE` | 0.30mm | 0.40mm | Glide/snap |
+| `COMP_SPINE` | 0.30mm | 0.50mm | **← too small, needs ~4mm** |
+| `COMP_CLASP` | 4.0mm | 4.6mm | Latch engagement depth |
+| `COMP_BELLY` | 0.5mm | 0.8mm | Clip flat zone |
+
+### Flip_Double geometry (PETG, 0.4mm nozzle, current values)
+```
+hinge_d     = 4.0mm
+clip_wall   = noz * 4 = 1.6mm
+clip_od     = hinge_d + clearance*2 + clip_wall*2 = 7.7mm
+cc_z        = clip_od/2 = 3.85mm
+spine_gap   = ROOM_SPINE_PETG = 0.50mm   ← PROBLEM: needs ≥ clip_od/2 = 3.85mm
+hinge_y     = clip_od/2 + spine_gap = 4.35mm
+spine_w     = hinge_y*2 + hinge_d = 12.7mm
+flip_half_lid_l(data) = l/2 - hinge_y
+```
+
+---
+
+## Suggested New Session Prompt
+
+```
+We're continuing MasterTray on branch refactor/code-clarity-and-safety.
+Read docs/HANDOFF.md first — it has the full list of what was fixed and
+what's still open.
+
+Two fixes are needed:
+
+1. CRITICAL — Flip_Double simultaneous 90° open:
+   spine_gap = ROOM_SPINE in MasterTolerance.scad is 0.5mm — far too
+   small. The C-clip arc radius is clip_od/2 ≈ 3.85mm. Two C-clips
+   facing each other 2*spine_gap = 1mm apart will collide during opening.
+   ROOM_SPINE_PETG and ROOM_SPINE_PLA need to be increased to at least
+   clip_od/2 so each C-clip can swing 90° without hitting the other.
+   After updating ROOM_SPINE, verify flip_hinge_y() in MasterManifest.scad
+   recalculates spine_w and flip_half_lid_l correctly.
+   Also: clean up the visual appearance of where the C-clip foot meets the
+   lid slab in RenderLid.scad Flip_Single section.
+
+2. LOW — Rabbet snap groove_z is wrong (see HANDOFF for details).
+
+After fixes, run "Lid Testing" intent to review. Then push branch + open PR.
+```
