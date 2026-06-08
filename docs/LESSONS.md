@@ -182,23 +182,37 @@ and fails in print.
 1. C-clip hinge arm tips — arc opening at +Z left tips floating above lid top
 2. Glide ball catch — sphere at sl/2 with ball_r > sl/2 → top of ball floats above lid
 
-**Fixes by case:**
+**Preferred fix: thicken the host body.**
 
-| Situation | Fix | Do not |
-|-----------|-----|--------|
-| Feature too tall for host Z | Add full-height connecting rib from feature back to host wall | Just move the ball — you'll break the mating geometry |
-| Arc/C-shape printed face-down | Opening faces −Z; arc at top = self-supporting | Opening at +Z = arm tips float |
-| Spherical snap catch on thin slab | Rib spans Z=0..sl, inset inside host wall boundary | Bare sphere at sl/2 |
+If a round feature doesn't fit within the host's Z range, increase the host
+thickness so it does. This is cleaner than adding ribs or repositioning geometry.
 
-**Rib pattern for ball catches:**
 ```scad
-// Ball at correct protrusion (mating geometry unchanged)
-translate([sx * (wall_edge + ball_r - ball_protr), y, sl/2])
+// Glide lid — ensure ball is fully embedded
+sl_glide = max(sl, ball_d);   // lid at least as thick as ball diameter
+// Ball center at sl_glide/2 — ball_r ≤ sl_glide/2, always within body
+translate([sx * (wall_edge + ball_r - ball_protr), y, sl_glide/2])
     sphere(d=ball_d);
-// Full-height rib — inset inside wall, no groove protrusion
+
+// Plaque socket — ensure face plate is at least as thick as socket OD
+p_t_eff = max(p_t, od);       // slab fully backs the socket base, no bridging
+```
+
+**Fallback fix: full-height connecting rib.** When thickening would break mating
+geometry or is too expensive dimensionally, add a rib that spans the full host
+height and connects the feature to the host wall at every layer:
+
+```scad
+// Rib inset inside wall, no protrusion into groove channel
 translate([sx * (wall_edge - ball_r/2), y, sl/2])
     cuboid([ball_r + EPS, ball_d * 0.7, sl + EPS], anchor=CENTER);
 ```
+
+| Situation | Preferred fix | Fallback |
+|-----------|--------------|---------|
+| Ball catch on thin slab | `sl = max(sl, ball_d)` | Full-height rib inset inside wall |
+| Socket OD > slab thickness | `p_t = max(p_t, od)` | Rib / boss at socket base |
+| Arc/C-shape printed face-down | Opening at −Z (arc self-supporting) | — |
 
 **Flag immediately** any sphere, hemisphere, or cylindrical snap feature placed at the
 midpoint of a thin slab without verifying the Z-range containment condition.
