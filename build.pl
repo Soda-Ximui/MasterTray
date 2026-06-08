@@ -1,17 +1,19 @@
 #!/usr/bin/env perl
 # ──────────────────────────────────────────────────────────────────────────────
-# mastertray_build.pl — MasterTray build queue runner
+# build.pl — MasterTray build queue runner
 # Tested on Strawberry Perl 5.42 / Windows 11
 #
 # Usage:
-#   perl mastertray_build.pl queue.yaml
-#   perl mastertray_build.pl queue.yaml --dry-run                # show commands only
-#   perl mastertray_build.pl queue.yaml --only "Jar with Lid"    # single intent
-#   perl mastertray_build.pl queue.yaml --out ./MySTL            # override output dir
-#   perl mastertray_build.pl queue.yaml --output-dir D:\Prints   # same, long form
-#   perl mastertray_build.pl queue.yaml --verbose
+#   perl build.pl queue.yaml
+#   perl build.pl queue.yaml --dry-run                # show commands only
+#   perl build.pl queue.yaml --only "Box"             # single intent by name
+#   perl build.pl queue.yaml --out ./MySTL            # override output dir
+#   perl build.pl queue.yaml --output-dir D:\Prints   # same, long form
+#   perl build.pl queue.yaml --verbose
 #
 # Output dir precedence:  --out / --output-dir CLI  >  output.dir in YAML  >  STL/
+#
+# Queue file format: see queue.example.yaml
 #
 # Required modules — missing ones are installed automatically via cpanm/cpan:
 #   YAML::Tiny, JSON::PP, File::Temp  — bundled with Strawberry Perl
@@ -62,36 +64,68 @@ BEGIN {
 # OpenSCAD variables whose values must be quoted as strings: VAR="value"
 my %STR_VARS = map { $_ => 1 } qw(
     Part_To_Build Filament_Type Mechanical_Fit mesh_pattern
-    dimension_mode jar_shape grid_type grid_layout plaque_text
-    plaque_style modify_wall target_wall lid_glide_direction lid_glide_snap
+    dimension_mode jar_shape grid_layout modify_wall target_wall
+    Glide_Direction Glide_Snap plaque_target clip_type
 );
 
 # Map: queue YAML key  →  OpenSCAD Customizer variable name
+# Valid intents (Part_To_Build): Box | Pillbox Full Set | Lid | Simple Tray |
+#   Jar | Threaded Jar | S4 Jar | Spool Jar | S4 Wedge | S4 Set |
+#   Plaque | Grid | Grid Test | Lid Testing
 my %FIELD_MAP = (
-    intent            => 'Part_To_Build',
-    width             => 'part_width',
-    length            => 'part_length',
-    height            => 'part_height',
-    dimension_mode    => 'dimension_mode',
-    material          => 'Filament_Type',
-    fit_profile       => 'Mechanical_Fit',
-    nozzle            => 'Nozzle_Diameter',
-    layer_height      => 'Layer_Height',
-    wall_loops        => 'Wall_Loops',
-    mesh_pattern      => 'mesh_pattern',
-    mesh_hole_size    => 'mesh_hole_size',
-    strut_wall        => 'strut_wall_perc',
-    strut_floor       => 'strut_floor_perc',
-    strut_lid         => 'strut_lid_perc',
-    wall_thickness    => 'wall_thickness',
-    floor_thickness   => 'floor_thickness',
-    lid_thickness     => 'lid_thickness',
-    divider_thickness => 'divider_thickness',
-    grid_type         => 'grid_type',
-    grid_layout       => 'grid_layout',
-    grid_has_base     => 'grid_has_base',
-    jar_shape         => 'jar_shape',
-    plaque_text       => 'plaque_text',
+    # Core
+    intent              => 'Part_To_Build',
+    width               => 'part_width',
+    length              => 'part_length',
+    height              => 'part_height',
+    dimension_mode      => 'dimension_mode',      # Total | Usable
+    # Printer
+    material            => 'Filament_Type',        # PLA | PETG | TPU | ABS
+    fit_profile         => 'Mechanical_Fit',       # Tighter|Tight|Standard|Loose|Looser
+    nozzle              => 'Nozzle_Diameter',
+    layer_height        => 'Layer_Height',
+    wall_loops          => 'Wall_Loops',
+    # Mesh aesthetics
+    mesh_pattern        => 'mesh_pattern',         # Honeycomb|Teardrop|Slotted|Circle|Square|Diamond|None
+    mesh_hole_size      => 'mesh_hole_size',
+    mesh_hole_spacing   => 'mesh_hole_spacing',
+    strut_wall          => 'strut_wall_perc',
+    strut_floor         => 'strut_floor_perc',
+    strut_lid           => 'strut_lid_perc',
+    # Thickness overrides
+    wall_thickness      => 'wall_thickness',
+    floor_thickness     => 'floor_thickness',
+    lid_thickness       => 'lid_thickness',
+    divider_thickness   => 'divider_thickness',
+    # Box lid type selectors (Box intent — each generates a box+lid pair)
+    snap_external       => 'Snap_External',        # true|false
+    snap_internal       => 'Snap_Internal',
+    glide_external      => 'Glide_External',
+    glide_internal      => 'Glide_Internal',
+    flip_single         => 'Flip_Single',
+    flip_double         => 'Flip_Double',
+    glide_direction     => 'Glide_Direction',      # H | V
+    glide_snap          => 'Glide_Snap',           # Ball | Tab
+    # Jar
+    jar_shape           => 'jar_shape',            # Circle|Quad|Hexa|Octa|Dodeca
+    jar_with_lid        => 'Jar_Lid',              # true = threaded lid
+    # Simple Tray stackable variants
+    nesting             => 'Nesting',
+    peg                 => 'Peg',
+    # Grid
+    grid_layout         => 'grid_layout',
+    # Plaque
+    plaque_target       => 'plaque_target',        # Wall | Lid | Lid_Peg
+    clip_type           => 'clip_type',            # Vertical | Horizontal
+    plaque_w            => 'plaque_w',
+    plaque_h            => 'plaque_h',
+    clip_h              => 'clip_h',
+    # Wall modifications
+    modify_wall         => 'modify_wall',          # None|Dropped|50%|25%
+    target_wall         => 'target_wall',          # All Walls|Front|Back|Left|Right
+    # Geometry overrides
+    chamfer_size        => 'chamfer_size',
+    corner_radius       => 'corner_radius',
 );
 
 # Template is now installed (or was already). Load it.

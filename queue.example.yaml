@@ -1,92 +1,133 @@
 # ──────────────────────────────────────────────────────────────────────────────
-# MasterTray Build Queue
-# Run with:  perl mastertray_build.pl queue.yaml
+# MasterTray Build Queue  —  queue.example.yaml
+#
+# Run with:  perl build.pl queue.yaml
+#            perl build.pl queue.yaml --dry-run
+#            perl build.pl queue.yaml --only "Box"
+#            perl build.pl queue.yaml --out D:\Prints --verbose
+#
+# Valid intents (intent: field):
+#   Box           — box + all selected lid types on one platter
+#   Lid           — standalone lid only
+#   Simple Tray   — open tray (optionally with Nesting / Peg variants)
+#   Pillbox Full Set
+#   Jar           — open-top jar
+#   Threaded Jar  — jar with screw-cap lid
+#   S4 Jar | Spool Jar | S4 Wedge | S4 Set
+#   Plaque        — label clip (Wall) or adhesive plate (Lid / Lid_Peg)
+#   Grid          — drop-in divider grid only
+#   Grid Test     — small test piece to verify grid fit before a full run
+#   Lid Testing   — platter of every lid type for fit calibration
 # ──────────────────────────────────────────────────────────────────────────────
 
-# ── Tool configuration ────────────────────────────────────────────────────────
+# ── Tool paths ────────────────────────────────────────────────────────────────
 tools:
-  # Path to OpenSCAD binary. "openscad" if it's in PATH.
   openscad: "C:/Program Files/OpenSCAD/openscad.exe"
-  # Path to MasterBuilder.scad (relative to this file, or absolute)
-  scad_file: MasterBuilder.scad
-  # Template directory (leave blank to use built-in templates)
-  template_dir: templates
+  scad_file: MasterBuilder.scad        # relative to this file, or absolute
 
 # ── Output ────────────────────────────────────────────────────────────────────
 output:
-  dir: STL
-  format: 3mf            # stl | 3mf
-  generate_report: true  # create {name} - Report.md
-  generate_slicer: true  # create {name} - Slicer.md
-  save_payload: false    # keep {name}.psv (raw debug payload)
+  dir: STL                             # relative to this file, or absolute
+  format: 3mf                          # stl | 3mf
+  generate_report: true                # write {name} - Report.md
+  generate_slicer: true                # write {name} - Slicer.md
+  save_payload: false                  # keep raw {name}.psv debug payload
 
 # ── Global defaults ───────────────────────────────────────────────────────────
-# Any field set here is used for every build unless the build overrides it.
+# Any key set here applies to every build unless the build overrides it.
 defaults:
-  material:           PETG
-  fit_profile:        Standard   # Tighter | Tight | Standard | Loose | Looser
+  material:           PETG             # PLA | PETG | TPU | ABS
+  fit_profile:        Standard         # Tighter | Tight | Standard | Loose | Looser
   nozzle:             0.4
   layer_height:       0.28
   wall_loops:         2
-  dimension_mode:     Total      # Total | Usable
-  jar_shape:          Circle     # Circle | Quad | Hexa | Octa | Dodeca
-  mesh_pattern:       Teardrop   # Honeycomb | Teardrop | Slotted | Circle | Square | Diamond | None
-  mesh_hole_size:     0.0        # 0 = auto; >0 overrides all three surfaces
-  strut_wall:         100        # % mesh density on walls
-  strut_floor:        100
-  strut_lid:          100
+  dimension_mode:     Total            # Total (outer dims) | Usable (inner dims)
+  mesh_pattern:       Teardrop         # Honeycomb|Teardrop|Slotted|Circle|Square|Diamond|None
+  mesh_hole_size:     1.6
+  mesh_hole_spacing:  1.2
+  strut_wall:         0
+  strut_floor:        25
+  strut_lid:          75
   wall_thickness:     2.4
   floor_thickness:    2.0
   lid_thickness:      2.0
   divider_thickness:  1.2
-  grid_type:          None       # Built-in | Drop-in | None
-  grid_layout:        ""
-  grid_has_base:      false
 
 # ── Builds ────────────────────────────────────────────────────────────────────
 builds:
 
-  - intent:            "Jar with Lid"
-    width:             40
-    length:            120
-    height:            50
-    material:          PETG
-    nozzle:            0.6
-    layer_height:      0.28
-    mesh_pattern:      Teardrop
-    mesh_hole_size:    1.8
-    divider_thickness: 1.6
-    strut_wall:        20
-    strut_floor:       25
-    strut_lid:         10
+  # ── Box with selected lid types ─────────────────────────────────────────────
+  # Each true selector adds a box+lid pair to the platter.
+  - intent:           Box
+    width:            60
+    length:           80
+    height:           35
+    snap_external:    true
+    snap_internal:    false
+    glide_external:   true
+    glide_internal:   false
+    glide_direction:  H               # H (Y-axis slide) | V (X-axis slide)
+    glide_snap:       Ball            # Ball (side dimples) | Tab (front snap)
+    flip_single:      true
+    flip_double:      false
 
-  - intent:            "7-Day Pill Box"
-    width:             140
-    length:            35
-    height:            25
-    fit_profile:       Tight
-    mesh_hole_size:    1.4
-    strut_wall:        30
-    strut_floor:       30
-    strut_lid:         20
+  # ── Lid Testing — fit calibration platter ────────────────────────────────────
+  # Generates one of every lid type for a given box size. Print this first
+  # when dialling in tolerances for a new filament or printer.
+  - intent:           Lid Testing
+    width:            60
+    length:           80
+    height:           35
+    fit_profile:      Tight
 
-  - intent:            "14-Day AM/PM Box"
-    width:             140
-    length:            35
-    height:            25
-    fit_profile:       Tight
-    mesh_hole_size:    1.4
-    strut_wall:        30
-    strut_floor:       30
-    strut_lid:         20
+  # ── Threaded jar with screw lid ───────────────────────────────────────────────
+  - intent:           Threaded Jar
+    width:            50              # outer diameter for Circle shape
+    height:           60
+    jar_shape:        Circle          # Circle|Quad|Hexa|Octa|Dodeca
+    jar_with_lid:     true            # true = include screw cap
+    material:         PETG
+    nozzle:           0.4
+    mesh_hole_size:   1.8
+    strut_wall:       20
+    strut_floor:      30
 
-  - intent:            "Standalone Box"
-    width:             80
-    length:            50
-    height:            30
-    mesh_hole_size:    1.6
-    strut_wall:        25
-    strut_floor:       25
-    strut_lid:         15
-    grid_type:         Built-in
-    grid_layout:       "4x3"
+  # ── Open jar, no lid ──────────────────────────────────────────────────────────
+  - intent:           Jar
+    width:            40
+    height:           50
+    jar_shape:        Hexa
+    jar_with_lid:     false
+
+  # ── Simple tray with all stackable variants ────────────────────────────────────
+  # Generates plain + Nesting + Peg variants in one shot when both are true.
+  - intent:           Simple Tray
+    width:            120
+    length:           80
+    height:           25
+    nesting:          true
+    peg:              true
+    mesh_pattern:     Honeycomb
+    strut_floor:      0
+
+  # ── Grid drop-in ───────────────────────────────────────────────────────────────
+  # grid_layout: cell definitions string — see MasterBuilder.scad comments.
+  - intent:           Grid
+    width:            120
+    length:           80
+    height:           25
+    grid_layout:      "(A1,60)(A2,60)[A1,N][A2,E]"
+
+  # ── Wall plaque — U-clip label holder ─────────────────────────────────────────
+  - intent:           Plaque
+    plaque_target:    Wall            # Wall | Lid | Lid_Peg
+    clip_type:        Vertical        # Vertical | Horizontal
+    plaque_w:         50
+    plaque_h:         30
+    clip_h:           20
+
+  # ── Lid plaque — press-fit peg mount ──────────────────────────────────────────
+  - intent:           Plaque
+    plaque_target:    Lid_Peg
+    plaque_w:         50
+    plaque_h:         30

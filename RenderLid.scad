@@ -157,8 +157,11 @@ module factory_render_lid(data, opts, phys) {
                                 cuboid([clip_len+2, clip_outer_d,
                                         clip_outer_d - flat_belly*2], anchor=CENTER);
                             }
+                            // X span = clip_len − EPS so block ends are EPS/2 inside the
+                            // cylinder ends (both are clip_len/2 without this) — coplanar X faces
+                            // in union() produce non-manifold edges along the shared boundary.
                             translate([0, -hinge_y_off/2, -(clip_z-sl)/2 - 0.5])
-                                cuboid([clip_len, hinge_y_off+1.0, (clip_z-sl)+1.0],
+                                cuboid([clip_len - EPS, hinge_y_off+1.0, (clip_z-sl)+1.0],
                                        chamfer=1.0, edges=[TOP+FRONT, TOP+BACK], anchor=CENTER);
                         }
                         yrot(90) cyl(d=hinge_d + clearance*2, h=clip_len+2, $fn=36);

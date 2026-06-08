@@ -814,6 +814,7 @@ If any computed face coordinate equals the chassis wall coordinate exactly → a
 | Flip_Single lid C-opening cutter | `RenderLid.scad` | Cutter top coplanar with connection-block top at local z=0 | `clip_outer_d + EPS2` on cutter height (see §11d) |
 | Flip_Single lid diamond tip hull | `RenderLid.scad` | Hull cuboid X face coplanar with latch arm X face | Hull width `lid_w-sw*4+EPS` (see §11e) |
 | Flip_Single/Double axle pins | `RenderBox.scad` | Pin end cap at ±(w/2−sw) = inner wall X face | `h=w−sw*2+EPS2` (see §11g) |
+| Flip_Single lid C-clip foot | `RenderLid.scad` | Connection block X = cylinder X = ±clip_len/2, coplanar in inner `union()` | Block width `clip_len−EPS` (see §11h) |
 
 ### Floating regions after non-manifold repair
 
@@ -1112,3 +1113,39 @@ yrot(90) cyl(d=hinge_d, h=w - sw*2 + EPS2, chamfer=0.5, $fn=36);
 **Applies to:** Flip_Single axle pin (1 pin), Flip_Double axle pins (2 pins). Both use the
 same formula. Each coplanar end cap produces multiple non-manifold edges at the circular
 boundary — a single `EPS2` fix on `h` resolves all of them.
+
+---
+
+### 11h. Two additions with equal span in a nested `union()` — connection block vs cylinder
+
+When a cylinder and a rectangular block are `union()`-ed inside a `difference()`, and both have the
+same axis-aligned span, their end faces are coplanar. CGAL produces non-manifold edges along the
+boundary of the region where the two faces coincide.
+
+**The C-clip foot example:**
+
+```scad
+union() {
+    yrot(90) cyl(d=clip_outer_d, h=clip_len, ...);   // X extent: ±clip_len/2
+    cuboid([clip_len, ...], anchor=CENTER);            // X extent: ±clip_len/2  ← coplanar ✗
+}
+```
+
+Both have X end faces at exactly ±clip_len/2. In the overlap region in YZ, the faces coincide.
+After the outer `difference()` subtracts the bore and C-opening, the remaining connection block
+still has X faces at ±clip_len/2 coplanar with the cylinder's chamfered ends.
+
+**Fix:** Shrink the connection block by `EPS` so its ends are inside the cylinder ends:
+
+```scad
+cuboid([clip_len - EPS, ...], anchor=CENTER);  // X extent: ±(clip_len/2 − EPS/2) ✓
+```
+
+The cylinder ends at ±clip_len/2 are now EPS/2 outside the block. No coplanar face.
+
+**Which to shrink?** Shrink the STRUCTURAL piece (the foot), not the functional piece (the cylinder
+whose length determines the hinge gap and must match the box boss spacing).
+
+**Detection rule:** Any two `union()` additions that use the same dimension expression for the same
+axis — check their end faces. If both end at ±X, ±Y, or ±Z with the same arithmetic result, one
+needs `− EPS` on that dimension.
