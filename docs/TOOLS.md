@@ -1,6 +1,26 @@
 # MasterTray Project Tools
 
-Reference for every tool available in this repo. Covers purpose, inputs, outputs, and quick invocation.
+Reference for every tool available in this repo — both the project automation scripts and the underlying runtime environment they depend on.
+
+---
+
+## Environment / Runtimes
+
+| Tool | Version | Path | Notes |
+|---|---|---|---|
+| **OpenSCAD** | 2026.04.26 | `C:\Program Files\OpenSCAD\openscad.exe` | Use this path in scripts; CGAL manifold backend enabled via Preferences → Features → manifold |
+| **Python** | 3.14.5 | `C:\Python314\python.exe` | Use this interpreter, not the WindowsApps shim |
+| **pymeshlab** | 2025.7.post1 | (Python package) | `pip install pymeshlab` — required by `check_manifold.py` and `nm_hunt.py` |
+| **Perl** | 5.42.2 (Strawberry) | `C:\Strawberry\perl\bin\perl.exe` | Use Strawberry Perl for `build.pl`; the Git-bundled `/usr/bin/perl` lacks the required modules |
+| **Template (TT2)** | 3.102 | (Strawberry Perl module) | Required by `build.pl` for report generation |
+| **YAML::Tiny** | 1.76 | (Strawberry Perl module) | Required by `build.pl` for queue parsing |
+| **PowerShell** | 7+ (pwsh) | system | Used by `TODO.ps1` and for general shell work |
+
+**PATH note:** When invoking Perl from PowerShell, call Strawberry explicitly:
+```powershell
+C:\Strawberry\perl\bin\perl.exe build.pl queue.yaml
+```
+Or ensure `C:\Strawberry\perl\bin` precedes the Git Perl in `$env:PATH`.
 
 ---
 
