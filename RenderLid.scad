@@ -179,9 +179,17 @@ module factory_render_lid(data, opts, phys) {
                     }
             }
             // Diamond latch arm — one solid block from lid face to clasp top.
-            // Sunk EPS below Z=0 so the bottom face doesn't share the lid face plane (non-manifold).
-            translate([0, -lid_l/2 - 1.1 + EPS, -EPS])
-                cuboid([lid_w - sw*4, 2.2, sl + clasp_depth + EPS], anchor=BOTTOM);
+            // Bottom at -EPS so arm doesn't share the lid bottom face plane.
+            // Back face (anchor=BACK) buried arm_bury past lid body -Y face so the root
+            // clears the lid's bottom+top chamfer zones. Without this, the arm's +Y face
+            // at -lid_l/2+EPS sits inside the chamfer zone — three planes (lid front, lid
+            // bottom chamfer, arm side) converge near the same point → non-manifold corners.
+            // arm_bury = chamfer_depth + noz margin, so back face is past the chamfer zone.
+            // Front face stays at -lid_l/2-2.2 (same protrusion, same latch engagement).
+            arm_bury = max(noz, m_chamf(data)) + noz;
+            translate([0, -lid_l/2 + arm_bury, -EPS])
+                cuboid([lid_w - sw*4, 2.2 + arm_bury, sl + clasp_depth + EPS],
+                       anchor=BACK+BOTTOM);
             // Diamond tip — the snap click point.
             // Z-tips truncated to noz*1.05 (Arachne flat-top, no pressure pinch).
             // Z-offsets snapped to layer boundaries via layer_snap() — no micro-stepping.

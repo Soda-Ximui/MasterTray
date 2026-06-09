@@ -816,6 +816,7 @@ If any computed face coordinate equals the chassis wall coordinate exactly → a
 | Flip_Single lid diamond tip hull | `RenderLid.scad` | Hull cuboid X face coplanar with latch arm X face | Hull width `lid_w-sw*4+EPS` (see §11e) |
 | Flip_Single/Double axle pins | `RenderBox.scad` | Pin end cap at ±(w/2−sw) = inner wall X face | `h=w−sw*2+EPS2` (see §11g) |
 | Flip_Single lid C-clip foot | `RenderLid.scad` | Connection block X = cylinder X = ±clip_len/2, coplanar in inner `union()` | Block width `clip_len−EPS` (see §11h) |
+| Flip_Single lid latch arm root | `RenderLid.scad` | Arm back face inside lid body chamfer zone → NM corners at ±X bottom edges | `arm_bury = max(noz,m_chamf)+noz`; `anchor=BACK+BOTTOM` (see §11j) |
 
 ### Floating regions after non-manifold repair
 
@@ -1199,3 +1200,34 @@ translate([x, y, sf - EPS]) cuboid([w, d, h + EPS], anchor=BOTTOM);
 
 **Detection rule:** Any `translate([..., sf])` with `anchor=BOTTOM` placing a feature on the
 floor top — add `- EPS` to the Z translation and `+ EPS` to the height.
+
+---
+
+### §11j — Addition root face inside body chamfer zone
+
+`apply_master_bounds` (and any `cuboid` with `chamfer=`) removes material in a triangular zone near
+each edge. When a second `union()` solid has its root face **inside** that zone, three planes
+(body face, chamfer face, addition side face) converge near the same point — CGAL produces
+non-manifold corners there.
+
+**Example:** Flip_Single lid latch arm. The arm's back (+Y) face was at `-lid_l/2 + EPS`. The lid
+body has chamfer depth `max(noz, m_chamf)` ≈ 0.4–1.0 mm from the front face. The arm root sat
+squarely inside the chamfer zone, creating non-manifold corners at ±X bottom edges.
+
+```scad
+// BAD — arm root at -lid_l/2+EPS lands inside lid body chamfer zone ✗
+translate([0, -lid_l/2 - 1.1 + EPS, -EPS])
+    cuboid([lid_w-sw*4, 2.2, sl+clasp_depth+EPS], anchor=BOTTOM);
+// arm back face (+Y) at translate Y = -lid_l/2+EPS → inside chamfer zone → NM corners
+
+// GOOD — bury root past chamfer zone; keep front face protrusion unchanged ✓
+arm_bury = max(noz, m_chamf(data)) + noz;  // one noz margin past chamfer depth
+translate([0, -lid_l/2 + arm_bury, -EPS])
+    cuboid([lid_w-sw*4, 2.2 + arm_bury, sl+clasp_depth+EPS], anchor=BACK+BOTTOM);
+// back face at -lid_l/2+arm_bury (past chamfer zone)
+// front face at -lid_l/2+arm_bury-(2.2+arm_bury) = -lid_l/2-2.2 (unchanged) ✓
+```
+
+**Detection rule:** Any `union()` solid whose root face is closer than `max(noz, m_chamf)` to a
+chamfered edge of the container body — increase the burial to at least `max(noz, m_chamf) + noz`
+and compensate the opposite face to preserve geometry.
