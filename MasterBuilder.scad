@@ -27,15 +27,21 @@ dimension_mode = "Total"; // ["Total", "Usable"]
 grid_layout = "(A1,60,0)(A2,60,145,80%)(A3,60,195,C40,80)[A1,N][A2,E][A3,E]";
 
 /* [Box Lid Types] */
+// Standalone "Lid" intent: select which lid type to build.
+// Glide also uses Glide_Direction and Glide_Snap below.
+// Snap also uses Lid_Style below.
+Standalone_Lid_Type  = "Flip_Single"; // ["Slip", "Snap", "Glide", "Flip_Single", "Screw"]
+Lid_Style            = "External";    // ["External", "Rabbet"]
+
 // Each checked type generates an additional box+lid pair on the platter.
-Snap_External = true;
-Snap_Internal = true;
-Glide_External = true;
-Glide_Internal = true;
+Snap_External = false;
+Snap_Internal = false;
+Glide_External = false;
+Glide_Internal = false;
 Glide_Direction = "H"; // ["H", "V"]
 Glide_Snap      = "Ball"; // ["Ball", "Tab"]
 Flip_Single = true;
-Flip_Double = true;
+Flip_Double = false;
 
 /* [Stacking Trays] */
 // When building "Simple Tray", also generate these stackable variants.
@@ -48,12 +54,12 @@ jar_shape = "Circle"; // ["Circle", "Quad", "Hexa", "Octa", "Dodeca"]
 Jar_Lid = false;
 
 /* [Mesh Aesthetics] */
-mesh_pattern = "Teardrop"; // ["Honeycomb", "Teardrop", "Slotted", "Circle", "Square", "Diamond", "None"]
+mesh_pattern = "None"; // ["Honeycomb", "Teardrop", "Slotted", "Circle", "Square", "Diamond", "None"]
 // Hole diameter (mm). Min printable ≈ 1.0mm at 0.4mm nozzle.
-mesh_hole_size = 1.6; // [0.5 : 0.1 : 8.0]
+mesh_hole_size = 0; // [0.0 : 0.1 : 8.0]
 // Minimum gap between hole edges (mm). Physics floor always applies regardless.
 // Tip: Wall_Loops × Nozzle_Diameter (e.g. 2 × 0.4 = 0.8mm at default settings).
-mesh_hole_spacing = 1.2; // [1.0 : 0.1 : 5.0]
+mesh_hole_spacing = 1.2; // [0.0: 0.1 : 5.0]
 // Solid border as % of surface. 0 = edge-to-edge holes. 100 = fully solid (no mesh).
 // The minimum solid margin at the jar neck / box lip is provided by the container
 // geometry itself — the mesh strut% is purely aesthetic and always honoured as-is.
@@ -191,6 +197,8 @@ ui_payload = [
     [JAR_WITH_LID,       Jar_Lid],
     [GLIDE_DIR,          Glide_Direction],
     [GLIDE_SNAP,         Glide_Snap],
+    [LID_TYPE_SEL,       Standalone_Lid_Type],
+    [LID_STYLE,          Lid_Style],
     [CHAMFER_SIZE,       chamfer_size],
     [CORNER_RADIUS,      corner_radius],
     [PEG_SOCKET_D,       peg_socket_diameter],

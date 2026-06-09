@@ -60,6 +60,7 @@ JAR_SIDES    = "JAR_SIDES";
 GLIDE_DIR      = "GLIDE_DIR";   // "H" (horizontal) | "V" (vertical)
 GLIDE_SNAP     = "GLIDE_SNAP"; // "Ball" (default) | "Tab"
 LID_STYLE      = "LID_STYLE";  // "External" (default) | "Rabbet" (inside groove, flush top)
+LID_TYPE_SEL   = "LID_TYPE_SEL"; // standalone Lid intent: "Slip"|"Snap"|"Glide"|"Flip_Single"|"Screw"
 GRID_WALL_H    = "GRID_WALL_H";  // injected by factory — max divider height
 IS_JAR_GRID    = "IS_JAR_GRID"; // clip cartesian grid to circular jar boundary
 STACKABLE      = "STACKABLE";

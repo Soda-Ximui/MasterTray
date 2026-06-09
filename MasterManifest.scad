@@ -307,6 +307,17 @@ function compile_manifest(intent, data) =
   (intent == "Pillbox Full Set") ?
     concat(compile_manifest("14-Day AM/PM Box", data), compile_manifest("7-Day Pill Box", data), compile_manifest("1-Day AM/PM Box", data))
   :
+  // ── STANDALONE LID ─────────────────────────────────────────────────────────
+  // Builds one lid of the selected type. Useful for reprinting a lost lid or
+  // testing fit. LID_TYPE_SEL from Customizer selects the type; LID_STYLE selects
+  // External (over-wall groove) vs Rabbet (inside-wall groove) for Snap/Glide.
+  // Glide also reads GLIDE_DIR and GLIDE_SNAP from the Customizer as normal.
+  (intent == "Lid") ?
+    let(phys     = get_physics_profile(data),
+        lid_type = get_val(LID_TYPE_SEL, data, "Flip_Single"))
+    [["LID", data, [["LID_TYPE", lid_type]], phys]]
+  :
+
   // ── BOX / TRAY PUBLIC AGGREGATORS ──────────────────────────────────────────
   // Each checkbox = one compile_manifest call to the matching private intent.
   // Drop-in grids are decoration — emitted once here, not inside the private intents.
