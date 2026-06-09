@@ -206,18 +206,20 @@ module factory_render_box(data, opts, phys) {
             // Back Y face would land at l/2 (box outer wall) — coplanar.
             // Width  sw*3 - EPS → outer X face at ±w/2 + EPS/2 (inside wall material). ✓
             // Depth clip_od - EPS → back Y face at l/2 - EPS (inside wall material). ✓
-            // Bottom EPS sink: pillar bottom would land at Z=sf (floor top) — coplanar.
-            // Translate to sf-EPS, height +EPS so top stays at axle crown.
+            // Bottom EPS sink: pillar bottom at sf-EPS (not sf) — avoids floor-top coplanar.
+            // Height axle_z+cc_z-sf: top at sf-EPS+(axle_z+cc_z-sf) = axle_z+cc_z-EPS = h-EPS.
+            // axle_z+cc_z = h exactly, so +EPS on height would bring top to h — coplanar with
+            // box top face. Keep height as axle_z+cc_z-sf so top lands at h-EPS. ✓
             translate([-(w-sw*2)/2 + sw/2, l/2 - clip_od, sf - EPS])
-                cuboid([sw*3 - EPS, clip_od - EPS, axle_z+cc_z-sf+EPS], chamfer=m_chamf(data),
+                cuboid([sw*3 - EPS, clip_od - EPS, axle_z+cc_z-sf], chamfer=m_chamf(data),
                        edges=TOP, anchor=BOTTOM+FRONT);
             translate([ (w-sw*2)/2 - sw/2, l/2 - clip_od, sf - EPS])
-                cuboid([sw*3 - EPS, clip_od - EPS, axle_z+cc_z-sf+EPS], chamfer=m_chamf(data),
+                cuboid([sw*3 - EPS, clip_od - EPS, axle_z+cc_z-sf], chamfer=m_chamf(data),
                        edges=TOP, anchor=BOTTOM+FRONT);
             if (cols > 1 && !skip_p)
                 for (i = [1 : cols-1])
                     translate([-int_w/2 + i*(int_w/cols), l/2 - clip_od, sf - EPS])
-                        cuboid([div_t, clip_od, axle_z+cc_z-sf+EPS], chamfer=m_chamf(data),
+                        cuboid([div_t, clip_od, axle_z+cc_z-sf], chamfer=m_chamf(data),
                                edges=TOP, anchor=BOTTOM+FRONT);
             // Axle pin — EPS2 so ends at ±(w/2−sw+EPS), past box inner wall face.
             translate([0, l/2 - hinge_y, axle_z])
@@ -287,24 +289,25 @@ module factory_render_box(data, opts, phys) {
             }
             // Spine pillars (corner supports, both variants)
             // EPS-shrunk width: outer X face would land at ±w/2 (box wall) — coplanar = non-manifold.
-            // Bottom EPS sink: pillar bottom at sf-EPS so it doesn't share the floor top face.
+            // Bottom EPS sink: pillar bottom at sf-EPS (not sf) — avoids floor-top coplanar.
+            // Height axle_z+cc_z-sf: top at h-EPS (not h) — avoids box-top coplanar. ✓
             translate([-(w-sw*2)/2 + sw/2, 0, sf - EPS])
-                cuboid([sw*3 - EPS, spine_w, axle_z+cc_z-sf+EPS], chamfer=m_chamf(data),
+                cuboid([sw*3 - EPS, spine_w, axle_z+cc_z-sf], chamfer=m_chamf(data),
                        edges=TOP, anchor=BOTTOM);
             translate([ (w-sw*2)/2 - sw/2, 0, sf - EPS])
-                cuboid([sw*3 - EPS, spine_w, axle_z+cc_z-sf+EPS], chamfer=m_chamf(data),
+                cuboid([sw*3 - EPS, spine_w, axle_z+cc_z-sf], chamfer=m_chamf(data),
                        edges=TOP, anchor=BOTTOM);
             if (cols > 1 && !skip_p)
                 for (i = [1 : cols-1])
                     translate([-int_w/2 + i*(int_w/cols), 0, sf - EPS])
-                        cuboid([div_t, spine_w, axle_z+cc_z-sf+EPS], chamfer=m_chamf(data),
+                        cuboid([div_t, spine_w, axle_z+cc_z-sf], chamfer=m_chamf(data),
                                edges=TOP, anchor=BOTTOM);
             // Spine fill — connects the two side pillars across the full spine width.
             // Only for SPINE_FILL variant: individual bore cuts leave the chassis solid
             // between hinges, so this block merges seamlessly with the retained material.
             if (spine_fill && clip_len > 0)
                 translate([0, 0, sf - EPS])
-                    cuboid([int_w - sw*6, spine_w, axle_z+cc_z-sf+EPS],
+                    cuboid([int_w - sw*6, spine_w, axle_z+cc_z-sf],
                            chamfer=m_chamf(data), edges=TOP, anchor=BOTTOM);
             // Two axle pins — EPS2 so ends at ±(w/2−sw+EPS), past box inner wall face.
             translate([0, -hinge_y, axle_z])
