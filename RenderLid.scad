@@ -149,7 +149,11 @@ module factory_render_lid(data, opts, phys) {
                                         get_mesh_cfg(data, HOLE_LID, STRUT_LID));
             // C-clip hinge on +Y face — suppressed if lid is too narrow for mechanism
             if (clip_len > 0) {
-                translate([0, lid_l/2 + hinge_y_off, clip_z])
+                // +EPS on Y: cylinder is tangent to lid body +Y face at lid_l/2.
+                // Tangent contact (curved surface meets flat face at a line) can produce
+                // degenerate edges in CGAL. Shifting EPS moves the tangent to lid_l/2+EPS,
+                // breaking the contact — cylinder no longer touches the lid body boundary.
+                translate([0, lid_l/2 + hinge_y_off + EPS, clip_z])
                     difference() {
                         union() {
                             intersection() {
