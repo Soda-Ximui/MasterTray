@@ -437,17 +437,14 @@ function get_xy(manifest, target_idx, curr_idx=0, edge_x=0, edge_y=0, row_max_y=
 function layer_snap(z, lh) = round(z / lh) * lh;
 
 /// Glide lid — ball catch diameter scaled with box footprint.
-/// Larger boxes need larger balls for proportional retention strength.
-/// Capped at sw×2 so the ball never exceeds the groove wall depth.
-/// Minimum raised to noz*8 (3.2mm at 0.4mm nozzle) — keeps ball diameter above
-/// Arachne's small-perimeter speed clamp (~3mm), avoiding pressure-pinch slowdown.
-// groove_wall = (sw - 0.6) / 2 (External glide: groove leaves ~sw/2 wall each side).
-// Ball center at groove_w/2 + noz/2 — ball_r must not exceed groove_wall - noz/2
-// or the sphere cutter breaks through the outer box wall (visible holes from outside).
-// Cap: sw - 0.6 - noz ensures ball outer edge is flush with or inside the outer wall.
+/// Glide ball diameter — scales with box footprint, capped at 1.5× wall thickness.
+/// Boss pads (RenderBox) provide structural backing so the old groove-wall-penetration
+/// cap (wall_cap) is no longer needed — it was limiting ball_d to 0.8mm (2 nozzle
+/// widths), which produced zero-protrusion sockets that couldn't snap shut.
+/// Minimum noz*5 (2mm at 0.4mm nozzle) — smallest sphere with a printable socket ring.
+/// Scale 0.04: 2mm at 50mm footprint, 4mm at 100mm — proportional retention force.
 function glide_ball_d(w, l, sw, noz) =
-    let(wall_cap = max(noz * 2, sw - 0.6 - noz))
-    min(sw * 2, wall_cap, max(noz * 4, max(w, l) * 0.03));
+    max(noz * 5, min(sw * 1.5, max(w, l) * 0.04));
 
 /// Glide lid — how deeply the ball center is recessed into the lid face.
 /// Positions ball center at noz/2 past the groove wall — gentle cam entry

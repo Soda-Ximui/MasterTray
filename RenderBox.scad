@@ -97,27 +97,56 @@ module factory_render_box(data, opts, phys) {
             // Lid dims — must match RenderLid Rabbet formula
             lid_w_r  = (glide_dir == "H") ? w - sw - glide_tol : l - sw/2;
             lid_l_r  = (glide_dir == "H") ? l - sw/2           : w - sw - glide_tol;
-            ball_y   = lid_l_r/2 - ball_r*2.5;
-            ball_x_r = lid_w_r/2 + ball_r - ball_protr;
+            // sw*3 inset from end: keeps socket well clear of the corner where the
+            // Y-wall leaves no backing material. Must match ball_y in RenderLid Rabbet.
+            ball_y   = lid_l_r/2 - sw*3;
+            // noz inset: moves socket away from thin rabbet wall so sphere leaves more
+            // material on the outer side; must match the ball offset in RenderLid.
+            ball_x_r = lid_w_r/2 + ball_r - ball_protr - noz;
+            // boss_d / boss_th: pad ring on the rabbet wall face around each socket.
+            // Nested difference lets us union the boss after the rabbet cut so it
+            // protrudes into the rabbet channel and thickens the socket ledge.
+            // boss_d / boss_th: pad ring on the rabbet wall face around each socket.
+            // boss_th = ball_d + noz*4 — boss is deep enough that the sphere cutter
+            // leaves at least noz*2 of structural ring on the groove-wall side.
+            boss_d  = ball_d * 2 + noz * 4;
+            boss_th = ball_d + noz * 4;
             difference() {
-                apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
-                    core_tray_chassis(data_g);
-                if (glide_dir == "H") {
-                    for (sx = [-1, 1])
-                        translate([sx * (int_w_r/2 + rabbet_d/2), 0, h - rabbet_h])
-                            cuboid([rabbet_d + EPS, int_l_r + EPS, rabbet_h + EPS], anchor=BOTTOM);
-                    if (glide_snap == "Ball")
+                union() {
+                    difference() {
+                        apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
+                            core_tray_chassis(data_g);
+                        if (glide_dir == "H")
+                            for (sx = [-1, 1])
+                                // int_l_r + sw: extends slot through the −Y wall face so
+                                // the lid can enter from that side. +Y end stays closed (stop wall).
+                                translate([sx * (int_w_r/2 + rabbet_d/2), -sw/2, h - rabbet_h])
+                                    cuboid([rabbet_d + EPS, int_l_r + sw + EPS, rabbet_h + EPS], anchor=BOTTOM);
+                        else
+                            for (sy = [-1, 1])
+                                translate([0, sy * (int_l_r/2 + rabbet_d/2), h - rabbet_h])
+                                    cuboid([int_w_r + EPS, rabbet_d + EPS, rabbet_h + EPS], anchor=BOTTOM);
+                    }
+                    if (glide_snap == "Ball") {
+                        if (glide_dir == "H")
+                            for (sx = [-1, 1])
+                                translate([sx * ball_x_r, ball_y, h - rabbet_h/2])
+                                    yrot(90) cyl(d=boss_d, h=boss_th, $fn=36);
+                        else
+                            for (sy = [-1, 1])
+                                translate([ball_y, sy * ball_x_r, h - rabbet_h/2])
+                                    xrot(90) cyl(d=boss_d, h=boss_th, $fn=36);
+                    }
+                }
+                if (glide_snap == "Ball") {
+                    if (glide_dir == "H")
                         for (sx = [-1, 1])
                             translate([sx * ball_x_r, ball_y, h - rabbet_h/2])
-                                sphere(d=ball_d + glide_tol);
-                } else {
-                    for (sy = [-1, 1])
-                        translate([0, sy * (int_l_r/2 + rabbet_d/2), h - rabbet_h])
-                            cuboid([int_w_r + EPS, rabbet_d + EPS, rabbet_h + EPS], anchor=BOTTOM);
-                    if (glide_snap == "Ball")
+                                sphere(d=ball_d + glide_tol, $fn=24);
+                    else
                         for (sy = [-1, 1])
                             translate([ball_y, sy * ball_x_r, h - rabbet_h/2])
-                                sphere(d=ball_d + glide_tol);
+                                sphere(d=ball_d + glide_tol, $fn=24);
                 }
             }
         } else {
@@ -136,19 +165,33 @@ module factory_render_box(data, opts, phys) {
         lid_w      = groove_w - glide_tol;       // must match RenderLid lid_w formula
         lid_l      = l - sw / 2;
         ball_y     = lid_l / 2 - ball_r * 2.5;  // same formula as in RenderLid
-        ball_x     = lid_w / 2 + ball_r - ball_protr;  // = groove_w/2 + noz/2
+        // noz inset: moves socket inward so sphere leaves more material in the groove wall;
+        // must stay in sync with the matching offset in RenderLid External ball position.
+        ball_x     = lid_w / 2 + ball_r - ball_protr - noz;
+        // Boss pad — extra disk of material around each socket on the groove wall face.
+        // Nested difference: boss is unioned after groove cut so it protrudes into the
+        // groove space and gives the socket ring structural wall thickness.
+        // boss_th = ball_d + noz*4 — deep enough that the sphere leaves noz*2 ring material.
+        boss_d  = ball_d * 2 + noz * 4;
+        boss_th = ball_d + noz * 4;
 
         difference() {
-            apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
-                core_tray_chassis(data_g);
-            // Groove channel for lid to slide into
-            up(groove_z)
-                cuboid([groove_w, groove_l, groove_h], anchor=BOTTOM);
+            union() {
+                difference() {
+                    apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
+                        core_tray_chassis(data_g);
+                    up(groove_z) cuboid([groove_w, groove_l, groove_h], anchor=BOTTOM);
+                }
+                if (glide_snap == "Ball")
+                    for (sx = [-1, 1])
+                        translate([sx * ball_x, ball_y, groove_z + groove_h / 2])
+                            yrot(90) cyl(d=boss_d, h=boss_th, $fn=36);
+            }
             // Ball-catch dimples — Z at groove centre so noz*2 wall exists above and below.
             if (glide_snap == "Ball")
                 for (sx = [-1, 1])
                     translate([sx * ball_x, ball_y, groove_z + groove_h / 2])
-                        sphere(d=ball_d + glide_tol);
+                        sphere(d=ball_d + glide_tol, $fn=24);
             // Thumb notch at −Y groove mouth bottom — fingernail purchase under lid edge.
             // Shifted EPS above groove_z so notch overlaps groove interior (avoids coplanar
             // face with groove cutter bottom — would create non-manifold edges).

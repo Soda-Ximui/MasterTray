@@ -96,7 +96,9 @@ module factory_render_lid(data, opts, phys) {
             ? ((glide_dir == "H") ? l - sw / 2      : w - sw - glide_tol)
             : ((glide_dir == "H") ? l - sw / 2      : (w - sw + 0.6) - glide_tol);
 
-        ball_y = lid_l / 2 - ball_r * 2.5;
+        // Rabbet: sw*3 inset keeps ball clear of the corner where backing is absent.
+        // External: original 2.5-radius inset (near end, short groove).
+        ball_y = (lid_style == "Rabbet") ? lid_l / 2 - sw * 3 : lid_l / 2 - ball_r * 2.5;
 
         union() {
             apply_master_bounds(lid_w, lid_l, sl_glide, m_c_rad(data), m_chamf(data))
@@ -105,9 +107,10 @@ module factory_render_lid(data, opts, phys) {
 
             if (glide_snap == "Ball") {
                 for (sx = [-1, 1])
-                    // Ball center at sl_glide/2 — fully within lid body (ball_r ≤ sl_glide/2).
-                    translate([sx * (lid_w/2 + ball_r - ball_protr), ball_y, sl_glide/2])
-                        sphere(d=ball_d);
+                    // noz inset matches box socket offset — both shift inward by noz so ball
+                    // and socket stay aligned. Ball still fully within lid body (ball_r ≤ sl_glide/2).
+                    translate([sx * (lid_w/2 + ball_r - ball_protr - noz), ball_y, sl_glide/2])
+                        sphere(d=ball_d, $fn=24);
             } else {
                 tab_h = sl_glide * 0.6;
                 tab_d = noz * 3;
@@ -164,39 +167,43 @@ module factory_render_lid(data, opts, phys) {
                                 cuboid([clip_len+2, clip_outer_d,
                                         clip_outer_d - flat_belly*2], anchor=CENTER);
                             }
-                            translate([0, -hinge_y_off/2, -(clip_z-sl)/2 - 0.5])
-                                cuboid([clip_len, hinge_y_off+1.0, (clip_z-sl)+1.0],
+                            translate([0, -hinge_y_off/2, -(clip_z-sl)/2])
+                                cuboid([clip_len, hinge_y_off+2.0, (clip_z-sl)+2.0],
                                        chamfer=1.0, edges=[TOP+FRONT, TOP+BACK], anchor=CENTER);
                         }
                         yrot(90) cyl(d=hinge_d + clearance*2, h=clip_len+2, $fn=36);
-                        // C-opening faces DOWN (−Z) so arms point toward lid body.
-                        // Printed face-down: arc is at top of print, fully self-supporting.
-                        // Pin enters from below as the lid is pressed onto the box hinge.
-                        // Cutter top extends EPS past connection-block top (both land at local z=0).
-                        // Without EPS2: cutter face coplanar with block face → non-manifold edges.
-                        translate([0, 0, -clip_outer_d/2])
+                        // C-opening faces UP (+Z): printer traces U-shapes layer-by-layer,
+                        // zero overhangs. Pin snaps in as lid rotates onto the box axle.
+                        // Bridge embeds +2mm total (1mm into clip, 1mm into lid body) so
+                        // the slicer sees one continuous solid — no micro-gap shell split.
+                        translate([0, 0, clip_outer_d/2])
                             cuboid([clip_len+2, clip_gap, clip_outer_d + EPS2], anchor=CENTER);
                     }
             }
-            // Diamond latch arm — one solid block from above chamfer zone to clasp top.
-            // Bottom raised to chamf+EPS (not Z=0/-EPS) to stay out of the lid body's
-            // front-bottom chamfer zone. The chamfer zone occupies Z=0 to chamf near
-            // Y=-lid_l/2. If the arm starts at Z≤chamf, the arm side faces (at ±X=lid_w-sw*4/2)
-            // pass through the chamfer face → non-manifold edge along the intersection line.
-            // Raising to chamf+EPS keeps arm side faces entirely above the chamfer zone.
-            // Back face at -lid_l/2+EPS: arm overlaps lid body by EPS only (minimal).
-            // Front face stays at -lid_l/2-2.2+EPS (identical protrusion, same latch engagement).
+            // Diamond latch arm — single solid block + diamond click tip.
+            // One solid arm is structurally stronger than the old two-part split arm.
+            // Bottom raised to chamf+EPS: arm ±X side faces must not intersect the lid
+            //   body's front-bottom chamfer face (at Y=−lid_l/2, Z=0..chamf) — that
+            //   intersection produces NM edges. Chamf+EPS clears the danger zone.
+            // Root gusset (hull below): tapers from zero width at Z=0 to full arm width
+            //   at Z=chamf, filling the chamfer gap without touching the chamfer face.
+            //   Gives the arm a solid triangle of material from lid face to arm base.
             chamf = max(noz, m_chamf(data));
+            // Root gusset: triangular fill from Z=0 (zero width) to Z=chamf (full width).
+            hull() {
+                translate([0, -lid_l/2 - 1.1 + EPS, EPS])
+                    cuboid([EPS, 2.2, EPS], anchor=BOTTOM);
+                translate([0, -lid_l/2 - 1.1 + EPS, chamf + EPS])
+                    cuboid([lid_w - sw*4, 2.2, EPS], anchor=BOTTOM);
+            }
+            // Arm body: full depth, single solid block from chamf to arm tip.
             translate([0, -lid_l/2 - 1.1 + EPS, chamf + EPS])
                 cuboid([lid_w - sw*4, 2.2, sl + clasp_depth - chamf - EPS], anchor=BOTTOM);
-            // Diamond tip — the snap click point.
-            // Z-tips truncated to noz*1.05 (Arachne flat-top, no pressure pinch).
-            // Z-offsets snapped to layer boundaries via layer_snap() — no micro-stepping.
-            // Engagement Y-cuboid widened to noz*2 — was 0.1mm (sub-nozzle, unprintable).
+            // Diamond tip — the click point that engages the box wall groove.
+            // Protrudes 0.9mm in +Y from arm inner face — cams into box groove on close.
+            // +EPS on X: hull and arm share X width (lid_w−sw*4) → coplanar ±X faces.
+            // Widening hull by EPS makes arm X faces interior to hull volume (no NM edge).
             lz = layer_snap(0.8, m_lh(data));
-            // +EPS on hull cuboid X: latch arm and hull share the same X width (lid_w−sw*4).
-            // In the Z overlap zone their ±X faces are coplanar → non-manifold edges.
-            // Widening hull by EPS makes the latch arm X faces interior to the hull volume.
             translate([0, -lid_l/2 - 1.5, sl + clasp_depth])
                 hull() {
                     translate([0, 0,   -lz]) cuboid([lid_w-sw*4+EPS, 0.1,   noz*1.05], anchor=CENTER);
