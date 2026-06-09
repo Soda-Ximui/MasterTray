@@ -1439,3 +1439,143 @@ python check_manifold.py STL/
 
 All NM edge counts should be 0. If a platter file shows N NM edges but the constituent single-part
 files show 0 each → the codebase is clean; the platter NM edges are artifacts only.
+
+---
+
+## 13. The complete non-manifold picture — four root causes and how this codebase handles them
+
+OpenSCAD's non-manifold problem has exactly four root causes. This section is the executive
+summary — the full details are in §9–§12k. Read this first; drill into the numbered sections
+when you need the specific fix.
+
+---
+
+### 13a. Zero-thickness coincidence (the "overlap trick")
+
+**Root cause:** A `difference()` cutter's face lands exactly flush with the face it is
+supposed to pierce. The engine cannot determine which side of the boundary each vertex
+belongs to → Z-fighting in preview, non-manifold edge on export.
+
+**The textbook example:**
+```scad
+// BAD — cutter top at Z=10, solid top at Z=10 → zero-thickness coincidence
+difference() {
+    cube([50, 50, 10]);
+    translate([5, 5, 2]) cube([40, 40, 8]);  // top: 2+8 = 10 = solid top ✗
+}
+```
+
+**This codebase's fix:** `EPS = 0.1mm`, `EPS2 = 0.2mm`. Every `difference()` cutter is
+extended `EPS` past each face it must pierce. Why 0.1mm and not the commonly cited 0.01mm:
+at 0.4mm nozzle, 0.01mm falls within floating-point rounding on cylindrical geometry
+(`$fn=36` arc facets). 0.1mm is safe across all feature sizes and invisible in print.
+Defined in `MasterEngine.scad`; overridden by `bool_overlap_eps` in the Customizer.
+
+See §9 for the full EPS reference.
+
+---
+
+### 13b. Coplanar face in union() (the "butterfly edge")
+
+**Root cause:** A `union()` addition's face lands exactly on the chassis boundary, or on
+another addition's face. CGAL produces edges shared by 4 faces instead of 2 → non-manifold.
+The slicer auto-repairs by capping the zero-thickness gap with a paper-thin disconnected face,
+which prints as a floating blob.
+
+**Two variants:**
+- Addition face coincides with **chassis wall** (§11, §11b, §11i, §11j)
+- Addition face coincides with **another addition's face** in the same `union()` (§11e, §11h)
+
+**This codebase's fix:** Shrink additions inward by EPS so their face is inside the chassis
+material, not flush with the boundary. "Shrink inward, never grow outward" — §11b.
+
+Every confirmed instance with its exact fix is in the table in §11.
+
+---
+
+### 13c. Curved-surface tangency (the "kiss" problem)
+
+**Root cause:** A cylinder or sphere surface is geometrically tangent to a flat face — they
+touch at exactly one line or point. CGAL sees a degenerate edge at that contact. Not a
+floating-point issue; it is exact-arithmetic tangency. Occurs in any CSG system, not just
+OpenSCAD.
+
+**Example:** Flip_Double spine pillar width = `hinge_y*2 + hinge_d` places the pillar ±Y
+faces exactly tangent to the axle cylinders.
+
+**This codebase's fix:** Add EPS to make the flat face secant (cuts through) instead of
+tangent (just kisses). `spine_w = hinge_y*2 + hinge_d + EPS*2`. See §11f.
+
+**Detection:** Compute `flat_face_coord == center ± radius` algebraically. If equal → tangency
+→ add EPS.
+
+---
+
+### 13d. Chamfer zone intersection (addition root inside body chamfer zone)
+
+**Root cause:** `apply_master_bounds` removes material in a triangular zone near each body
+edge. If a `union()` addition's side faces pass through that zone at any Z, three planes
+converge (body face, chamfer face, addition side face) → non-manifold corners.
+
+**Critical insight:** The failure is caused by the **side faces** of the addition passing
+through the chamfer zone, not the root face position. Burying the root face deeper into the
+body moves MORE side face into the chamfer zone — making things worse, not better.
+
+**This codebase's fix:** Raise the addition's bottom to `chamf + EPS` so zero material exists
+in the Z=0 to chamf zone. Reduce height by the same amount to keep the top unchanged.
+See §11k.
+
+---
+
+### 13e. This codebase uses CSG only — rules 2 and 3 don't apply
+
+FrankenTray ribs and hubs are `cuboid()` and `cyl()` from BOSL2, clipped with
+`apply_master_bounds` / `intersection()`. There are **no `polyhedron()` calls** anywhere.
+
+Consequences:
+- **Vertex winding** is handled automatically by BOSL2 and CGAL. No manual CCW/CW tracking needed.
+- **Shared vertex references** are guaranteed by CGAL's exact arithmetic. No floating-point
+  drift between adjacent primitives.
+- **Boolean union** is the architecture — shapes are never merged by concatenating triangle
+  lists. `union()`, `difference()`, `intersection()` are the only merge operations.
+
+If `polyhedron()` is ever added (e.g., for organic shapes BOSL2 can't express), the separate
+mesh generation rules apply — see the mesh-generation-rules memory entry.
+
+---
+
+### 13f. The Manifold render engine — faster iteration, same export rules
+
+OpenSCAD 2023+ includes a new **Manifold** rendering backend that replaces CGAL for
+interactive F6 renders. Enable it at `Edit → Preferences → Features → manifold`.
+
+**What it improves:** Dramatically faster F6 render times (seconds instead of minutes on
+complex geometry). More tolerant of near-coincident faces during interactive preview.
+
+**What it does NOT change:** The exported STL is still a triangle mesh that slicers process
+independently. Coplanar faces from `union()` coincidences still appear in the export and
+still trigger slicer warnings. The EPS rules remain necessary for clean STL output.
+
+**Rule of thumb:** Use Manifold for interactive development. Run `nm_hunt.py` on the exported
+STL to confirm the mesh is clean regardless of which engine produced it.
+
+---
+
+### 13g. The automated verification pipeline
+
+`nm_hunt.py` is the canonical pre-push check. It exports every lid type and box variant via
+OpenSCAD CLI, checks each STL with pymeshlab, and distinguishes real bugs from platter artifacts.
+
+```
+python nm_hunt.py
+```
+
+**Platter artifacts are detected automatically.** An NM edge that is 4-face-sharing AND at
+Z > 0 is classified as a benign platter artifact (`sf = sl` layer-snap coincidence). Any
+3-face-sharing NM edge, or any edge at Z ≤ 0.05mm, is flagged as a real bug.
+
+**Verified clean (2026-06-09):** All 7 standalone lid types (Slip, Snap×2, Glide×2,
+Flip_Single, Screw) exported at 0 NM edges. The 6 box platters each show 4-face-sharing NM
+edges at Z=1.96mm only — confirmed benign.
+
+Run `nm_hunt.py` after any geometry change before committing.
