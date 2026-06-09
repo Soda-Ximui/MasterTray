@@ -55,8 +55,8 @@ module core_tray_chassis(data) {
     h_left  = (targ == "Left"   || targ == "All Walls") ? max(0.1, wall_h * mod_p) : wall_h;
     h_right = (targ == "Right"  || targ == "All Walls") ? max(0.1, wall_h * mod_p) : wall_h;
     union() {
-        up(sf / 2)
-            framed_mesh(data, w, l, sf, false, get_mesh_cfg(data, HOLE_FLOOR, STRUT_FLOOR));
+        up((sf + EPS) / 2)
+            framed_mesh(data, w, l, sf + EPS, false, get_mesh_cfg(data, HOLE_FLOOR, STRUT_FLOOR));
         translate([0, -l/2 + sw/2, sf + h_front/2])
             xrot(90) render_wall_face(data, w, h_front, sw);
         translate([0,  l/2 - sw/2, sf + h_back/2])
