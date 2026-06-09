@@ -807,16 +807,17 @@ If any computed face coordinate equals the chassis wall coordinate exactly → a
 |---------|------|--------------|-----|
 | Flip_Single hinge pillars | `RenderBox.scad` | Left/right outer X at ±w/2; back Y at l/2; bottom at Z=sf | `sw*3-EPS` width, `clip_od-EPS` depth, `sf-EPS` Z, height`+EPS` |
 | Flip_Double spine pillars | `RenderBox.scad` | Left/right outer X at ±w/2; bottom at Z=sf | `sw*3-EPS` width, `sf-EPS` Z, height`+EPS` |
-| Flip_Single/Double diamond latch hull (box) | `RenderBox.scad` | Hull root face at outer wall Y face (±l/2) | `translate([0, ±(l/2-EPS), latch_z])` (see §11i) |
+| Flip_Single/Double diamond latch hull (box) | `RenderBox.scad` | Hull root face at outer wall Y face (±l/2) | `translate([0, ±(l/2-EPS), latch_z])` (see §11j) |
 | Glide lid pull tab | `RenderLid.scad` | +Y face at -lid_l/2 (lid body -Y) | translate Y += EPS |
 | Latch arm on Flip lid | `RenderLid.scad` | Bottom face at Z=0 (lid flat face) | translate Z -= EPS |
 | Thumb notch in box end wall | `RenderBox.scad` | Top face at groove_z (groove cutter bottom) | translate Z += EPS |
 | Snap lid retention bead (both styles) | `RenderLid.scad` | Degenerate EPS-thin flat face (chamfer = height/2) | `chamfer = (height - m_lh) / 2` (see §11c) |
+| Flip_Double spine pillar ±Y faces | `RenderBox.scad` | Pillar ±Y faces exactly tangent to axle cylinders (pillar face = cylinder tangent point) | `spine_w = hinge_y*2 + hinge_d + EPS*2` (see §11f) |
 | Flip_Single lid C-opening cutter | `RenderLid.scad` | Cutter top coplanar with connection-block top at local z=0 | `clip_outer_d + EPS2` on cutter height (see §11d) |
 | Flip_Single lid diamond tip hull | `RenderLid.scad` | Hull cuboid X face coplanar with latch arm X face | Hull width `lid_w-sw*4+EPS` (see §11e) |
-| Flip_Single/Double axle pins | `RenderBox.scad` | Pin end cap at ±(w/2−sw) = inner wall X face | `h=w−sw*2+EPS2` (see §11g) |
-| Flip_Single lid C-clip foot | `RenderLid.scad` | Connection block X = cylinder X = ±clip_len/2, coplanar in inner `union()` | Block width `clip_len−EPS` (see §11h) |
-| Flip_Single lid latch arm root | `RenderLid.scad` | Arm back face inside lid body chamfer zone → NM corners at ±X bottom edges | `arm_bury = max(noz,m_chamf)+noz`; `anchor=BACK+BOTTOM` (see §11j) |
+| Flip_Single/Double axle pins | `RenderBox.scad` | Pin end cap at ±(w/2−sw) = inner wall X face | `h=w−sw*2+EPS2` (see §11h) |
+| Flip_Single lid C-clip foot | `RenderLid.scad` | Connection block X = cylinder X = ±clip_len/2, coplanar in inner `union()` | Block width `clip_len−EPS` (see §11i) |
+| Flip_Single lid latch arm root | `RenderLid.scad` | Arm ±X side faces passing through lid body front-bottom chamfer zone (Z=0 to chamf) | Raise arm bottom to `chamf+EPS`, reduce height by `chamf+EPS` to keep top fixed (see §11k) |
 
 ### Floating regions after non-manifold repair
 
@@ -1049,7 +1050,46 @@ If they overlap AND share a face coordinate, add `EPS` to separate them.
 
 ---
 
-### 11f. Slicer "floating cantilever" — when it's real vs expected
+### 11f. Curved-surface tangency — cylinder face touching a flat face at a line
+
+When a cylinder's curved surface is tangent to a flat face (touches at exactly one line), CGAL sees
+a degenerate edge at that contact line. The tangent point is where the flat face and the cylinder
+surface have exactly the same position — the union boundary is a mathematical line, not a face, which
+is a degenerate condition.
+
+**The Flip_Double spine pillar example:**
+
+The spine pillar (a cuboid) bridges the two hinge axles. If the pillar Y dimension is exactly
+`hinge_y*2 + hinge_d`, the pillar ±Y faces land exactly where the cylinder surface is tangent:
+
+```
+axle cylinder at Y = ±hinge_y, radius = hinge_d/2
+tangent point  = ±(hinge_y + hinge_d/2) = ±(hinge_y*2+hinge_d)/2
+
+pillar ±Y face = ±spine_w/2 = ±(hinge_y*2+hinge_d)/2   ← exactly tangent ✗
+```
+
+**Fix:** Widen the pillar so its ±Y faces extend slightly past the tangent points — the flat face
+no longer touches the curved surface; it passes through it, producing a clean CGAL boolean:
+
+```scad
+// BAD — pillar ±Y face exactly tangent to axle cylinder surface ✗
+spine_w = hinge_y*2 + hinge_d;
+
+// GOOD — pillar ±Y face at ±(tangent_point + EPS), breaking tangency ✓
+spine_w = hinge_y*2 + hinge_d + EPS*2;
+```
+
+**General rule:** Whenever a flat face would be geometrically tangent to a cylinder or sphere
+surface (touching at a line or point), add EPS in that direction to move the flat face from tangent
+to secant (the flat face cuts into the curved solid rather than just kissing it).
+
+**Detection:** Compute the tangent coordinate analytically. If `flat_face_coord == center ± radius`
+for any axis, the tangency condition holds → add EPS.
+
+---
+
+### 11g. Slicer "floating cantilever" — when it's real vs expected
 
 The slicer warning "floating cantilever" (or "floating island") has two distinct causes:
 
@@ -1071,7 +1111,7 @@ fine without supports. Examples in this codebase:
 
 **How to tell them apart:**
 
-1. Fix any non-manifold edges first (§11–§11e). Re-export the STL.
+1. Fix any non-manifold edges first (§11–§11k). Re-export the STL.
 2. If the cantilever warning remains on the clean STL: it is Cause B (expected overhang).
    Accept it or redesign the overhang geometry.
 3. If the warning disappears after fixing non-manifolds: it was Cause A.
@@ -1083,7 +1123,7 @@ is informational.
 
 ---
 
-### 11g. Axle pin coplanar with inner wall — span dimension equals interior width
+### 11h. Axle pin coplanar with inner wall — span dimension equals interior width
 
 A cylinder spanning across the box interior with `h=w-sw*2` has half-length `(w-sw*2)/2 = w/2-sw`.
 The box inner wall X face is at `±(w/2-sw)`. They are exactly equal — the chamfered end cap of the
@@ -1118,7 +1158,7 @@ boundary — a single `EPS2` fix on `h` resolves all of them.
 
 ---
 
-### 11h. Two additions with equal span in a nested `union()` — connection block vs cylinder
+### 11i. Two additions with equal span in a nested `union()` — connection block vs cylinder
 
 When a cylinder and a rectangular block are `union()`-ed inside a `difference()`, and both have the
 same axis-aligned span, their end faces are coplanar. CGAL produces non-manifold edges along the
@@ -1165,7 +1205,7 @@ functional dimension.
 axis — check their end faces. If both end at ±X, ±Y, or ±Z with the same arithmetic result, one
 needs `− EPS` on that dimension.
 
-### §11i — Addition translated to exact container wall face
+### §11j — Addition translated to exact container wall face
 
 When a `union()` addition (diamond latch, boss, pull tab) is translated so its root face lands
 **exactly** on the container's outer wall face, CGAL sees two co-planar boundary faces at that
@@ -1203,31 +1243,199 @@ floor top — add `- EPS` to the Z translation and `+ EPS` to the height.
 
 ---
 
-### §11j — Addition root face inside body chamfer zone
+### §11k — Addition root face inside body chamfer zone
 
 `apply_master_bounds` (and any `cuboid` with `chamfer=`) removes material in a triangular zone near
-each edge. When a second `union()` solid has its root face **inside** that zone, three planes
-(body face, chamfer face, addition side face) converge near the same point — CGAL produces
-non-manifold corners there.
+each edge. When a second `union()` solid has any face — including its **side faces** — passing
+through that chamfer zone, three planes (body face, chamfer face, addition side face) converge near
+the same line — CGAL produces non-manifold edges along that intersection.
 
-**Example:** Flip_Single lid latch arm. The arm's back (+Y) face was at `-lid_l/2 + EPS`. The lid
-body has chamfer depth `max(noz, m_chamf)` ≈ 0.4–1.0 mm from the front face. The arm root sat
-squarely inside the chamfer zone, creating non-manifold corners at ±X bottom edges.
+**Example:** Flip_Single lid latch arm. The arm's ±X side faces are at `±(lid_w-sw*4)/2`. The lid
+body has a front-bottom chamfer zone from Z=0 up to `chamf = max(noz, m_chamf)` near Y=-lid_l/2.
+Any arm material in this zone means the arm ±X faces pass through the chamfer face plane → NM edges.
 
+**Wrong first attempt — extend back face past chamfer zone:**
 ```scad
-// BAD — arm root at -lid_l/2+EPS lands inside lid body chamfer zone ✗
-translate([0, -lid_l/2 - 1.1 + EPS, -EPS])
-    cuboid([lid_w-sw*4, 2.2, sl+clasp_depth+EPS], anchor=BOTTOM);
-// arm back face (+Y) at translate Y = -lid_l/2+EPS → inside chamfer zone → NM corners
-
-// GOOD — bury root past chamfer zone; keep front face protrusion unchanged ✓
-arm_bury = max(noz, m_chamf(data)) + noz;  // one noz margin past chamfer depth
+// WRONG — burying back face deeper extends arm into chamfer zone, making things WORSE ✗
+arm_bury = max(noz, m_chamf(data)) + noz;
 translate([0, -lid_l/2 + arm_bury, -EPS])
     cuboid([lid_w-sw*4, 2.2 + arm_bury, sl+clasp_depth+EPS], anchor=BACK+BOTTOM);
-// back face at -lid_l/2+arm_bury (past chamfer zone)
-// front face at -lid_l/2+arm_bury-(2.2+arm_bury) = -lid_l/2-2.2 (unchanged) ✓
+// arm now spans the ENTIRE chamfer zone height at ±X, creating a longer NM intersection line
 ```
 
-**Detection rule:** Any `union()` solid whose root face is closer than `max(noz, m_chamf)` to a
-chamfered edge of the container body — increase the burial to at least `max(noz, m_chamf) + noz`
-and compensate the opposite face to preserve geometry.
+This backfired because anchoring to `BACK+BOTTOM` and extending the arm deeper through the chamfer
+zone increased the intersection length of arm ±X faces with the chamfer face plane.
+
+**Correct fix — raise arm BOTTOM above the chamfer zone entirely:**
+```scad
+// GOOD — arm bottom starts above chamfer zone; no arm material in Z=0 to chamf zone ✓
+chamf = max(noz, m_chamf(data));
+translate([0, -lid_l/2 - 1.1 + EPS, chamf + EPS])
+    cuboid([lid_w-sw*4, 2.2, sl + clasp_depth - chamf - EPS], anchor=BOTTOM);
+// arm Z range: chamf+EPS to sl+clasp_depth  ← entirely above chamfer zone
+// arm Y range: -lid_l/2-2.2+EPS to -lid_l/2+EPS  ← unchanged (geometry preserved)
+// arm height: sl+clasp_depth-chamf-EPS  ← reduced by chamf to keep top at sl+clasp_depth
+```
+
+**Key insight:** The chamfer zone occupies Z=0 to `chamf` near the body's bottom corners. An arm
+side face at ±X that passes through this zone at ANY Z value creates an intersection. The fix is not
+about the back/front face position — it is about keeping the arm's **Z range entirely above the
+chamfer zone**.
+
+**Detection rule:** For any `union()` solid adjacent to a chamfered body corner, ask: do the solid's
+±X (or ±Y) side faces pass through the Z range `[0, chamf]` near the corresponding body edge? If
+yes, raise the solid's bottom to `chamf + EPS` and reduce its height by `chamf + EPS` to keep the
+top at the same position.
+
+**The wrong-direction failure mode to avoid:** burying a feature's ROOT face deeper into the body
+moves MORE of the feature into the chamfer zone (more material at low Z), not less. The arm root
+and the arm side faces are orthogonal — fixing root position does not fix side-face intersection.
+
+---
+
+## 12. How to hunt non-manifold edges — the diagnostic playbook
+
+This is the workflow used to find and fix all non-manifold edges in this codebase. Knowing the
+method is as important as knowing the fixes — the same patterns recur whenever new geometry is added.
+
+### Step 1 — Get a count baseline with `check_manifold.py`
+
+```
+python check_manifold.py STL/
+```
+
+This counts edges shared by >2 faces in every STL/3mf found. Zero NM edges = clean. Non-zero = work
+to do. Run this after every export cycle to confirm fixes actually reduced the count.
+
+```
+python check_manifold.py "STL/Flip Lids.STL"   # single file
+python check_manifold.py STL/                  # entire directory
+```
+
+The script also reports boundary edges (count=1). A healthy closed mesh has zero boundary edges too.
+Boundary edges indicate holes in the mesh — a different (usually worse) problem.
+
+### Step 2 — Locate the feature by clustering Z coordinates
+
+NM edges cluster at specific Z heights that correspond to geometry features. Extract where they are:
+
+```python
+import pymeshlab, numpy as np
+from collections import defaultdict
+
+ms = pymeshlab.MeshSet()
+ms.load_new_mesh("STL/Flip Lids.STL")
+faces = ms.current_mesh().face_matrix()
+verts = ms.current_mesh().vertex_matrix()
+
+edge_verts = defaultdict(list)
+for f in faces:
+    for a, b in ((f[0],f[1]), (f[1],f[2]), (f[0],f[2])):
+        edge_verts[(min(a,b), max(a,b))].append(f)
+
+nm_zs = []
+for (a, b), flist in edge_verts.items():
+    if len(flist) > 2:
+        nm_zs.append((verts[a][2] + verts[b][2]) / 2)
+
+print(sorted(set(round(z, 2) for z in nm_zs)))
+```
+
+**What the Z values tell you:**
+
+| Z cluster | What it is |
+|-----------|-----------|
+| Z ≈ 0 | Lid or box floor — features at the print bed level |
+| Z ≈ sf (floor height) | Box interior floor — pillar bottoms, grid bases |
+| Z ≈ sl (lid height) | Lid top face — additions at lid surface |
+| Z ≈ bh (box height) | Box top — pillar tops, hinge crown |
+| Z ≈ sf = sl | **Platter artifact** — floor and lid heights are equal (see §12b) |
+
+### Step 3 — Visualize with MeshLab (optional but fast for new bugs)
+
+1. Open STL in MeshLab
+2. `Filters → Selection → Select non Manifold Edges` — red faces appear adjacent to problem edges
+3. `Render → Wireframe` mode — yellow edges show the NM edges
+4. Zoom in on the red patches to understand the geometric relationship
+
+**Red patch shapes and what they mean:**
+
+| Shape | Likely cause |
+|-------|-------------|
+| Two symmetrical red stripes at ±X on a lid face | Side face of addition passing through chamfer zone (§11k) |
+| Small red corners at bottom of a pillar or boss | Pillar bottom coplanar with floor (§11j) |
+| Red stripe along a full edge shared by two features | Two additions with coplanar face (§11e) |
+| Red at both ends of a cylinder | Cylinder span equals interior width (§11g) |
+| Diagonal red stripes on a chamfered corner | Addition protruding past a wall (§11b wrong direction) |
+| Red crown on C-clip | Cutter top coplanar with block top (§11d) |
+| Entire top surface pink / diffuse | >2 faces at every edge — platter artifact (§12b) |
+
+### Step 4 — Map the Z cluster to a file and feature
+
+From the Z height and visual shape, identify which feature in which file produced the NM edges:
+
+| Z range | File | Feature to audit |
+|---------|------|-----------------|
+| Z ≈ 0–1mm on a lid | `RenderLid.scad` | Pull tab, latch arm, snap bead, ball sphere |
+| Z ≈ sf on a box | `RenderBox.scad` | Hinge pillars, spine pillars, diamond latch hull |
+| Z ≈ bh on a box | `RenderBox.scad` | Pillar top, axle crown |
+| Any Z on a cylinder | Check axle pins, C-clip cylinder, jar neck |
+
+### Step 5 — Apply the §11 fix
+
+Identify the pattern from the confirmed-instances table in §11, apply the EPS fix, re-export, re-run
+`check_manifold.py`. Confirm the count drops. If it doesn't: the math predicted a coplanar face but
+the actual geometry is different — re-read the translate/dimension expressions carefully.
+
+**Most common mistake:** applying EPS in the wrong direction (§11b). Always verify: does the fix
+move the face **into** the chassis material, or **past** it?
+
+### Step 6 — Distinguish real bugs from platter artifacts
+
+Not every NM edge in a bulk export is a printability problem. See §12b.
+
+---
+
+### §12b — Platter artifact: benign NM edges when sf = sl
+
+When multiple parts are unioned into a display platter, and two parts have faces at the same Z
+height, those faces are coplanar in the platter mesh → NM edges. This happens consistently when:
+
+- Box floor height `sf` and lid height `sl` are both snapped to layer boundaries
+- Both snap to the same multiple of layer height (e.g., 7 × 0.28mm = 1.96mm)
+- Platter unions box (top face at `bh`) and lid (top face at `sl = 1.96mm`)
+  but also box floor top at `sf = 1.96mm` coincides with lid top at `sl = 1.96mm`
+
+**How to confirm it's a platter artifact:**
+
+1. Export a single part (just the box, or just the lid) as a separate STL
+2. Run `check_manifold.py` on that single-part file
+3. If it reports 0 NM edges → the individual geometry is clean; the NM edges were platter artifacts
+
+**Is it a printability problem?**
+
+No — with one exception. NM edges **at Z=0** (the print bed level) can confuse slicers into
+treating the first layer as disconnected faces, preventing "elephant's foot" compensation from
+working. NM edges at Z=sf or Z=sl (above the bed) are cosmetic — slicers generate valid toolpaths
+through them.
+
+**When to fix platter artifacts:**
+
+Only if Z=0 NM edges appear in the platter. If all NM edges are at Z>0 (Z=sf, Z=sl, Z=bh), leave
+them — fixing them would require adding sub-EPS geometry to the platter assembly code, which adds
+complexity for zero print benefit.
+
+---
+
+### §12c — Confirming individual parts are clean
+
+The canonical check before pushing:
+
+```
+# Export one representative of each primitive type as a single-part STL
+# Then run:
+python check_manifold.py STL/
+```
+
+All NM edge counts should be 0. If a platter file shows N NM edges but the constituent single-part
+files show 0 each → the codebase is clean; the platter NM edges are artifacts only.
