@@ -69,10 +69,12 @@ TOL_SNAP_GAP0 = 0.1;            // Default snap clearance (mm)
 TOL_CLIP0 = 0.1;                // Default clip tolerance (mm)
 
 // Boolean operation epsilon — prevents Z-fighting and non-manifold edges in preview.
-// Extend one face of a difference() cutter by EPS so it clearly pierces the target.
-// Use EPS2 when both ends of a cutter need to extend (top + bottom).
+// EPS  = single-sided cutter overlap. Sub-line-width (0.1mm); invisible in print.
+//        Can be nudged to 0.11 for marginal geometry without print consequence.
+// EPS2 = double-sided cutter overlap = one nozzle line width. Overridden in
+//        MasterBuilder to Nozzle_Diameter so it scales with printer settings.
 EPS  = 0.1;
-EPS2 = EPS * 2;
+EPS2 = 0.4;   // default: one line width at 0.4mm nozzle; overridden in MasterBuilder
 
 PLATTER_GAP0 = 15;              // Default part spacing on bed (mm)
 THREAD_PITCH0 = 2.0;            // Default thread pitch (mm)

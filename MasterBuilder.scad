@@ -143,7 +143,7 @@ include <RenderPlaque.scad>
 
 // Override MasterEngine defaults with Customizer values (must follow all includes).
 EPS  = bool_overlap_eps;
-EPS2 = EPS * 2;
+EPS2 = Nozzle_Diameter;   // one line width — scales with printer; EPS2/2 per cutter face
 
 // --- AUTO-MATH ENGINE ---
 raw_w = (dimension_mode == "Usable") ? part_width + (wall_thickness * 2) : part_width;

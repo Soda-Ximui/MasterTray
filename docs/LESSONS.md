@@ -1465,11 +1465,23 @@ difference() {
 }
 ```
 
-**This codebase's fix:** `EPS = 0.1mm`, `EPS2 = 0.2mm`. Every `difference()` cutter is
-extended `EPS` past each face it must pierce. Why 0.1mm and not the commonly cited 0.01mm:
-at 0.4mm nozzle, 0.01mm falls within floating-point rounding on cylindrical geometry
-(`$fn=36` arc facets). 0.1mm is safe across all feature sizes and invisible in print.
-Defined in `MasterEngine.scad`; overridden by `bool_overlap_eps` in the Customizer.
+**This codebase's fix:** Two distinct epsilon values with different semantics:
+
+| Constant | Value | Meaning | Parametric? |
+|----------|-------|---------|-------------|
+| `EPS` | 0.1mm | Single-sided cutter overlap. Sub-line-width; invisible in print. Can be nudged to 0.11 for marginal geometry without consequence. | Customizer: `bool_overlap_eps` |
+| `EPS2` | `Nozzle_Diameter` | Double-sided cutter overlap = one full nozzle line width (0.4mm at default). Scales with printer settings; at 0.6mm nozzle = 0.6mm. | `MasterBuilder.scad`: `EPS2 = Nozzle_Diameter` |
+
+Why 0.1mm for EPS and not the commonly cited 0.01mm: at 0.4mm nozzle, 0.01mm falls within
+floating-point rounding on cylindrical geometry (`$fn=36` arc facets). 0.1mm is safe across
+all feature sizes.
+
+Why `EPS2 = Nozzle_Diameter` and not `EPS * 2`: EPS2 is used where a cutter must pierce
+BOTH faces symmetrically (axle pin ends, slot cutters, hub hollow cores). Tying it to one
+nozzle line width gives a semantically meaningful unit — the minimum printable increment —
+and scales correctly as nozzle size changes. `EPS2/2` per face is the per-face overlap.
+
+Defined in `MasterEngine.scad`; overridden by the Customizer assignments after all includes.
 
 See §9 for the full EPS reference.
 
