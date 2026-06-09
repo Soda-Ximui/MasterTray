@@ -69,11 +69,11 @@ TOL_SNAP_GAP0 = 0.1;            // Default snap clearance (mm)
 TOL_CLIP0 = 0.1;                // Default clip tolerance (mm)
 
 // Boolean operation epsilon — prevents Z-fighting and non-manifold edges in preview.
-// EPS  = single-sided cutter overlap. Sub-line-width (0.1mm); invisible in print.
-//        Can be nudged to 0.11 for marginal geometry without print consequence.
+// EPS  = single-sided cutter overlap. 0.01mm = 10 microns — below any FDM resolution,
+//        dimensionally invisible, sits in the floating-point Goldilocks zone for CGAL.
 // EPS2 = double-sided cutter overlap = one nozzle line width. Overridden in
 //        MasterBuilder to Nozzle_Diameter so it scales with printer settings.
-EPS  = 0.1;
+EPS  = 0.01;
 EPS2 = 0.4;   // default: one line width at 0.4mm nozzle; overridden in MasterBuilder
 
 PLATTER_GAP0 = 15;              // Default part spacing on bed (mm)

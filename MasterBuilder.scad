@@ -128,7 +128,7 @@ debug_payload = false;
 // How far difference() cutters extend past the face they pierce (default 0.1mm).
 // Prevents Z-fighting in F5 preview and non-manifold edges on export.
 // Raise toward 0.2–0.3 if you see flickering cut faces. See LESSONS.md §EPS.
-bool_overlap_eps = 0.1; // [0.01 : 0.01 : 0.5]
+bool_overlap_eps = 0.01; // [0.001 : 0.001 : 0.1]
 
 include <MasterManifest.scad>
 include <MasterDebug.scad>

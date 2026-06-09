@@ -526,16 +526,16 @@ this is invisible. The rule is:
 
 | Symptom | Action |
 |---------|--------|
-| Flickering face in F5 preview | Raise to 0.2 |
-| Slicer reports non-manifold on a flat cut surface | Raise to 0.2–0.3 |
-| Visible step or ridge at cut edge in physical print | Lower back toward 0.1 |
-| No symptoms | Leave at 0.1 — it has worked for every tested geometry |
+| Flickering face in F5 preview | Raise to 0.02–0.05 |
+| Slicer reports non-manifold on a flat cut surface | Raise to 0.05 |
+| No symptoms | Leave at 0.01 — verified clean across all part types |
 
-**Never set below 0.05.** Very small values lose the benefit and can reintroduce
-Z-fighting on high-$fn cylindrical geometry where floating-point rounding is aggressive.
+**Never set below 0.005.** Below that, floating-point trig error in arc vertex positions
+can match the EPS value and the separation disappears inside CGAL.
 
-**0.5 is the practical ceiling.** Above that, the cutter overlap starts to visibly
-mis-dimension features like snap beads and hinge sockets.
+**0.1 is the practical ceiling.** Above that, the cutter overlap starts to measurably
+shift interior face positions, which matters for tight-fit features like snap beads and
+hinge sockets.
 
 ### Where it is used in code
 
@@ -1469,12 +1469,16 @@ difference() {
 
 | Constant | Value | Meaning | Parametric? |
 |----------|-------|---------|-------------|
-| `EPS` | 0.1mm | Single-sided cutter overlap. Sub-line-width; invisible in print. Can be nudged to 0.11 for marginal geometry without consequence. | Customizer: `bool_overlap_eps` |
+| `EPS` | 0.01mm | Single-sided cutter overlap. 10 microns — below any FDM resolution, dimensionally invisible. The Goldilocks zone for CGAL: large enough to register as a distinct surface, small enough that no physical dimension shifts. | Customizer: `bool_overlap_eps` |
 | `EPS2` | `Nozzle_Diameter` | Double-sided cutter overlap = one full nozzle line width (0.4mm at default). Scales with printer settings; at 0.6mm nozzle = 0.6mm. | `MasterBuilder.scad`: `EPS2 = Nozzle_Diameter` |
 
-Why 0.1mm for EPS and not the commonly cited 0.01mm: at 0.4mm nozzle, 0.01mm falls within
-floating-point rounding on cylindrical geometry (`$fn=36` arc facets). 0.1mm is safe across
-all feature sizes.
+Why 0.01mm and not 0.1mm: 0.1mm is 1/4 of the nozzle diameter — borderline measurable.
+EPS appears on interior shared faces and cutter extensions, never on visible outer surfaces,
+but keeping it at 10 microns ensures no dimension is altered by even a fraction of a layer.
+Why not 0.001mm or smaller: CGAL uses exact arithmetic for boolean operations, but the mesh
+is generated using floating-point `sin()`/`cos()` for arc vertices. Below ~0.005mm the
+vertex-position error from trig rounding can match the EPS value — the separation disappears.
+0.01mm is safely above that floor. Verified: nm_hunt.py passes identically at 0.01mm.
 
 Why `EPS2 = Nozzle_Diameter` and not `EPS * 2`: EPS2 is used where a cutter must pierce
 BOTH faces symmetrically (axle pin ends, slot cutters, hub hollow cores). Tying it to one
