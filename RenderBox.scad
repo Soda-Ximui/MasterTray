@@ -247,7 +247,11 @@ module factory_render_box(data, opts, phys) {
         cc_z        = clip_od / 2;
         hinge_y     = clip_od/2 + spine_gap;
         latch_z     = flip_latch_z(h, cc_z, clasp_depth);
-        spine_w    = hinge_y*2 + hinge_d;
+        // hinge_y*2 + hinge_d puts the pillar ±Y faces exactly tangent to the axle cylinders
+        // (cylinder radius = hinge_d/2, axle at ±hinge_y → tangent at ±(hinge_y+hinge_d/2)).
+        // Curved-surface tangent against flat face → CGAL degenerate edge (§11f pattern).
+        // +EPS*2: pillar ±Y faces extend EPS past the tangent points, breaking the contact.
+        spine_w    = hinge_y*2 + hinge_d + EPS*2;
         axle_z     = h - cc_z;
         clip_len   = w - sw*6;
         int_w      = w - sw*2;
