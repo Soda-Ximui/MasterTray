@@ -3,20 +3,22 @@
 // ARCHITECTURE: Layer 4 (User Interface & Main Entry Point)
 // PURPOSE: Customizer-friendly UI + build dispatcher for MasterTray system
 // ==============================================================================
+// @CONFIG_SECTION_START: printer
 /* [Printer / Slicer Setting] */
 Nozzle_Diameter = 0.4;  // [0.2, 0.4, 0.6, 0.8]
 Wall_Loops      = 2;    // [1 : 1 : 10]
 Layer_Height    = 0.28; // [0.12, 0.16, 0.20, 0.24, 0.28]
 Filament_Type   = "PLA"; // ["PLA", "PETG", "TPU", "ABS"]
 Mechanical_Fit  = "Standard"; // ["Tighter", "Tight", "Standard", "Loose", "Looser"]
+// @CONFIG_SECTION_END: printer
 
 /* [Build Selection] */
 Part_To_Build = "Box"; // ["Box", "Pillbox Full Set", "Lid", "Simple Tray", "Jar", "Threaded Jar", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", "Plaque", "Grid", "Grid Test", "Lid Testing"]
 
 /* [Dimensions: W x L x H] */
-part_width  = 40;   // [10 : 0.5 : 300]
-part_length = 80;   // [10 : 0.5 : 300]
-part_height = 30;   // [5 : 0.5 : 300]
+part_width  = 140;  // [10 : 0.5 : 300]
+part_length = 70;   // [10 : 0.5 : 300]
+part_height = 20;   // [5 : 0.5 : 300]
 dimension_mode = "Total"; // ["Total", "Usable"]
 // Grid layout string — leave blank for no grid. When non-empty, container intents
 // auto-generate all variants: plain + built-in grid + drop-in (no base) + drop-in
@@ -30,7 +32,7 @@ grid_layout = "(A1,60,0)(A2,60,145,80%)(A3,60,195,C40,80)[A1,N][A2,E][A3,E]";
 // Standalone "Lid" intent: select which lid type to build.
 // Glide also uses Glide_Direction and Glide_Snap below.
 // Snap also uses Lid_Style below.
-Standalone_Lid_Type  = "Flip_Single"; // ["Slip", "Snap", "Glide", "Flip_Single", "Screw"]
+Standalone_Lid_Type  = "Flip_Single"; // ["Slip", "Snap", "Glide", "Flip_Single", "Flip_Double", "Screw"]
 Lid_Style            = "External";    // ["External", "Rabbet"]
 
 // Each checked type generates an additional box+lid pair on the platter.
@@ -53,6 +55,7 @@ jar_shape = "Circle"; // ["Circle", "Quad", "Hexa", "Octa", "Dodeca"]
 // Yes = threaded jar + screw lid.  No = open-top jar, no lid.
 Jar_Lid = false;
 
+// @CONFIG_SECTION_START: mesh
 /* [Mesh Aesthetics] */
 mesh_pattern = "None"; // ["Honeycomb", "Teardrop", "Slotted", "Circle", "Square", "Diamond", "None"]
 // Hole diameter (mm). Min printable ≈ 1.0mm at 0.4mm nozzle.
@@ -66,6 +69,7 @@ mesh_hole_spacing = 1.2; // [0.0: 0.1 : 5.0]
 strut_wall_perc  =  0; // [0 : 5 : 100]
 strut_floor_perc = 25; // [0 : 5 : 100]
 strut_lid_perc   = 75; // [0 : 5 : 100]
+// @CONFIG_SECTION_END: mesh
 
 /* [Wall Modifications] */
 modify_wall = "None"; // ["None", "Dropped", "50%", "25%"]
@@ -86,6 +90,7 @@ plaque_h   = 40; // [15 : 5 : 100]
 // Wall only: clip body height (mm) — should span the wall section it grips.
 clip_h     = 20; // [10 : 5 : 60]
 
+// @CONFIG_SECTION_START: advanced
 /* [Core Engineering (R&D Exposed)] */
 floor_thickness = 2.0;
 lid_thickness = 2.0;
@@ -129,6 +134,7 @@ debug_payload = false;
 // Prevents Z-fighting in F5 preview and non-manifold edges on export.
 // Raise toward 0.2–0.3 if you see flickering cut faces. See LESSONS.md §EPS.
 bool_overlap_eps = 0.01; // [0.001 : 0.001 : 0.1]
+// @CONFIG_SECTION_END: advanced
 
 include <MasterManifest.scad>
 include <MasterDebug.scad>
@@ -224,7 +230,12 @@ module build_part(name, data) {
             else if (type == "FLIP_BOX")         { factory_render_flip_box(payload, options, physics); }
             else if (type == "DOUBLE_FLIP_BOX")  { factory_render_double_flip_box(payload, options, physics); }
             else if (type == "JAR")              { factory_render_jar(payload, options, physics); }
-            else if (type == "LID")              { factory_render_lid(payload, options, physics); }
+            else if (type == "LID") {
+                if (get_val("ROTATE_180", options, false))
+                    rotate([0, 0, 180]) factory_render_lid(payload, options, physics);
+                else
+                    factory_render_lid(payload, options, physics);
+            }
             else if (type == "GRID")             { factory_render_grid(payload, options, physics); }
             else if (type == "PEG")              { factory_render_peg(payload, options, physics); }
             else if (type == "PLAQUE")           { factory_render_plaque(payload, options, physics); }

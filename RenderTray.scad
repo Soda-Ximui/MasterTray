@@ -32,10 +32,13 @@ module render_wall_face(data, face_w, face_h, wall_t) {
     top_margin = get_val(MESH_TOP_MARGIN, data, 0);
     mesh_cfg   = get_mesh_cfg(data, HOLE_WALL, STRUT_WALL);
     h_mesh = max(0, face_h - top_margin);
-    // Lower meshed band
+    // Lower meshed band — extended by EPS into the solid band above (mirrors the
+    // floor/wall EPS overlap in core_tray_chassis) so the meshed band's hole-pattern
+    // border vertices don't land exactly coplanar with the solid band's bottom face,
+    // which produced 4-face-sharing NM edges along the whole top-margin seam.
     if (h_mesh > 0)
-        translate([0, -face_h/2 + h_mesh/2, 0])
-            framed_mesh(data, face_w, h_mesh, wall_t, false, mesh_cfg);
+        translate([0, -face_h/2 + (h_mesh+EPS)/2, 0])
+            framed_mesh(data, face_w, h_mesh+EPS, wall_t, false, mesh_cfg);
     // Upper solid band — always solid regardless of strut_wall_perc
     if (top_margin > 0 && top_margin <= face_h)
         translate([0, face_h/2 - top_margin/2, 0])

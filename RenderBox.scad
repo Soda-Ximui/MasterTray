@@ -213,7 +213,7 @@ module factory_render_box(data, opts, phys) {
         // When closed: lid face sits at h − sl − 2·cc_z; latch tip at +clasp_depth above that.
         latch_z     = flip_latch_z(h, cc_z, clasp_depth);
         axle_z     = h - cc_z;
-        clip_len   = w - sw*6;
+        clip_len   = flip_hinge_len(w, sw);
         int_w      = w - sw*2;
         div_t      = get_val(THICK_DIVIDER, data, 1.2);
         // grid column count from layout string (for hinge pillar spacing)
@@ -238,9 +238,19 @@ module factory_render_box(data, opts, phys) {
                     core_tray_chassis(data_g);
                 // Hinge bore recess — centred on axle, open at box top for C-clip entry.
                 // Axle sits at l/2−hinge_y so the C-clip outer edge is flush with l/2.
+                // B6 fix: bore radius scaled to 1.5x clip_od (was clip_od + flat 3.0mm).
+                // A flat addition doesn't keep pace with clip_od, which itself grows
+                // with nozzle diameter (clip_wall = noz*4) — at noz=0.6 the flat
+                // +3.0mm left the bore's chord at the box-top edge falling just short
+                // of the back wall's outer face, leaving an uncut sliver that blocked
+                // the C-clip cylinder ("thin line on top, the cylinder won't go
+                // through"). Scaling with clip_od keeps a positive breach margin at
+                // any nozzle size. The lid's connecting block (RenderLid.scad ~170)
+                // extends slightly past the C-clip's outline, so this margin also
+                // keeps it clear of the back wall as the lid rotates.
                 if (clip_len > 0)
                     translate([0, l/2 - hinge_y, axle_z])
-                        yrot(90) cyl(d=clip_od + clearance*4, h=clip_len+2, $fn=36);
+                        yrot(90) cyl(d=clip_od*1.5 + clearance*4, h=clip_len+2, $fn=36);
             }
             // Hinge pillars — fill from l/2−clip_od to l/2, height up to axle crown.
             // This keeps the full hinge assembly within the box's total footprint.
@@ -271,11 +281,14 @@ module factory_render_box(data, opts, phys) {
             // Diamond latch recess — cutter matches lid tab shape.
             // Z-tips widened to noz*1.05 to mirror the truncated lid tab (same extrusion width).
             // +EPS on Y so hull root face is EPS inside the wall, not coplanar with wall -Y face.
+            // B5 fix: bulge at +0.8 (local +Y = into the wall, toward box interior, from
+            // the origin at -l/2+EPS) so this cutter actually carves a pocket into the
+            // wall. The lid's diamond tip protrudes +Y (toward the wall) to seat in it.
             translate([0, -l/2 + EPS, latch_z])
                 hull() {
-                    translate([0,  0,   0.8]) cuboid([w-sw*4, 0.1, noz*1.05], anchor=CENTER);
-                    translate([0, -0.8, 0  ]) cuboid([w-sw*4, noz*2, 0.1   ], anchor=CENTER);
-                    translate([0,  0,  -0.8]) cuboid([w-sw*4, 0.1, noz*1.05], anchor=CENTER);
+                    translate([0, 0,   0.8]) cuboid([w-sw*4, 0.1, noz*1.05], anchor=CENTER);
+                    translate([0, 0.8, 0  ]) cuboid([w-sw*4, noz*2, 0.1   ], anchor=CENTER);
+                    translate([0, 0,  -0.8]) cuboid([w-sw*4, 0.1, noz*1.05], anchor=CENTER);
                 }
         }
 
@@ -296,7 +309,7 @@ module factory_render_box(data, opts, phys) {
         // +EPS*2: pillar ±Y faces extend EPS past the tangent points, breaking the contact.
         spine_w    = hinge_y*2 + hinge_d + EPS*2;
         axle_z     = h - cc_z;
-        clip_len   = w - sw*6;
+        clip_len   = flip_hinge_len(w, sw);
         int_w      = w - sw*2;
         div_t      = get_val(THICK_DIVIDER, data, 1.2);
         g_str      = get_val(GRID_LAYOUT, data, "");
@@ -321,16 +334,20 @@ module factory_render_box(data, opts, phys) {
                 // Hull variant: cut the full pill-shaped slab between hinges (original).
                 // Individual cuts leave spine material between the two hinges intact;
                 // hull removes everything between them (creating the visible open gap).
+                // B6 fix: bore radius scaled to 1.5x clip_od (was clip_od + flat
+                // clearance*4, no extra margin) — see Flip_Single's bore cutter above
+                // for why a flat margin fails to breach the wall at larger nozzle
+                // sizes ("thin line on top, the cylinder won't go through").
                 if (spine_fill) {
                     for (sy = [-1, 1])
                         translate([0, sy*hinge_y, axle_z])
-                            yrot(90) cyl(d=clip_od + clearance*4, h=clip_len+2, $fn=36);
+                            yrot(90) cyl(d=clip_od*1.5 + clearance*4, h=clip_len+2, $fn=36);
                 } else {
                     hull() {
                         translate([0, -hinge_y, axle_z])
-                            yrot(90) cyl(d=clip_od + clearance*4, h=clip_len+2, $fn=36);
+                            yrot(90) cyl(d=clip_od*1.5 + clearance*4, h=clip_len+2, $fn=36);
                         translate([0,  hinge_y, axle_z])
-                            yrot(90) cyl(d=clip_od + clearance*4, h=clip_len+2, $fn=36);
+                            yrot(90) cyl(d=clip_od*1.5 + clearance*4, h=clip_len+2, $fn=36);
                     }
                 }
             }
@@ -363,12 +380,14 @@ module factory_render_box(data, opts, phys) {
                 yrot(90) cyl(d=hinge_d, h=w - sw*2 + EPS2, chamfer=0.5, $fn=36);
             // Diamond latch recesses on both Y faces — Z-tips truncated to match lid tab.
             // EPS shrink on Y: hull root face at sy*(l/2−EPS) — inside wall, not coplanar.
+            // B5 fix: bulge at -sy*0.8 so the cutter goes into the wall (toward box
+            // centre) regardless of which Y wall it's on, matching the Single-flip fix.
             for (sy = [-1, 1])
                 translate([0, sy * (l/2 - EPS), latch_z])
                     hull() {
-                        translate([0, sy*0,    0.8]) cuboid([w-sw*4, 0.1, noz*1.05], anchor=CENTER);
-                        translate([0, sy*0.8,  0  ]) cuboid([w-sw*4, noz*2, 0.1   ], anchor=CENTER);
-                        translate([0, sy*0,   -0.8]) cuboid([w-sw*4, 0.1, noz*1.05], anchor=CENTER);
+                        translate([0, sy*0,     0.8]) cuboid([w-sw*4, 0.1, noz*1.05], anchor=CENTER);
+                        translate([0, -sy*0.8,  0  ]) cuboid([w-sw*4, noz*2, 0.1   ], anchor=CENTER);
+                        translate([0, sy*0,    -0.8]) cuboid([w-sw*4, 0.1, noz*1.05], anchor=CENTER);
                     }
         }
     }

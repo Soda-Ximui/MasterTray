@@ -48,6 +48,9 @@ LAYER_HEIGHT0 = 0.20;           // Default slicer layer height (mm)
 WALL_LOOPS0 = 3;                // Default perimeter passes
 NOZZLE_DIAMETER0 = 0.4;         // Default nozzle size (mm)
 
+HINGE_WIDTH_PERCENT0 = 0.6;     // Default flip-lid C-clip hinge length, as a fraction of part width
+MIN_HINGE_WIDTH0 = 16;          // Default minimum flip-lid C-clip hinge length (mm)
+
 MIN_HOLE_SPACING0 = 1.2;        // Default mesh hole min spacing (mm)
 PATTERN0 = TEARDROP;            // Default mesh pattern
 STRUT_WALL0 = 25;               // Default wall mesh density (%)
@@ -457,6 +460,13 @@ function glide_ball_protr(ball_r, glide_tol, noz) =
 /// When closed: lid face at h − sl − 2·cc_z; latch tip at +clasp_depth above that.
 function flip_latch_z(h, cc_z, clasp_depth) =
     h - 2 * cc_z + clasp_depth;
+
+/// Flip lid — length of the C-clip hinge / connecting block along the wall.
+/// HINGE_WIDTH_PERCENT0 of the part width, floored at MIN_HINGE_WIDTH0 so small
+/// parts still get a hinge wide enough to be structurally sound, and capped at
+/// part_w - sw*6 so it never collides with the side walls.
+function flip_hinge_len(part_w, sw) =
+    min(part_w - sw * 6, max(part_w * HINGE_WIDTH_PERCENT0, MIN_HINGE_WIDTH0));
 
 /// Grid span — clamp span wall height to the container's permitted maximum.
 /// Prevents spans from exceeding flip-lid axle clearance or jar neck clearance.

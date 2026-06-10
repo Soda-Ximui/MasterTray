@@ -71,7 +71,6 @@ function flip_hinge_y(data) =
       spine_gap  = breathing_room(COMP_SPINE, data))
   (4.0 + clearance*2 + get_val(NOZZLE_DIAMETER, data, 0.4)*8) / 2 + spine_gap;
 
-function flip_lid_l(data)      = get_val(LENGTH, data, LENGTH0) - flip_hinge_y(data);
 // Half-lid length for Flip_Double: spine is centred, each lid covers one half.
 // Assembly requires flipping the lid 180° (C-clip faces spine). Latch lands at:
 //   hinge_y + lid_l + cc_z = l/2  →  flip_half_lid_l = l/2 - spine_gap
@@ -312,10 +311,27 @@ function compile_manifest(intent, data) =
   // testing fit. LID_TYPE_SEL from Customizer selects the type; LID_STYLE selects
   // External (over-wall groove) vs Rabbet (inside-wall groove) for Snap/Glide.
   // Glide also reads GLIDE_DIR and GLIDE_SNAP from the Customizer as normal.
+  //
+  // Flip_Single: pass part_length = your box length. The renderer subtracts
+  //   clip_outer_d internally, so the lid body + hinge assembly = box length exactly.
+  //
+  // Flip_Double: emits TWO lids at flip_half_lid_l each (box_length/2 - spine_gap).
+  //   spine_gap = breathing_room(COMP_SPINE, data) — filament-driven, not hardcoded.
+  //   Pass part_length = your full box length; the system divides and subtracts for you.
   (intent == "Lid") ?
     let(phys     = get_physics_profile(data),
-        lid_type = get_val(LID_TYPE_SEL, data, "Flip_Single"))
-    [["LID", data, [["LID_TYPE", lid_type]], phys]]
+        lid_type = get_val(LID_TYPE_SEL, data, "Flip_Single"),
+        half_l   = flip_half_lid_l(data))
+    // Flip_Double's two half-lids are mirror images: each one's hinge sits at the
+    // box's centre spine and its latch engages the opposite outer wall. The
+    // Flip_Single renderer always puts the C-clip hinge on local +Y and the
+    // latch arm on local -Y, so the second half must be rotated 180° about Z to
+    // swap those ends — otherwise its latch points into the spine gap (no wall
+    // to engage) instead of at its outer wall ("open cantilever").
+    (lid_type == "Flip_Double")
+        ? [["LID", concat([[LENGTH, half_l]], data), [["LID_TYPE", "Flip_Single"]], phys],
+           ["LID", concat([[LENGTH, half_l]], data), [["LID_TYPE", "Flip_Single"], ["ROTATE_180", true]], phys]]
+        : [["LID", data, [["LID_TYPE", lid_type]], phys]]
   :
 
   // ── BOX / TRAY PUBLIC AGGREGATORS ──────────────────────────────────────────

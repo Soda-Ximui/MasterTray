@@ -26,9 +26,14 @@ COMP_GLIDE = "glide_track";
 // --- BASELINE TOLERANCES (Breathing Room / Gap) ---
 // Smaller number = tighter fit
 // ROOM_SPINE: gap between the two Flip_Double C-clip faces at box centre.
-// Must be ≥ clip_od/2 ≈ 3.85mm so each C-clip sweeps a full 90° without
-// colliding with the other during simultaneous opening (see HANDOFF physics).
-ROOM_SPINE_PETG = 4.00; ROOM_SPINE_TPU = 0.20; ROOM_SPINE_PLA = 4.00;
+// B8 (2026-06-10): was 4.00 (≈clip_od/2, sized for a full 90° simultaneous-
+// opening sweep), but printed parts show this leaves a closed-lid gap of
+// roughly 1/3 of the spine width. Each half-lid's hinge already hard-stops
+// against its own wall at ~90° (see B6), so the two clips never approach
+// each other closely enough to need the full clip_od/2 clearance. Reduced
+// to 1.00mm; reprint to confirm the C-clips still don't bind when both
+// half-lids are opened simultaneously.
+ROOM_SPINE_PETG = 1.00; ROOM_SPINE_TPU = 0.20; ROOM_SPINE_PLA = 1.00;
 ROOM_CCLIP_PETG = 0.25; ROOM_CCLIP_TPU = 0.10; ROOM_CCLIP_PLA = 0.15;
 ROOM_GLIDE_PETG = 0.40; ROOM_GLIDE_TPU = 0.60; ROOM_GLIDE_PLA = 0.20; 
 
@@ -40,6 +45,18 @@ ENG_BELLY_PETG = 0.6; ENG_BELLY_TPU = 0.4; ENG_BELLY_PLA = 0.5;
 // --- MODIFIER STEP CONSTANTS ---
 STEP_ROOM = 0.05; // Adjusts gap clearances by 50 microns per fit level
 STEP_ENG  = 0.20; // Adjusts snap engagements by 0.2mm per fit level
+
+// --- WALL-LOOP COMPENSATION ---
+// More perimeter loops = more cumulative over-extrusion pressure on the
+// outermost wall, which bulges outward into clearance gaps and inward-bulges
+// the walls of holes/recesses (shrinking engagement pockets). Baseline
+// tolerances above are tuned for WALL_LOOPS0 (3) loops; each additional loop
+// nudges clearances open and engagement depths deeper to compensate.
+LOOP_BASELINE   = WALL_LOOPS0; // loop count the baseline numbers above assume
+STEP_LOOP_ROOM  = 0.025;       // extra clearance per loop above baseline (mm)
+STEP_LOOP_ENG   = 0.05;        // extra engagement depth per loop above baseline (mm)
+
+function loop_excess(data) = max(0, m_wloops(data) - LOOP_BASELINE);
 
 
 // ==============================================================================
@@ -70,20 +87,22 @@ function get_fit_mod(data) =
     (fit == FIT_LOOSER)  ?  2 : 
     0; 
     
-function breathing_room(component, data) = 
-    let(fil = get_val("FILAMENT_TYPE", data, FIL_PLA), mod = get_fit_mod(data))
-    (component == COMP_SPINE) ? 
-        ((fil == FIL_PETG) ? ROOM_SPINE_PETG : (fil == FIL_TPU) ? ROOM_SPINE_TPU : ROOM_SPINE_PLA) + (mod * STEP_ROOM) :
-    (component == COMP_CCLIP) ? 
-        ((fil == FIL_PETG) ? ROOM_CCLIP_PETG : (fil == FIL_TPU) ? ROOM_CCLIP_TPU : ROOM_CCLIP_PLA) + (mod * STEP_ROOM) :
-    (component == COMP_GLIDE) ? 
-        ((fil == FIL_PETG) ? ROOM_GLIDE_PETG : (fil == FIL_TPU) ? ROOM_GLIDE_TPU : ROOM_GLIDE_PLA) + (mod * STEP_ROOM) :
+function breathing_room(component, data) =
+    let(fil = get_val("FILAMENT_TYPE", data, FIL_PLA), mod = get_fit_mod(data),
+        loop_bonus = loop_excess(data) * STEP_LOOP_ROOM)
+    (component == COMP_SPINE) ?
+        ((fil == FIL_PETG) ? ROOM_SPINE_PETG : (fil == FIL_TPU) ? ROOM_SPINE_TPU : ROOM_SPINE_PLA) + (mod * STEP_ROOM) + loop_bonus :
+    (component == COMP_CCLIP) ?
+        ((fil == FIL_PETG) ? ROOM_CCLIP_PETG : (fil == FIL_TPU) ? ROOM_CCLIP_TPU : ROOM_CCLIP_PLA) + (mod * STEP_ROOM) + loop_bonus :
+    (component == COMP_GLIDE) ?
+        ((fil == FIL_PETG) ? ROOM_GLIDE_PETG : (fil == FIL_TPU) ? ROOM_GLIDE_TPU : ROOM_GLIDE_PLA) + (mod * STEP_ROOM) + loop_bonus :
     0.0;
 
-function engagement_depth(component, data) = 
-    let(fil = get_val("FILAMENT_TYPE", data, FIL_PLA), mod = get_fit_mod(data))
-    (component == COMP_CLASP) ? 
-        ((fil == FIL_PETG) ? ENG_CLASP_PETG : (fil == FIL_TPU) ? ENG_CLASP_TPU : ENG_CLASP_PLA) - (mod * STEP_ENG) :
-    (component == COMP_BELLY) ? 
-        ((fil == FIL_PETG) ? ENG_BELLY_PETG : (fil == FIL_TPU) ? ENG_BELLY_TPU : ENG_BELLY_PLA) : 
+function engagement_depth(component, data) =
+    let(fil = get_val("FILAMENT_TYPE", data, FIL_PLA), mod = get_fit_mod(data),
+        loop_bonus = loop_excess(data) * STEP_LOOP_ENG)
+    (component == COMP_CLASP) ?
+        ((fil == FIL_PETG) ? ENG_CLASP_PETG : (fil == FIL_TPU) ? ENG_CLASP_TPU : ENG_CLASP_PLA) - (mod * STEP_ENG) + loop_bonus :
+    (component == COMP_BELLY) ?
+        ((fil == FIL_PETG) ? ENG_BELLY_PETG : (fil == FIL_TPU) ? ENG_BELLY_TPU : ENG_BELLY_PLA) + loop_bonus :
     0.0;

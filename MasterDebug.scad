@@ -73,7 +73,7 @@ module dump_build_options(intent, data) {
     clip_od     = 4.0 + cclip_tol*2 + clip_wall*2;
     cc_z        = clip_od / 2;
     axle_z      = h - cc_z;
-    clip_len    = w - sw*6;
+    clip_len    = flip_hinge_len(w, sw);
     latch_z     = flip_latch_z(h, cc_z, clasp_depth);
 
     g_str  = get_val(GRID_LAYOUT,   data, "");
@@ -120,7 +120,8 @@ module dump_build_options(intent, data) {
     echo("   Flip hinge mechanism:");
     echo(str("     clip_od  = ", clip_od,     " mm  (C-clip outer dia from nozzle + tolerance)"));
     echo(str("     axle_z   = ", axle_z,      " mm  (axle pin height derived from clip geometry)"));
-    echo(str("     clip_len = ", clip_len,    " mm  (hinge span = w − sw×6",
+    echo(str("     clip_len = ", clip_len,    " mm  (hinge span = clamp(w×",
+             HINGE_WIDTH_PERCENT0, ", min ", MIN_HINGE_WIDTH0, ", max w−sw×6)",
              clip_len <= 0 ? "  ⚠ TOO NARROW — hinge suppressed" : "  ✓ fits", ")"));
     echo(str("     latch_z  = ", latch_z,     " mm  (latch recess aligned to lid tip when closed)"));
     echo("   Grid:");
@@ -212,7 +213,7 @@ module dump_build_payload(intent, data) {
     clip_od     = 4.0 + cclip_tol*2 + clip_wall*2;
     cc_z        = clip_od / 2;
     axle_z      = h - cc_z;
-    clip_len    = w - sw*6;
+    clip_len    = flip_hinge_len(w, sw);
     latch_z     = flip_latch_z(h, cc_z, clasp_depth);
     hinge_y_s   = cc_z;
     hinge_y_d   = cc_z + spine_gap;
@@ -309,7 +310,7 @@ module dump_build_payload(intent, data) {
     echo(str("AUTO|FLIP|clip_od|",      clip_od,    "|mm|COMPUTED|4.0+cclip*2+clip_wall*2|DRIVES=cc_z;axle_z;hinge_y;gwall_h"));
     echo(str("AUTO|FLIP|cc_z|",         cc_z,       "|mm|COMPUTED|clip_od/2|DRIVES=axle_z;latch_z;hinge_y"));
     echo(str("AUTO|FLIP|axle_z|",       axle_z,     "|mm|COMPUTED|h-cc_z|DRIVES=hinge_pillars;gwall_h_flipbox"));
-    echo(str("AUTO|FLIP|clip_len|",     clip_len,   "|mm|COMPUTED|w-sw*6|NOTE=hinge_span;guard=must_be_positive"));
+    echo(str("AUTO|FLIP|clip_len|",     clip_len,   "|mm|COMPUTED|clamp(w*", HINGE_WIDTH_PERCENT0, ", min ", MIN_HINGE_WIDTH0, ", max w-sw*6)|NOTE=hinge_span;guard=must_be_positive"));
     echo(str("AUTO|FLIP|clasp_depth|",  clasp_depth,"|mm|MATERIAL|ENG_CLASP_", fil, "-fit_mod*STEP_ENG|DRIVES=latch_z;lid_diamond_tip"));
     echo(str("AUTO|FLIP|flat_belly|",   flat_belly, "|mm|MATERIAL|ENG_BELLY_", fil, "|DRIVES=c_clip_opening_gap"));
     echo(str("AUTO|FLIP|latch_z|",      latch_z,    "|mm|COMPUTED|flip_latch_z(h,cc_z,clasp)|NOTE=recess_aligns_lid_tip_when_closed"));

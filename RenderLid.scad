@@ -144,7 +144,7 @@ module factory_render_lid(data, opts, phys) {
         hinge_y_off = clip_outer_d / 2;
         // lid_l: body only — C-clip adds clip_outer_d on the +Y side, so the total
         // assembly is exactly l (user's specified dimension, not l + clip_outer_d).
-        lid_w = w; lid_l = l - clip_outer_d; clip_len = lid_w - sw*6; clip_z = sl + cc_z;
+        lid_w = w; lid_l = l - clip_outer_d; clip_len = flip_hinge_len(lid_w, sw); clip_z = sl + cc_z;
         union() {
             // Flip lid body: minimum noz chamfer on all edges regardless of global chamfer_size=0.
             apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), max(noz, m_chamf(data)))
@@ -167,9 +167,23 @@ module factory_render_lid(data, opts, phys) {
                                 cuboid([clip_len+2, clip_outer_d,
                                         clip_outer_d - flat_belly*2], anchor=CENTER);
                             }
-                            translate([0, -hinge_y_off/2, -(clip_z-sl)/2])
-                                cuboid([clip_len, hinge_y_off+2.0, (clip_z-sl)+2.0],
-                                       chamfer=1.0, edges=[TOP+FRONT, TOP+BACK], anchor=CENTER);
+                            // B9 fix: extend this block's overlap into the lid body (toward
+                            // local -Y/-Z, which is the lid's interior — the +Y/+Z side
+                            // facing the back wall is untouched, so B6's clearance is
+                            // unaffected). Originally only ~1mm x 1mm of this block sat
+                            // inside the lid body (a tangent-line join, not a face) — a
+                            // stress riser that snapped in testing.
+                            // Z: anchor the block's bottom to the print bed (local Z = -clip_z,
+                            // i.e. global Z = 0) instead of a fixed ext_z offset — a fixed
+                            // offset can push the bottom BELOW the bed for thin lids (sl < 1mm),
+                            // which showed up as a disconnected rectangular sliver + gap at
+                            // layer 1. Bed-anchoring gives the maximum possible fused area
+                            // (full lid thickness) for any sl, with the top reaching 2mm past
+                            // clip_z into the C-clip cylinder for fusion there.
+                            ext_y = 3.0;
+                            translate([0, -hinge_y_off/2 - ext_y/2, -clip_z])
+                                cuboid([clip_len, hinge_y_off+2.0+ext_y, clip_z+2.0],
+                                       chamfer=1.0, edges=[TOP+FRONT, TOP+BACK], anchor=BOTTOM);
                         }
                         yrot(90) cyl(d=hinge_d + clearance*2, h=clip_len+2, $fn=36);
                         // C-opening faces UP (+Z): printer traces U-shapes layer-by-layer,
