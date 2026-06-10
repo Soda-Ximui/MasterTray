@@ -282,7 +282,7 @@ function compile_manifest(intent, data) =
         ["LID", concat([[WIDTH, cw - 0.6], [PLAQUE_TEXT, days[i]]], data), [["LID_TYPE", "Flip_Single"]], phys]]
     )
   :
-  (intent == "14-Day AM/PM Box") ?
+  (intent == "7-Day AM/PM Box") ?
     let(phys  = get_physics_profile(data),
         w     = get_val(WIDTH, data, WIDTH0),
         lid_l = flip_half_lid_l(data),
@@ -298,13 +298,13 @@ function compile_manifest(intent, data) =
     )
   :
   (intent == "Pillbox Set (Double Lid)") ?
-    concat(compile_manifest("14-Day AM/PM Box", data), compile_manifest("1-Day AM/PM Box", data))
+    concat(compile_manifest("7-Day AM/PM Box", data), compile_manifest("1-Day AM/PM Box", data))
   :
   (intent == "Pillbox Set (Single Lid)") ?
     concat(compile_manifest("7-Day Pill Box", data), compile_manifest("1-Day AM/PM Box", data))
   :
   (intent == "Pillbox Full Set") ?
-    concat(compile_manifest("14-Day AM/PM Box", data), compile_manifest("7-Day Pill Box", data), compile_manifest("1-Day AM/PM Box", data))
+    concat(compile_manifest("7-Day AM/PM Box", data), compile_manifest("7-Day Pill Box", data), compile_manifest("1-Day AM/PM Box", data))
   :
   // ── STANDALONE LID ─────────────────────────────────────────────────────────
   // Builds one lid of the selected type. Useful for reprinting a lost lid or
