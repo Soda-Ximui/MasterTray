@@ -1,0 +1,76 @@
+graph TD
+    subgraph SCAD["SCAD source of truth"]
+        MB["MasterBuilder.scad<br/>• Customizer UI (Part_To_Build, dims, lid flags...)<br/>• @CONFIG_SECTION_START/END defaults<br/>(printer / mesh / advanced)"]
+    end
+
+    subgraph TRANS["Translation layer (developer-facing)"]
+        MAP["build/mapping.yaml<br/>friendly terms ⟷ Customizer vars<br/>intents, lid types, config groups,<br/>cli_aliases"]
+        CFG["build/configs/*.yaml<br/>example --config templates<br/>(printer / mesh / advanced)"]
+    end
+
+    subgraph CORE["Core builder (owns the domain)"]
+        MT["build/mastertray.py<br/>build / list / init-config<br/>builds -D override list,<br/>runs OpenSCAD,<br/>writes report.yaml + report.html"]
+    end
+
+    subgraph FRONT["Front-ends (wrap mastertray, never change it)"]
+        BP["build/build.py<br/>terse shorthand CLI<br/>(box -dim LxWxH -lid name,name)"]
+        ASTRO["astro/.../builder.astro<br/>web form"]
+        SERVER["build/scripts/build_server.mjs<br/>local API server"]
+    end
+
+    subgraph CHECK["Sync / export utilities"]
+        SYNC["build/scripts/check_config_sync.pl<br/>verifies configs/*.yaml ==<br/>@CONFIG_SECTION defaults"]
+        EXPMAP["build/scripts/export_mapping.pl<br/>→ build/mapping.json"]
+        EXPINT["build/scripts/export_intents.pl<br/>→ build/intents.json"]
+    end
+
+    subgraph OUT["Build outputs"]
+        STL["<out>.stl / .3mf / .png"]
+        REPORTS["<out>.report.yaml<br/><out>.report.html"]
+    end
+
+    JUST["justfile (just meta)"]
+
+    %% SCAD relationships
+    MB -- "Customizer vars (-D KEY=value)" --> MT
+    MB -- "@CONFIG_SECTION defaults" --> SYNC
+    CFG -- "example values" --> SYNC
+    MAP -- "friendly key ⟷ var map" --> SYNC
+
+    %% translation layer
+    MAP --> MT
+    MAP --> BP
+    MAP --> EXPMAP
+    MAP --> EXPINT
+    MT -. "init-config copies" .-> CFG
+    CFG -- "--config FILE" --> MT
+
+    %% front-ends call core
+    BP -- "imports, calls cmd_build()" --> MT
+    SERVER -- "shells out: mastertray.py build" --> MT
+    ASTRO -- "POST /build" --> SERVER
+    EXPMAP -- "mapping.json" --> ASTRO
+    EXPINT -- "intents.json" --> ASTRO
+
+    %% outputs
+    MT --> STL
+    MT --> REPORTS
+
+    %% justfile orchestration
+    JUST -. "runs" .-> EXPMAP
+    JUST -. "runs" .-> EXPINT
+    JUST -. "runs" .-> SYNC
+
+    classDef scad fill:#fde2e2,stroke:#c0392b,color:#000;
+    classDef trans fill:#fff3cd,stroke:#b8860b,color:#000;
+    classDef core fill:#d4edda,stroke:#28a745,color:#000;
+    classDef front fill:#d6e9ff,stroke:#1f6feb,color:#000;
+    classDef check fill:#eee,stroke:#888,color:#000;
+    classDef out fill:#f0e6ff,stroke:#8e44ad,color:#000;
+
+    class MB scad
+    class MAP,CFG trans
+    class MT core
+    class BP,ASTRO,SERVER front
+    class SYNC,EXPMAP,EXPINT,JUST check
+    class STL,REPORTS out

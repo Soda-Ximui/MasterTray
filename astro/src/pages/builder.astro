@@ -1,0 +1,499 @@
+---
+import fs from 'node:fs';
+import path from 'node:path';
+import { parse as parseYaml } from 'yaml';
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { SITE_TITLE } from '../consts';
+
+const repoRoot = path.resolve(process.cwd(), '..');
+const mapping = parseYaml(fs.readFileSync(path.join(repoRoot, 'build/mapping.yaml'), 'utf-8'));
+const printerDefaults = parseYaml(fs.readFileSync(path.join(repoRoot, 'build/configs/printer.yaml'), 'utf-8'));
+
+// {Customizer var: value} for every top-level `Var = value;` Customizer
+// assignment in MasterBuilder.scad (everything before the first `include
+// <...>`). Mirrors mastertray.py's parse_scad_defaults() -- used to drop
+// -D overrides that match MasterBuilder.scad's own defaults, so the preview
+// shows the same "diff from defaults" the build script actually runs.
+function parseScadDefaults(scadText) {
+	const head = scadText.split(/\ninclude </)[0];
+	const defaults = {};
+	for (const m of head.matchAll(/^(\w+)\s*=\s*(.+?);/gm)) {
+		const [, name, raw] = m;
+		const trimmed = raw.trim();
+		if (trimmed === 'true') defaults[name] = true;
+		else if (trimmed === 'false') defaults[name] = false;
+		else if (/^"(.*)"$/.test(trimmed)) defaults[name] = trimmed.slice(1, -1);
+		else if (/^-?\d+(\.\d+)?$/.test(trimmed)) defaults[name] = Number(trimmed);
+		else defaults[name] = trimmed;
+	}
+	return defaults;
+}
+
+const scadDefaults = parseScadDefaults(fs.readFileSync(path.join(repoRoot, 'MasterBuilder.scad'), 'utf-8'));
+
+const intentNames = Object.keys(mapping.intents);
+const containerLidNames = Object.keys(mapping.container_lid_types);
+const standaloneLidNames = Object.keys(mapping.standalone_lid_types);
+const slideDirections = Object.keys(mapping.slide_direction);
+const slideCatches = Object.keys(mapping.slide_catch);
+const dimensionModes = Object.keys(mapping.dimension_mode);
+
+const data = {
+	mapping,
+	printerDefaults,
+	scadDefaults,
+	intentNames,
+	containerLidNames,
+	standaloneLidNames,
+	slideDirections,
+	slideCatches,
+	dimensionModes,
+};
+---
+
+<html lang="en">
+	<head>
+		<BaseHead title={`Builder — ${SITE_TITLE}`} description="Build a MasterTray container or lid using friendly terms." />
+	</head>
+	<body>
+		<Header />
+		<main class="builder">
+			<h1>Container / Lid Builder</h1>
+			<p>
+				Pick what you want to build in plain terms. This generates the
+				<code>build/mastertray.py</code> command (and the underlying
+				Customizer overrides) — copy it and run it locally. See the
+				<a href="/docs/readme">QA Build Guide</a> for full details.
+			</p>
+
+			<form id="builder-form">
+				<fieldset>
+					<legend>What to build</legend>
+
+					<label>
+						Intent
+						<select id="intent"></select>
+					</label>
+
+					<label id="lid-row">
+						Lid type
+						<select id="lid"></select>
+					</label>
+
+					<div id="slide-options" hidden>
+						<label>
+							Slide direction
+							<select id="slide-direction"></select>
+						</label>
+						<label>
+							Slide catch
+							<select id="slide-catch"></select>
+						</label>
+					</div>
+				</fieldset>
+
+				<fieldset>
+					<legend>Dimensions (mm)</legend>
+					<label>Width <input type="number" id="width" placeholder="e.g. 50" /></label>
+					<label>Length <input type="number" id="length" placeholder="e.g. 100" /></label>
+					<label>Height <input type="number" id="height" placeholder="e.g. 30" /></label>
+					<label>
+						Mode
+						<select id="mode"></select>
+					</label>
+				</fieldset>
+
+				<fieldset>
+					<legend>Printer / filament</legend>
+					<label>
+						Filament
+						<select id="filament">
+							<option>PLA</option>
+							<option>PETG</option>
+							<option>TPU</option>
+							<option>ABS</option>
+						</select>
+					</label>
+					<label>Nozzle (mm) <input type="number" step="0.05" id="nozzle" /></label>
+					<label>Layer height (mm) <input type="number" step="0.01" id="layer_height" /></label>
+					<label>Walls <input type="number" step="1" id="walls" /></label>
+					<label>
+						Fit
+						<select id="fit">
+							<option>Tighter</option>
+							<option>Tight</option>
+							<option>Standard</option>
+							<option>Loose</option>
+							<option>Looser</option>
+						</select>
+					</label>
+				</fieldset>
+
+				<fieldset>
+					<legend>Output</legend>
+					<label>File name <input type="text" id="out" value="part.stl" /></label>
+				</fieldset>
+			</form>
+
+			<section>
+				<h2>mastertray.py command</h2>
+				<pre id="cmd-friendly"></pre>
+
+				<h2>Customizer overrides (<code>-D</code>)</h2>
+				<p class="hint">This is what the friendly command above translates to under the hood.</p>
+				<pre id="cmd-overrides"></pre>
+
+				<h2>Run it</h2>
+				<div class="actions">
+					<button type="button" id="download-ps1">Download .ps1 script</button>
+					<button type="button" id="build-stl">Build STL (local server)</button>
+				</div>
+				<p class="hint" id="build-status"></p>
+			</section>
+		</main>
+		<Footer />
+
+		<script type="application/json" id="builder-data" set:html={JSON.stringify(data)} />
+		<script>
+			const data = JSON.parse(document.getElementById('builder-data').textContent);
+			const { mapping, printerDefaults } = data;
+
+			const $ = (id) => document.getElementById(id);
+
+			function fillSelect(select, options) {
+				select.innerHTML = '';
+				for (const opt of options) {
+					const el = document.createElement('option');
+					el.value = opt;
+					el.textContent = opt;
+					select.appendChild(el);
+				}
+			}
+
+			fillSelect($('intent'), data.intentNames);
+			fillSelect($('slide-direction'), data.slideDirections);
+			fillSelect($('slide-catch'), data.slideCatches);
+			fillSelect($('mode'), data.dimensionModes);
+
+			$('filament').value = printerDefaults.filament;
+			$('nozzle').value = printerDefaults.nozzle;
+			$('layer_height').value = printerDefaults.layer_height;
+			$('walls').value = printerDefaults.walls;
+			$('fit').value = printerDefaults.fit;
+			$('mode').value = 'Total';
+
+			// A lid type counts as "Slide" if its override dict sets a Glide_* flag
+			// (Container) or Standalone_Lid_Type: "Glide" (Container Lid).
+			function isSlideLid(table, name) {
+				const overrides = table[name] || {};
+				return Object.keys(overrides).some((k) => k.startsWith('Glide_') && overrides[k] === true)
+					|| overrides.Standalone_Lid_Type === 'Glide';
+			}
+
+			function updateLidOptions() {
+				const intent = $('intent').value;
+				const lidRow = $('lid-row');
+				const slideOptions = $('slide-options');
+
+				if (intent === 'Container') {
+					lidRow.hidden = false;
+					fillSelect($('lid'), data.containerLidNames);
+				} else if (intent === 'Container Lid') {
+					lidRow.hidden = false;
+					fillSelect($('lid'), data.standaloneLidNames);
+				} else {
+					lidRow.hidden = true;
+					$('lid').innerHTML = '';
+				}
+				updateSlideVisibility();
+			}
+
+			function updateSlideVisibility() {
+				const intent = $('intent').value;
+				const lid = $('lid').value;
+				let table = null;
+				if (intent === 'Container') table = mapping.container_lid_types;
+				else if (intent === 'Container Lid') table = mapping.standalone_lid_types;
+				$('slide-options').hidden = !(table && lid && isSlideLid(table, lid));
+			}
+
+			function fmtValue(value) {
+				if (typeof value === 'boolean') return value ? 'true' : 'false';
+				if (typeof value === 'number') return String(value);
+				return `"${value}"`;
+			}
+
+			function quoteArg(value) {
+				const s = String(value);
+				return /[\s"]/.test(s) ? `"${s.replace(/"/g, '\\"')}"` : s;
+			}
+
+			// Mirrors mastertray.py's values_equal(): drop -D overrides that match
+			// MasterBuilder.scad's own Customizer default for that variable.
+			function valuesEqual(value, fallback) {
+				if (typeof value === 'boolean' || typeof fallback === 'boolean') return value === fallback;
+				if (typeof value === 'number' && typeof fallback === 'number') return value === fallback;
+				return value === fallback;
+			}
+
+			function dropRedundantOverrides(overrides) {
+				const out = {};
+				for (const [key, value] of Object.entries(overrides)) {
+					if (!valuesEqual(value, data.scadDefaults[key])) out[key] = value;
+				}
+				return out;
+			}
+
+			function gatherParams() {
+				const intent = $('intent').value;
+				const lid = $('lid') && !$('lid-row').hidden ? $('lid').value : '';
+				const hasSlide = !$('slide-options').hidden;
+				return {
+					intent,
+					lid,
+					width: $('width').value,
+					length: $('length').value,
+					height: $('height').value,
+					mode: $('mode').value,
+					out: $('out').value || 'part.stl',
+					hasSlide,
+					slideDirection: hasSlide ? $('slide-direction').value : '',
+					slideCatch: hasSlide ? $('slide-catch').value : '',
+					printer: {
+						filament: $('filament').value,
+						nozzle: parseFloat($('nozzle').value),
+						layer_height: parseFloat($('layer_height').value),
+						walls: parseInt($('walls').value, 10),
+						fit: $('fit').value,
+					},
+				};
+			}
+
+			let currentParams = null;
+
+			function build() {
+				currentParams = gatherParams();
+				const { intent, lid, width, length, height, mode, out } = currentParams;
+
+				// --- Friendly mastertray.py command ---
+				const friendly = ['python', 'build/mastertray.py', 'build', '--intent', quoteArg(intent)];
+				if (lid) friendly.push('--lid', quoteArg(lid));
+				if (width) friendly.push('--width', width);
+				if (length) friendly.push('--length', length);
+				if (height) friendly.push('--height', height);
+				if (mode && mode !== 'Total') friendly.push('--mode', mode);
+
+				if (!$('slide-options').hidden) {
+					friendly.push('--slide-direction', quoteArg($('slide-direction').value));
+					friendly.push('--slide-catch', quoteArg($('slide-catch').value));
+				}
+
+				friendly.push('--out', quoteArg(out));
+				$('cmd-friendly').textContent = friendly.join(' ');
+
+				// --- Resulting Customizer overrides (-D ...) ---
+				const overrides = {};
+
+				// Printer config
+				const { printer } = currentParams;
+				overrides[mapping.config.printer.filament] = printer.filament;
+				overrides[mapping.config.printer.nozzle] = printer.nozzle;
+				overrides[mapping.config.printer.layer_height] = printer.layer_height;
+				overrides[mapping.config.printer.walls] = printer.walls;
+				overrides[mapping.config.printer.fit] = printer.fit;
+
+				// Intent
+				overrides['Part_To_Build'] = mapping.intents[intent];
+
+				// Dimensions
+				if (width) overrides['part_width'] = parseFloat(width);
+				if (length) overrides['part_length'] = parseFloat(length);
+				if (height) overrides['part_height'] = parseFloat(height);
+				if (mode) overrides['dimension_mode'] = mapping.dimension_mode[mode];
+
+				// Lid type
+				if (intent === 'Container' && lid) {
+					for (const flag of mapping.container_lid_flags) overrides[flag] = false;
+					Object.assign(overrides, mapping.container_lid_types[lid]);
+				} else if (intent === 'Container Lid' && lid) {
+					Object.assign(overrides, mapping.standalone_lid_types[lid]);
+				}
+
+				// Slide options
+				if (!$('slide-options').hidden) {
+					overrides['Glide_Direction'] = mapping.slide_direction[$('slide-direction').value];
+					overrides['Glide_Snap'] = mapping.slide_catch[$('slide-catch').value];
+				}
+
+				const filteredOverrides = dropRedundantOverrides(overrides);
+				const ddArgs = Object.entries(filteredOverrides).map(([k, v]) => `-D ${k}=${fmtValue(v)}`);
+				$('cmd-overrides').textContent = ddArgs.join(' \\\n  ');
+			}
+
+			$('intent').addEventListener('change', () => { updateLidOptions(); build(); });
+			$('lid').addEventListener('change', () => { updateSlideVisibility(); build(); });
+			document.getElementById('builder-form').addEventListener('input', build);
+			document.getElementById('builder-form').addEventListener('change', build);
+
+			updateLidOptions();
+			build();
+
+			const REPO_ROOT = 'C:\\repos\\3D\\MasterTray';
+			const PYTHON = 'C:\\Python314\\python.exe';
+			const BUILD_SERVER = 'http://127.0.0.1:5180';
+
+			function downloadBlob(blob, filename) {
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement('a');
+				a.href = url;
+				a.download = filename;
+				a.click();
+				URL.revokeObjectURL(url);
+			}
+
+			// PowerShell single-quoted here-string is literal — no escaping needed
+			// for $ or backticks, but a literal "'@" can't appear in the YAML values.
+			function buildPs1(p) {
+				const lines = [];
+				lines.push(`Set-Location "${REPO_ROOT}"`);
+				lines.push('');
+				lines.push('$printerConfig = New-TemporaryFile | Rename-Item -NewName { $_.Name + ".yaml" } -PassThru');
+				lines.push("@'");
+				lines.push(`filament: ${p.printer.filament}`);
+				lines.push(`nozzle: ${p.printer.nozzle}`);
+				lines.push(`layer_height: ${p.printer.layer_height}`);
+				lines.push(`walls: ${p.printer.walls}`);
+				lines.push(`fit: ${p.printer.fit}`);
+				lines.push("'@ | Set-Content $printerConfig");
+				lines.push('');
+
+				const args = [`"${PYTHON}"`, 'build/mastertray.py', 'build', '--intent', `"${p.intent}"`];
+				if (p.lid) args.push('--lid', `"${p.lid}"`);
+				if (p.width) args.push('--width', p.width);
+				if (p.length) args.push('--length', p.length);
+				if (p.height) args.push('--height', p.height);
+				if (p.mode && p.mode !== 'Total') args.push('--mode', p.mode);
+				if (p.hasSlide) {
+					args.push('--slide-direction', p.slideDirection);
+					args.push('--slide-catch', `"${p.slideCatch}"`);
+				}
+				args.push('--config', '$printerConfig');
+				args.push('--out', `"build/sandbox/output/${p.out}"`);
+
+				lines.push('New-Item -ItemType Directory -Force build/sandbox/output | Out-Null');
+				lines.push(`& ${args.join(' ')}`);
+				lines.push('');
+				lines.push('Remove-Item $printerConfig');
+				lines.push(`Write-Host "-> build/sandbox/output/${p.out}"`);
+
+				return lines.join('\n');
+			}
+
+			$('download-ps1').addEventListener('click', () => {
+				const script = buildPs1(currentParams);
+				downloadBlob(new Blob([script], { type: 'text/plain' }), 'build_part.ps1');
+			});
+
+			$('build-stl').addEventListener('click', async () => {
+				const status = $('build-status');
+				const p = currentParams;
+				status.textContent = 'Building...';
+				try {
+					const res = await fetch(`${BUILD_SERVER}/api/build`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							intent: p.intent,
+							lid: p.lid,
+							width: p.width,
+							length: p.length,
+							height: p.height,
+							mode: p.mode,
+							slideDirection: p.hasSlide ? p.slideDirection : undefined,
+							slideCatch: p.hasSlide ? p.slideCatch : undefined,
+							printer: p.printer,
+							outName: p.out,
+						}),
+					});
+					if (!res.ok) {
+						const err = await res.json().catch(() => ({}));
+						throw new Error(err.error || `HTTP ${res.status}`);
+					}
+					const sandboxPath = res.headers.get('X-Sandbox-Path');
+					const blob = await res.blob();
+					downloadBlob(blob, p.out);
+					status.textContent = `Done — saved to ${sandboxPath} and downloaded.`;
+				} catch (err) {
+					status.textContent = `Build server unavailable (${err.message}). `
+						+ `Start it with: just build-server`;
+				}
+			});
+		</script>
+
+		<style>
+			.builder {
+				max-width: 860px;
+				margin: 0 auto;
+				padding: 2em 1.5em;
+			}
+			.builder fieldset {
+				border: 1px solid rgb(var(--gray-light));
+				border-radius: 6px;
+				margin-bottom: 1em;
+				padding: 1em;
+				display: flex;
+				flex-wrap: wrap;
+				gap: 1em;
+			}
+			.builder legend {
+				font-weight: bold;
+				padding: 0 0.4em;
+			}
+			.builder label {
+				display: flex;
+				flex-direction: column;
+				font-size: 0.9em;
+				gap: 0.3em;
+			}
+			.builder input,
+			.builder select {
+				padding: 0.4em;
+				font-size: 1em;
+			}
+			#slide-options {
+				display: flex;
+				gap: 1em;
+			}
+			.hint {
+				font-size: 0.85em;
+				color: rgb(var(--gray));
+			}
+			.actions {
+				display: flex;
+				gap: 0.75em;
+				margin: 0.5em 0;
+			}
+			.actions button {
+				padding: 0.5em 1em;
+				font-size: 0.95em;
+				border: 1px solid rgb(var(--gray-light));
+				border-radius: 6px;
+				background: white;
+				cursor: pointer;
+			}
+			.actions button:hover {
+				background: rgb(var(--gray-light));
+			}
+			pre {
+				background: rgb(var(--gray-light));
+				padding: 1em;
+				border-radius: 6px;
+				overflow-x: auto;
+				white-space: pre-wrap;
+				word-break: break-all;
+			}
+		</style>
+	</body>
+</html>

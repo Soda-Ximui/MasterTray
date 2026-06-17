@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "allow": [
+      "mcp__9027e4e4-ea85-4380-a8e4-76b4a97ec7c2__search_threads",
+      "mcp__9027e4e4-ea85-4380-a8e4-76b4a97ec7c2__list_labels",
+      "mcp__9027e4e4-ea85-4380-a8e4-76b4a97ec7c2__get_thread"
+    ]
+  }
+}
