@@ -1,5 +1,5 @@
 # Session Handoff — MasterTray
-_Last updated: 2026-06-17 — Architecture review (Opus) + hardening pass: 8 fixes applied & verified_
+_Last updated: 2026-06-17 — Architecture review (Opus) + hardening pass: 8 fixes, committed `44fa802`_
 
 ---
 
@@ -159,18 +159,55 @@ Real, cited liabilities. Items marked Done above are kept here for context. **Do
 
 ---
 
-## Next session prompt
+## Guidance for the next session (Sonnet)
 
+**Current state:** the hardening pass is committed (`44fa802`). The build-matrix gate
+(`just check-build`) is green at 26/26. The codebase is safe to refactor *because* that
+gate exists — run it after any SCAD or build-tooling change and treat a red as a stop.
+
+**Workflow rules that held this session (keep them):**
+- After any `.scad`, `mastertray.py`, `mapping.yaml`, or `builder.astro` change, run
+  `python build/scripts/build_matrix.py` (or `just check-build`). Don't claim a change
+  works without it.
+- Verify SCAD edits by actually building (OpenSCAD is at
+  `C:\Program Files\OpenSCAD\openscad.exe`); run with `--set STRICT_KEYS=true` so typo'd
+  KEY constants fail loud.
+- Edit STILL-fragile areas only with a deliberate plan — they're load-bearing. Confirm
+  intent with the user before starting #1/#5/#7 below.
+- After regenerating `build/scad_defaults.json` (when MasterBuilder.scad defaults change),
+  run `just defaults` — `builder.astro` reads that file, not the SCAD.
+
+**Remaining open items (from the review; each needs a design decision, NOT a mechanical edit):**
+1. **Data-model redesign (biggest risk).** `ui_payload` is an untyped O(n) assoc-list that
+   grows unbounded via prepend-to-override. `STRICT_KEYS` only catches typo'd key *constants*.
+   The real fix is a typed struct / single environment object. Large; design first.
+2. **`drop_redundant_overrides` regex (mastertray.py).** Only sees top-level `Var = literal;`
+   before the first `include`; can silently drop a genuine override. Add a test + handle
+   expression/post-include defaults, or warn when a key isn't in the parsed defaults.
+3. **Layer violation.** `flip_hinge_y` / `flip_half_lid_l` (mm geometry) live in
+   MasterManifest (the intent compiler); they belong in MasterEngine. Deferred because flip
+   lids are frozen and touching their geometry is risky — only do this alongside a flip redesign.
+4. **`mapping.yaml` has no schema.** A malformed intent fails as a Python `KeyError`. Add a
+   validation step (mastertray.py startup or `just meta`) for a clear error.
+5. **Ball-snap long-term fix.** The gate confirms `Slide + Ball` = 4 components (CGAL can't
+   bond the boss). Widen the side-wall lip by reducing `groove_w`; update the lid width
+   formula AND the Rabbet branch in lockstep. Contained but multi-file. Tab snap is today's
+   workaround.
+
+**Paste-to-Sonnet prompt:**
 ```
 Continue MasterTray on branch refactor/code-clarity-and-safety.
-Read docs/HANDOFF.md — start with the CRITICAL ARCHITECTURE REVIEW section.
+Read docs/HANDOFF.md fully — start with the HARDENING PASS table, then the
+"Guidance for the next session" section.
 
-Build/web wiring is done (report endpoint + health indicator in builder.astro).
-The yaml.RepresenterError on --set is fixed.
+State: the architecture-hardening pass is committed (44fa802). The build-matrix
+gate `just check-build` is green at 26/26. ALWAYS run it (or
+`python build/scripts/build_matrix.py`) after any .scad / mastertray.py /
+mapping.yaml / builder.astro change, and treat a red result as a stop.
+Build SCAD edits with `--set STRICT_KEYS=true` so typo'd KEY constants fail loud.
 
-Highest-value next work (from the review, worst-first):
-1. Add a build-matrix test gate (build all intents, assert 2 components/manifold/NoError).
-2. get_val fail-loud debug mode for unknown keys.
-3. Table-drive the 6 duplicated box-variant branches in MasterManifest.scad compile_manifest.
-Confirm intent before large refactors — items 1-3 are deliberate, not mechanical.
+The remaining open items (#1 data-model redesign, #2 override-diff regex,
+#3 layer violation, #4 mapping schema, #5 ball-snap) each need a design decision —
+do NOT start them as mechanical edits. Tell me which one you want to tackle and
+propose a plan first; I'll confirm before you change load-bearing code.
 ```
