@@ -1,0 +1,151 @@
+# ==============================================================================
+# MasterTray Builder — Translation Layer
+#
+# This file is the ONLY place that maps human-friendly terms (left side) to
+# OpenSCAD Customizer variable names (right side, from MasterBuilder.scad).
+#
+# Audience: DEVELOPERS.
+#   - QA / build-script users never read this file and never need to know the
+#     Customizer variable names.
+#   - If you rename, add, or remove a Customizer variable in MasterBuilder.scad,
+#     update the matching entry here. The friendly (left-side) names are the
+#     QA-facing contract — keep those stable across renames.
+#   - mastertray.py reads this file at runtime; no code changes needed for a
+#     pure rename.
+# ==============================================================================
+
+# --- Config-file groups: build/config/{printer,mesh,advanced}.yaml ---
+# Left = friendly key used in the YAML config files.
+# Right = Customizer variable name (see MasterBuilder.scad @CONFIG_SECTION_* blocks).
+config:
+  printer:
+    filament:     Filament_Type
+    nozzle:       Nozzle_Diameter
+    layer_height: Layer_Height
+    walls:        Wall_Loops
+    fit:          Mechanical_Fit
+
+  mesh:
+    pattern:             mesh_pattern
+    hole_size:           mesh_hole_size
+    hole_spacing:        mesh_hole_spacing
+    wall_solid_percent:  strut_wall_perc
+    floor_solid_percent: strut_floor_perc
+    lid_solid_percent:   strut_lid_perc
+
+  advanced:
+    floor_thickness:          floor_thickness
+    lid_thickness:            lid_thickness
+    wall_thickness:           wall_thickness
+    divider_thickness:        divider_thickness
+    peg_thickness_multiplier: peg_thickness_multiplier
+    platter_gap:              platter_gap
+    thread_pitch:             thread_pitch
+    stackable_peg_height:     stackable_peg_height
+    corner_radius:            corner_radius
+    corner_round_ratio:       Corner_Round_Ratio
+    chamfer_size:             chamfer_size
+    peg_socket_diameter:      peg_socket_diameter
+    nesting_ledge_depth:      nesting_ledge_depth
+    peg_protrusion:           peg_protrusion
+    grid_modifier_hints:      grid_modifier_hints
+    debug_report:             debug_report
+    debug_payload:            debug_payload
+    boolean_epsilon:          bool_overlap_eps
+
+# --- Build intents: friendly name -> Part_To_Build value ---
+intents:
+  Container:        "Box"
+  Container Lid:    "Lid"
+  Pill Organizer:   "Pillbox Full Set"
+  Tray:             "Simple Tray"
+  Jar:              "Jar"
+  Threaded Jar:     "Threaded Jar"
+  Square Jar:       "S4 Jar"
+  Spool Jar:        "Spool Jar"
+  Square Jar Wedge: "S4 Wedge"
+  Square Jar Set:   "S4 Set"
+  Plaque:           "Plaque"
+  Grid:             "Grid"
+  Grid Test:        "Grid Test"
+  Lid Test Set:     "Lid Testing"
+
+# --- Lid types for the "Container" intent (box + matching lid built together) ---
+# Each entry sets the listed flag(s) true; every other flag in
+# container_lid_flags is forced false so exactly one mechanism is built.
+container_lid_types:
+  Snap (Outer Wall):
+    Snap_External: true
+  Snap (Inner Wall):
+    Snap_Internal: true
+  Slide (Outer Wall):
+    Glide_External: true
+  Slide (Inner Wall):
+    Glide_Internal: true
+  Flip (Single):
+    Flip_Single: true
+  Flip (Double):
+    Flip_Double: true
+
+container_lid_flags:
+  - Snap_External
+  - Snap_Internal
+  - Glide_External
+  - Glide_Internal
+  - Flip_Single
+  - Flip_Double
+
+# --- Lid types for the "Container Lid" intent (standalone reprint / spare) ---
+standalone_lid_types:
+  Plain:
+    Standalone_Lid_Type: "Slip"
+  Snap (Outer Wall):
+    Standalone_Lid_Type: "Snap"
+    Lid_Style: "External"
+  Snap (Inner Wall):
+    Standalone_Lid_Type: "Snap"
+    Lid_Style: "Rabbet"
+  Slide (Outer Wall):
+    Standalone_Lid_Type: "Glide"
+    Lid_Style: "External"
+  Slide (Inner Wall):
+    Standalone_Lid_Type: "Glide"
+    Lid_Style: "Rabbet"
+  Flip (Single):
+    Standalone_Lid_Type: "Flip_Single"
+  Flip (Double):
+    Standalone_Lid_Type: "Flip_Double"
+  Screw Cap:
+    Standalone_Lid_Type: "Screw"
+
+# --- Slide (Glide) sub-options, used when the chosen lid type is "Slide (...)" ---
+slide_direction:
+  Horizontal: "H"
+  Vertical:   "V"
+
+slide_catch:
+  Ball Detent: "Ball"
+  Tab Detent:  "Tab"
+
+# --- Dimension mode ---
+dimension_mode:
+  Total:  "Total"
+  Usable: "Usable"
+
+# --- Short CLI aliases for `mastertray.py build <alias>` (positional intent) ---
+# Left = lowercase alias typed on the command line. Right = key in `intents` above.
+cli_aliases:
+  box:              Container
+  lid:              Container Lid
+  pillbox:          Pill Organizer
+  tray:             Tray
+  jar:              Jar
+  threaded-jar:     Threaded Jar
+  square-jar:       Square Jar
+  spool-jar:        Spool Jar
+  square-jar-wedge: Square Jar Wedge
+  square-jar-set:   Square Jar Set
+  plaque:           Plaque
+  grid:             Grid
+  grid-test:        Grid Test
+  lid-test-set:     Lid Test Set

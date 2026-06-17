@@ -1,0 +1,23 @@
+# ==============================================================================
+# MasterTray — Mesh / Decorative Pattern Settings
+#
+# Controls the decorative perforation pattern on walls, floor, and lid.
+# Purely cosmetic / weight-reduction — does not affect structural fit.
+# ==============================================================================
+
+# Pattern style. One of: None, Honeycomb, Teardrop, Slotted, Circle, Square, Diamond.
+# "None" = solid surfaces, no holes.
+pattern: None
+
+# Hole diameter in mm. 0 = auto-sized. Minimum printable is about 1.0mm
+# at a 0.4mm nozzle.
+hole_size: 0
+
+# Minimum gap between holes, in mm.
+hole_spacing: 1.2
+
+# How much of each surface stays solid (0-100%). 0 = holes edge-to-edge,
+# 100 = fully solid (pattern invisible).
+wall_solid_percent: 0
+floor_solid_percent: 25
+lid_solid_percent: 75

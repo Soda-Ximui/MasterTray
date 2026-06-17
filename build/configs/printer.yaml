@@ -1,0 +1,25 @@
+# ==============================================================================
+# MasterTray — Printer / Slicer Settings
+#
+# Match these to your printer and the filament you're printing with.
+# All wall thicknesses, chamfers, clearances, and snap-fit dimensions
+# throughout the model are computed automatically from these four values.
+# ==============================================================================
+
+# Nozzle diameter in mm. Common values: 0.4 (most printers), 0.6, 0.8.
+nozzle: 0.4
+
+# Number of perimeter wall loops the slicer will print.
+# Wall thickness = walls x nozzle (e.g. 2 x 0.4mm = 0.8mm).
+walls: 2
+
+# Layer height in mm. Must be <= 0.75 x nozzle for reliable printing.
+layer_height: 0.28
+
+# Filament type. Affects clearances (how loosely parts fit) and snap
+# engagement depths. One of: PLA, PETG, TPU, ABS.
+filament: PLA
+
+# Overall fit tightness. One of: Tighter, Tight, Standard, Loose, Looser.
+# "Tighter" = snug fit, harder to open. "Looser" = easy fit, less retention.
+fit: Standard

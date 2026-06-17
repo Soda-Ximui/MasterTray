@@ -1,0 +1,39 @@
+# ==============================================================================
+# MasterTray — Advanced Settings
+#
+# Engineering overrides. Defaults are computed automatically from the
+# printer settings (printer.yaml) and are correct for almost all builds.
+# Only change these if you know what you're doing — ask a developer first.
+# ==============================================================================
+
+# --- Wall thicknesses (mm) ---
+floor_thickness: 2.0
+lid_thickness: 2.0
+wall_thickness: 2.4
+divider_thickness: 1.2
+
+# --- Stacking pegs ---
+peg_thickness_multiplier: 2.0
+stackable_peg_height: 80
+
+# --- Layout / threading ---
+platter_gap: 15
+thread_pitch: 2.0
+
+# --- Geometry overrides (0 = auto-computed from printer settings) ---
+corner_radius: 0.0
+corner_round_ratio: 0.20
+chamfer_size: 0.4
+peg_socket_diameter: 8.0
+nesting_ledge_depth: 2.0
+peg_protrusion: 0.0
+
+# --- Slicer modifier hints ---
+grid_modifier_hints: true
+
+# --- Debug output (prints extra info to console, no effect on geometry) ---
+debug_report: false
+debug_payload: false
+
+# --- Boolean overlap epsilon (mm) — geometry stitching tolerance ---
+boolean_epsilon: 0.01
