@@ -14,10 +14,10 @@ const blog = defineCollection({
 		}),
 });
 
-// Wire both root-level *.md and docs/**/*.md into one collection.
+// Wire root-level docs/**/*.md and build/docs/**/*.md into one collection.
 // Frontmatter is optional — title falls back to the filename.
 const docs = defineCollection({
-	loader: glob({ base: '../docs', pattern: '**/*.md' }),
+	loader: glob({ base: '..', pattern: '{docs,build/docs}/**/*.md' }),
 	schema: z.object({
 		title: z.string().optional(),
 		description: z.string().optional(),

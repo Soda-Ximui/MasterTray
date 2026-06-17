@@ -2,17 +2,27 @@
 import { getCollection, render } from 'astro:content';
 import DocsPage from '../../layouts/DocsPage.astro';
 
+// Strip a leading "docs/" or "build/docs/" so e.g. build/docs/README.md -> "readme"
+// Note: duplicated below — getStaticPaths runs in an isolated scope and can't
+// reference module-level consts.
+function stripDocsPrefix(id) {
+	return id.replace(/^(?:build\/)?docs\//, '');
+}
+
 export async function getStaticPaths() {
+	function stripDocsPrefix(id) {
+		return id.replace(/^(?:build\/)?docs\//, '');
+	}
 	const docs = await getCollection('docs');
 	return docs.map((doc) => ({
-		params: { slug: doc.id.replace(/^docs\//, '').replace(/\.md$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-') },
+		params: { slug: stripDocsPrefix(doc.id).replace(/\.md$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-') },
 		props: { doc },
 	}));
 }
 
 const { doc } = Astro.props;
 const { Content } = await render(doc);
-const title = doc.data.title ?? doc.id.replace(/^docs\//, '').replace(/\.md$/, '').replace(/[-_]/g, ' ');
+const title = doc.data.title ?? stripDocsPrefix(doc.id).replace(/\.md$/, '').replace(/[-_]/g, ' ');
 ---
 
 <DocsPage title={title} description={doc.data.description}>

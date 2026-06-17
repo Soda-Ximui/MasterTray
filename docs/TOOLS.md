@@ -11,6 +11,7 @@ Reference for every tool available in this repo — both the project automation 
 | **OpenSCAD** | 2026.04.26 | `C:\Program Files\OpenSCAD\openscad.exe` | Use this path in scripts; CGAL manifold backend enabled via Preferences → Features → manifold |
 | **Python** | 3.14.5 | `C:\Python314\python.exe` | Use this interpreter, not the WindowsApps shim |
 | **pymeshlab** | 2025.7.post1 | (Python package) | `pip install pymeshlab` — required by `check_manifold.py` and `nm_hunt.py` |
+| **PyYAML** | 6.0.3 | (Python package) | `pip install pyyaml` — required by `build/mastertray.py` |
 | **Perl** | 5.42.2 (Strawberry) | `C:\Strawberry\perl\bin\perl.exe` | Use Strawberry Perl for `build.pl`; the Git-bundled `/usr/bin/perl` lacks the required modules |
 | **Template (TT2)** | 3.102 | (Strawberry Perl module) | Required by `build.pl` for report generation |
 | **YAML::Tiny** | 1.76 | (Strawberry Perl module) | Required by `build.pl` for queue parsing |
@@ -144,7 +145,147 @@ No arguments, no configuration needed.
 
 ---
 
-## 5. OpenSCAD CLI — Direct Invocation
+## 5. `build/mastertray.py` — Friendly Build Wrapper (QA-facing)
+
+**Purpose:** Translates human-friendly terms ("Container", "Flip (Double)", "PLA") into
+OpenSCAD `-D` Customizer overrides. Lets QA build parts without knowing any Customizer
+variable names, and lets devs rename/restructure those variables without breaking the
+QA-facing interface.
+
+**Usage:** see `build/docs/README.md` (QA guide). Quick reference:
+```powershell
+python build/mastertray.py list intents
+python build/mastertray.py list lids --intent Container
+python build/mastertray.py init-config --out my_settings
+python build/mastertray.py build --intent Container --lid "Flip (Double)" `
+    --width 50 --length 100 --height 30 --config my_settings/printer.yaml --out box.stl
+```
+
+**Truly-overrides:** before running OpenSCAD, `compute_overrides()` (called by
+`cmd_build()`) drops any `-D` value that matches `MasterBuilder.scad`'s own
+Customizer default for that variable (`parse_scad_defaults()` parses every
+top-level `Var = value;` assignment in the file, `drop_redundant_overrides()`
+does the filtering, int/float-tolerant). So `--width 40` on a part whose
+Customizer default is already `part_width = 40` emits no `-D` at all — the
+`-D` list passed to OpenSCAD is always a **diff from MasterBuilder.scad's
+defaults**, not a full restatement of every parameter. `--set VAR=value` (the
+raw escape hatch) is exempt and always passes through, since it's an explicit
+developer override. `build/build.py`'s `-mesh`/`-strut` overrides go through
+this same filter (via `mt.build_overrides()` + `mt.drop_redundant_overrides()`
++ `mt.run_build()`, the same pieces `cmd_build()` composes).
+
+**Architecture — the translation layer:**
+
+- `build/mapping.yaml` — the **single source of truth** mapping friendly terms to
+  Customizer variable names. Three things live here:
+  - `config.{printer,mesh,advanced}` — friendly override-file keys → Customizer vars
+  - `intents` — friendly `--intent` names → `Part_To_Build` values
+  - `container_lid_types` / `standalone_lid_types` — friendly `--lid` names → flag
+    combinations (e.g. `"Flip (Double)"` → `Flip_Double=true` + all sibling flags forced false)
+  - `slide_direction` / `slide_catch` / `dimension_mode` — small enum translations
+- `build/configs/{printer,mesh,advanced}.yaml` — example `--config` override files,
+  written in friendly terms. `init-config` copies these as a starting point. They are
+  **not defaults** — `MasterBuilder.scad`'s own Customizer defaults apply to anything
+  not mentioned in a `--config` file.
+- **Renaming a Customizer variable:** update `MasterBuilder.scad` and the matching
+  right-hand-side entry in `mapping.yaml`. No Python changes needed, and the QA-facing
+  friendly names (left-hand side) stay stable.
+- **Adding a Customizer variable to a config group:** add it to the relevant
+  `@CONFIG_SECTION_START/END` block in `MasterBuilder.scad` (see below), then add a
+  friendly key for it in `mapping.yaml` and, optionally, to one of the
+  `build/configs/*.yaml` examples.
+- `--set VAR=value` is a raw escape hatch (developer use) — passes a literal `-D`
+  override straight through, bypassing the mapping entirely.
+
+**`@CONFIG_SECTION_START/END` markers in `MasterBuilder.scad`:** mark the three
+Customizer blocks (`printer`, `mesh`, `advanced`) that the `build/configs/*.yaml`
+examples correspond to. These are documentation/grouping markers only — not parsed by
+the script (the mapping file is authoritative) — but keep them in sync when
+adding/removing variables from those sections so the grouping stays meaningful.
+
+**`--config` files:** any number of friendly-key override files, applied in order
+(later files win on conflicting keys). The file name doesn't matter — every key from
+`mapping.yaml`'s `config.*` groups is accepted regardless of which group it's in.
+`init-config` (no `--out`) writes copies of the `build/configs/` examples into
+`build/sandbox/` (gitignored) for users to customize freely; pass those paths via
+`--config` (repeatable).
+
+**Build reports:** every successful `build` also writes `<out>.report.yaml`
+and `<out>.report.html` (e.g. `my_box.stl` → `my_box.report.yaml` /
+`my_box.report.html`) with the build parameters, the resulting `printer:`
+settings, a `changes:` diff of any `--config` values vs `build/configs/*.yaml`
+defaults, and the full `overrides:` (`-D`) set. The `.yaml` report is for
+diff tooling (`render_report_html()` in `mastertray.py` renders the same
+data as the `.html` report, a self-contained styled page for viewing in a
+browser). Pass `--no-report` to skip both. Used by the reporting/diff
+workflow to document and compare specific builds.
+
+**`build/build.py` — terse shorthand front-end:** a thin wrapper around
+`mastertray.cmd_build()` (imports `mastertray.py` directly, no subprocess) that
+trades `--intent`/`--width`/`--length`/`--height`/etc. for a positional intent
+alias plus comma-separated option groups: `-o`, `-dim "LxWxH"`, `-use "LxWxH"`,
+`-mesh "pattern, hole_size, hole_spacing"`, `-strut "lid%, floor%, wall%"`, and
+`-lid "name[, name, ...]"` (batch — one build per lid, output names get the lid
+name appended). Intent aliases (`box`, `lid`, `tray`, `jar`, `pillbox`, ...) live
+in `mapping.yaml`'s new `cli_aliases` section; with no intent given it falls back
+to `MasterBuilder.scad`'s own `Part_To_Build` default. `mastertray.py` itself is
+unchanged — `build.py` is purely a translation layer on top of it, and all of
+`mastertray.py`'s own flags (`--config`, `--set`, `--dry-run`, etc.) pass through.
+
+**Requires:** Python 3 + `pip install pyyaml`, OpenSCAD.
+
+---
+
+## 6. `build/scripts/export_mapping.pl` / `export_intents.pl` — Generated JSON for Other Tooling
+
+**Purpose:** Regenerate machine-readable JSON from the YAML sources of truth, for
+consumption by non-Perl/non-Python tooling (e.g. the Astro frontend).
+
+**Usage:**
+```powershell
+just meta      # regenerate both
+just mapping   # build/mapping.yaml -> build/mapping.json
+just intents   # MasterBuilder.scad / MasterManifest.scad -> build/intents.json
+```
+
+- **`export_mapping.pl`** — converts `build/mapping.yaml` to `build/mapping.json`,
+  fixing up YAML::Tiny's stringified `'true'`/`'false'` into real JSON booleans.
+- **`export_intents.pl`** — parses the `Part_To_Build` dropdown in `MasterBuilder.scad`
+  (the **public** intents) and every `intent == "..."` string in `MasterManifest.scad`
+  (public + **internal**, i.e. sub-parts only reachable via recursive
+  `compile_manifest()` calls — individual lids, half-lids, grid inserts, etc.).
+  Cross-checks that `build/mapping.yaml`'s `intents:` table exactly covers the public
+  set and reports any drift in `mapping_mismatches`.
+
+**Output files** (`build/mapping.json`, `build/intents.json`) are gitignored —
+regenerate them after editing `build/mapping.yaml`, `MasterBuilder.scad`'s
+`Part_To_Build` dropdown, or `MasterManifest.scad`'s intent list.
+
+**Requires:** Strawberry Perl with `YAML::Tiny` and `JSON::PP` (core module).
+
+---
+
+## 6b. `build/scripts/check_config_sync.pl` — Config Defaults Drift Check
+
+**Purpose:** Verify `build/configs/{printer,mesh,advanced}.yaml` still match
+`MasterBuilder.scad`'s `@CONFIG_SECTION_START/END` default values. Build reports
+(see section 5) diff `--config` overrides against these files, so they need to
+stay in sync with the Customizer defaults they're meant to mirror.
+
+**Usage:**
+```powershell
+just check-configs   # also runs as part of `just meta`
+```
+
+Reports any of: a `@CONFIG_SECTION` variable with no `mapping.yaml` entry, a
+`build/configs/*.yaml` key with no matching Customizer default, or a value
+mismatch between the two. Exits 1 if any drift is found.
+
+**Requires:** Strawberry Perl with `YAML::Tiny`.
+
+---
+
+## 7. OpenSCAD CLI — Direct Invocation
 
 **Purpose:** Export STL/3mf from any `.scad` file with Customizer variable overrides. Used directly by `nm_hunt.py` and `build.pl`, but also useful for one-off exports or debugging.
 
@@ -191,7 +332,7 @@ No arguments, no configuration needed.
 | `Flip_Single`, `Flip_Double` | bool | `true`/`false` |
 | `Snap_External`, `Snap_Internal` | bool | `true`/`false` |
 | `Glide_External`, `Glide_Internal` | bool | `true`/`false` |
-| `Standalone_Lid_Type` | string | `"Slip"`, `"Snap"`, `"Glide"`, `"Flip_Single"`, `"Screw"` |
+| `Standalone_Lid_Type` | string | `"Slip"`, `"Snap"`, `"Glide"`, `"Flip_Single"`, `"Flip_Double"`, `"Screw"` |
 | `Lid_Style` | string | `"External"`, `"Rabbet"` |
 | `mesh_pattern` | string | `"Honeycomb"`, `"None"` |
 | `bool_overlap_eps` | number | `0.01` |
@@ -200,10 +341,45 @@ No arguments, no configuration needed.
 
 ---
 
-## 6. `queue.example.yaml` — Build Queue Reference
+## 8. `queue.example.yaml` — Build Queue Reference
 
 **Purpose:** Example queue file showing every valid field and intent for `build.pl`. Copy and modify to create a project-specific build queue.
 
 **Location:** `queue.example.yaml` (repo root)
 
 Covers: all box lid types, jar shapes, simple tray variants, grid drop-ins, plaque types.
+
+---
+
+## 9. `/builder` Astro page + `build/scripts/build_server.mjs` — Web Builder UI
+
+**Purpose:** Browser-based front-end for `build/mastertray.py build`, driven by
+`build/mapping.yaml`. Lets you pick intent / lid type / dimensions / printer settings
+in plain terms, and shows both the equivalent `mastertray.py` command and the raw
+Customizer `-D` overrides it expands to.
+
+**Location:** `astro/src/pages/builder.astro` (page), available at `/builder` on the
+Astro dev/preview site. The page itself is fully static — it reads `build/mapping.yaml`
+and `build/configs/printer.yaml` at build time and runs only client-side JS, so it can
+be deployed to a public static host with no server-side execution.
+
+**"Run it" actions:**
+- **Download .ps1 script** — generates a self-contained PowerShell script (writes a
+  temp `--config` override file, calls `mastertray.py build` with the chosen args,
+  saves to `build/sandbox/output/`) for the user to run locally.
+- **Build STL (local server)** — POSTs the current selections to a local-only
+  `build_server.mjs` server, which runs `mastertray.py build` and streams the
+  resulting STL back for download (also leaving a copy in `build/sandbox/output/`).
+
+**`build_server.mjs`:**
+```powershell
+just build-server   # node build/scripts/build_server.mjs, listens on 127.0.0.1:5180
+```
+Zero npm dependencies (Node built-ins only). Bound to `127.0.0.1` and only accepts
+CORS requests from `http://localhost:4321` (the Astro dev server) — not meant to be
+exposed beyond localhost, since it shells out to OpenSCAD with caller-supplied
+parameters. If unreachable, the page falls back to telling the user to run
+`just build-server`.
+
+**Requires:** Node (for `build_server.mjs`), Python 3 + OpenSCAD (for `mastertray.py`,
+same as section 5).

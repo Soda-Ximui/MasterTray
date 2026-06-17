@@ -258,6 +258,68 @@ done
 
 ---
 
+## Lid print-test exports
+
+Three commands cover the baseline lid set. All use default dimensions (40 × 80 × 30 mm)
+and `Filament_Type="PLA"`. Adjust `part_width`, `part_length`, `part_height` to match
+the box you printed.
+
+### 1 — Glide-Ball External (box + lid together)
+
+The Glide-Ball box and lid must be printed as a matched pair — the ball sockets in the box
+walls are sized to the same `glide_ball_d` formula as the balls on the lid. Export both
+at once:
+
+```powershell
+openscad -o glide_ball_test.stl `
+  "-DPart_To_Build=`"Box`"" `
+  -D Glide_External=true `
+  "-DGlide_Snap=`"Ball`"" `
+  -D Snap_External=false `
+  -D Snap_Internal=false `
+  -D Glide_Internal=false `
+  -D Flip_Single=false `
+  -D Flip_Double=false `
+  MasterBuilder.scad
+```
+
+### 2 — Flip_Single lid only
+
+Box already printed; export the lid alone:
+
+```powershell
+openscad -o flip_single_lid.stl `
+  "-DPart_To_Build=`"Lid`"" `
+  "-DStandalone_Lid_Type=`"Flip_Single`"" `
+  MasterBuilder.scad
+```
+
+### 3 — Flip_Double lids (two half-lids)
+
+**Why two lids?** A Flip_Double box has a structural spine in the centre that mounts both
+pairs of C-clip axles. The spine takes `spine_gap` out of the interior so the lids open
+90° without their C-clips colliding. Each lid covers half the box length minus that gap:
+
+```
+half_lid_length = box_length / 2 − spine_gap(filament)
+```
+
+`spine_gap` is filament-driven (`breathing_room(COMP_SPINE, data)`): PLA = 4.0 mm,
+PETG = 4.0 mm, TPU = 0.2 mm. **You do not calculate this.** Pass the full box length;
+the system divides and subtracts for you:
+
+```powershell
+openscad -o flip_double_lids.stl `
+  "-DPart_To_Build=`"Lid`"" `
+  "-DStandalone_Lid_Type=`"Flip_Double`"" `
+  MasterBuilder.scad
+```
+
+This emits **two lids** on the platter at the correct half-length. Both are physically
+identical — no AM/PM labelling unless you add `Plaque_Text`.
+
+---
+
 ## Tips
 
 - Use `.csg` output for fast geometry checks without full mesh computation — much faster than `.stl` for validation.

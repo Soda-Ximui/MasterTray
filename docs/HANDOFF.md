@@ -1,5 +1,5 @@
 # Session Handoff — MasterTray
-_Last updated: 2026-06-08 — All non-manifold edges resolved; branch clean_
+_Last updated: 2026-06-17 — Build tooling committed; line endings normalized_
 
 ---
 
@@ -8,138 +8,113 @@ _Last updated: 2026-06-08 — All non-manifold edges resolved; branch clean_
 
 ## Recent Commits (newest first)
 
-| Hash | Message |
-|------|---------|
-| `84828bf` | fix: resolve all non-manifold edges across lid and box STLs |
-| `30dfd94` | docs: update HANDOFF.md with post-print-2 status and next session prompt |
-| `9cff93c` | fix: glide ball dimples as full circles + flip_single corner gap |
-| `4720b25` | fix: revert MIRROR_Y (direction was correct), document snap/flip lessons |
-| `16c58cd` | fix: resolve 4 print failures from physical test |
+| SHA | Message |
+|-----|---------|
+| _(pending)_ | feat: docs, web builder, and dev utilities |
+| _(pending)_ | feat(build): mastertray.py build tooling + mapping/config layer |
+| _(pending)_ | chore: add .gitattributes + normalize all line endings to LF |
+| `e5db572` | feat(pillbox): add PILLBOX_DAYS param + fix Glide-External groove geometry |
+| `b520422` | rename: 14-Day AM/PM Box -> 7-Day AM/PM Box |
+| `d87d22f` | fix: B5-B9 flip-lid fix pass — clasp recess direction, hinge sizing, spine gap, gusset |
+| `ce1f83d` | fix: close out baseline lid set — Glide-Ball, Flip latch, arm root |
+| `6b24215` | fix: eliminate floor-wall coplanar NM edges in core_tray_chassis |
 
 ---
 
-## What Was Fixed (This Session — Non-Manifold Cleanup)
+## What's committed and verified
 
-All STL exports are now slicer-clean (zero non-manifold edges). Five root causes found and fixed:
+### Pillbox refactor (`e5db572`)
 
-### Snap lid retention bead (RenderLid.scad)
-- **External:** `bead_z = sl - EPS` placed bead inside `apply_master_bounds` TOP chamfer zone (0.4mm deep). Complex CGAL interaction → 6 edges.
-  - Fix: `bead_z = sl - chamf - EPS`; `bead_h_ext = bead_h + chamf + EPS` to keep bead-top position.
-- **Rabbet:** `chamfer = bead_h/2` with height `bead_h + EPS` left only `EPS = 0.1mm` flat face → degenerate → 6 edges.
-  - Fix: `bead_chamf = (bead_h_ext - m_lh(data)) / 2` — always leaves one full layer height of flat face.
+**MasterEnum.scad**: `PILLBOX_DAYS = "PILLBOX_DAYS"` key added.
 
-### Flip_Single lid C-opening cutter (RenderLid.scad)
-- Cutter top at local z=0 = connection-block top at local z=0 → coplanar in `difference()` → 10 edges (Flip_Single) / 16 (Flip_Double, two half-lids).
-- Fix: `clip_outer_d + EPS2` on cutter height → top at local z=EPS.
+**MasterBuilder.scad**: `Pillbox_Days = 7; // [1:7]` in a `[Pillbox]` customizer section, wired into `ui_payload`.
 
-### Flip_Single lid diamond hull (RenderLid.scad)
-- Hull cuboids same X width as latch arm (`lid_w-sw*4`). In overlap zone, ±X faces coplanar → non-manifold.
-- Fix: Hull cuboids widened to `lid_w-sw*4+EPS` so latch arm X faces are interior.
+**MasterManifest.scad** — three intents:
+- `"7-Day Pill Box"` → Nx1 Glide grid, PILLBOX_DAYS columns, `GLIDE_SNAP="Tab"`
+- `"7-Day AM/PM Box"` → Nx2 Glide grid, PILLBOX_DAYS columns, `GLIDE_SNAP="Tab"`
+- `"1-Day AM/PM Box"` → delegates to 7-Day AM/PM Box with `PILLBOX_DAYS=1`, `Flip_Single` lid
 
-### Axle pins coplanar with inner walls (RenderBox.scad)
-- `h = w - sw*2` → half-length = `w/2 - sw` = exact inner wall X face position. Chamfered end cap coplanar with inner wall → multiple edges per pin.
-- Fix: `h = w - sw*2 + EPS2` for all three pins (Flip_Single 1×, Flip_Double 2×).
-- This also resolved the "two other boxes with 6 edges" — they were Flip_Single boxes at different sizes.
+Verified: all 14 pillbox variants (7 days × 2 Glide intents) → **2 connected components, manifold, Status: NoError**.
 
-### Documentation
-- `docs/LESSONS.md` updated with §11c–§11g documenting each non-manifold pattern.
-- Confirmed instances table updated.
+**RenderBox.scad**: Fixed Glide-External `groove_z`.
 
----
+### Build tooling (this session)
 
-## What Was Fixed (Previous Session — Post Second Print Test)
+**build/mastertray.py** — core builder: parses `build/mapping.yaml`, builds `-D` override list, runs OpenSCAD, writes `report.yaml` + `report.html`. All front-ends (build.py, builder.astro, build_server.mjs) wrap this; none bypass it.
 
-### Snap lid fell through (RenderLid.scad)
-- Bead outer face was flush with lid edge; all-edges chamfer ate it → zero protrusion → no click.
-- **Fix:** `snap_protr = noz`. Translate: `sx * (lid_w/2 + clearance/2 + snap_protr - sw/2)`.
+**build/mapping.yaml** — single source of truth for friendly intent/lid names ↔ Customizer vars.
 
-### Glide lid wouldn't enter groove (RenderBox.scad)
-- `groove_h = sl + tol = 2.4mm` but lid `sl_glide = max(sl, ball_d) = 3.2mm`.
-- **Fix:** `groove_h = max(sl_glide + tol, ball_d + tol + noz*4)`.
+**build/configs/** — example `--config` templates (printer / mesh / advanced). `just check-configs` verifies these stay in sync with `@CONFIG_SECTION_START/END` defaults in MasterBuilder.scad.
 
-### C-clip broke on PLA (RenderLid.scad)
-- Gap hardcoded `hinge_d * 0.80` regardless of material.
-- **Fix:** `clip_gap = (filament=="PLA") ? hinge_d*0.90 : hinge_d*0.80`.
+**build/scripts/** — Perl export/sync utilities + Node build server.
 
-### Flip_Double half-lids too long (MasterManifest.scad)
-- All Flip_Double intents used `flip_lid_l` (full-box formula). Lids ~2× too long.
-- **Fix:** All Flip_Double intents use `flip_half_lid_l = l/2 - flip_hinge_y`.
+**justfile** — new targets: `mapping`, `intents`, `check-configs`, `meta`, `docs`, `build-server`.
 
-### Glide ball dimples were broken arcs (RenderBox.scad)
-- Sphere cutter diameter = groove_h → sphere cut to groove edges → arc not circle.
-- **Fix:** `groove_h = max(sl_glide + tol, ball_d + tol + noz*4)`.
+**astro/src/pages/builder.astro** — web customizer UI (in-progress). Reads `mapping.yaml` + parses MasterBuilder.scad defaults; POSTs to `build_server.mjs`.
 
-### Flip_Single hinge corner hollow + inside footprint (RenderBox.scad / RenderLid.scad)
-- Pillars started at `l/2 - 0.5`; axle at `l/2 + hinge_y` — both past the footprint boundary.
-- **Fix:** Axle moved to `l/2 - hinge_y`; pillars fill `l/2 - clip_od` to `l/2`; `lid_l = l - clip_outer_d`.
+**docs/PRINT_PARAMS.md** — complete reference: how nozzle, layer height, wall loops, and filament type drive geometry.
 
-### CRITICAL: Flip_Double simultaneous 90° open (MasterTolerance.scad)
-- `ROOM_SPINE = 0.5mm` — two C-clips collide immediately on opening.
-- **Fix:** `ROOM_SPINE_PETG = ROOM_SPINE_PLA = 4.00mm`.
+**docs/diags/buildtool.mmd** — Mermaid architecture diagram for the build system.
 
-### Rabbet snap groove_z (RenderBox.scad / RenderLid.scad)
-- Groove and bead misaligned — no overlap when lid seated.
-- **Fix:** `groove_z = h - bead_h`; Rabbet lid bead at `sl - bead_h`.
+**Line endings** — `.gitattributes` added; all tracked files normalized to LF. No more CRLF noise in diffs.
 
 ---
 
-## Open Issues
+## Key bug fixed — Glide-External groove_z
 
-### LOW: F6, F14, F15 (cosmetic, deferred)
-- F6: RenderLid.scad ~L120 — diamond latch `layer_snap` call
-- F14: RenderLid.scad ~L44 — snap bead layer-align
-- F15: RenderBox.scad ~L103 — flip-box hinge assert
+**Was**: `groove_z = h - sl - lh·ceil(1/lh)`
+→ groove bottom ≈ `h − 1.8mm`, groove top ≈ `h + 3.6mm` — boss floated above box for **all** box heights.
 
----
-
-## Architecture Quick Reference
-
-```
-MasterBuilder.scad       ← Layer 4: Customizer UI + dispatcher
-MasterManifest.scad      ← Layer 3: compile_manifest() + intent logic
-  flip_half_lid_l()      ← MUST use for Flip_Double half-lids (not flip_lid_l)
-  flip_hinge_y()         ← clip_od/2 + spine_gap
-RenderBox.scad           ← Factory: boxes with all lid variants
-RenderLid.scad           ← Factory: all lid types
-  factory_render_lid(data, opts, phys)
-  opts["LID_TYPE"]       ← "Snap" | "Glide" | "Flip_Single" | "Screw" | "Slip"
-  data["FILAMENT_TYPE"]  ← "PLA" | "PETG" — affects clip_gap
-RenderPlaque.scad        ← Factory: label plaques (Wall/Lid/Lid_Peg)
-MasterTolerance.scad     ← breathing_room(), engagement_depth(), COMP_* constants
-MasterEngine.scad        ← Pure functions: glide_ball_d(), flip_latch_z(), etc.
-MasterEnum.scad          ← All key constants
-```
-
-### Key tolerance constants (MasterTolerance.scad)
-| Constant | PLA | PETG | Note |
-|----------|-----|------|------|
-| `COMP_CCLIP` | 0.15mm | 0.25mm | C-clip clearance |
-| `COMP_GLIDE` | 0.30mm | 0.40mm | Glide/snap |
-| `COMP_SPINE` | 4.00mm | 4.00mm | Arc clearance for 90° C-clip swing |
-| `COMP_CLASP` | 4.0mm | 4.6mm | Latch engagement depth |
-| `COMP_BELLY` | 0.5mm | 0.8mm | Clip flat zone |
-
-### Flip_Double geometry (PETG, 0.4mm nozzle, current values)
-```
-hinge_d     = 4.0mm
-clip_wall   = noz * 4 = 1.6mm
-clip_od     = hinge_d + clearance*2 + clip_wall*2 = 7.7mm
-cc_z        = clip_od/2 = 3.85mm
-spine_gap   = ROOM_SPINE_PETG = 4.00mm   (≥ clip_od/2 = 3.85mm ✓)
-hinge_y     = clip_od/2 + spine_gap = 7.85mm
-spine_w     = hinge_y*2 + hinge_d = 19.7mm
-flip_half_lid_l(data) = l/2 - hinge_y
-```
+**Now**: `groove_z = h - sl - lh·ceil(1/lh) - groove_h`
+→ groove top = `h − sl − lh·ceil(1/lh)` with a solid-wall lip above; boss at `groove_z + groove_h/2` stays inside the box.
 
 ---
 
-## Suggested New Session Prompt
+## Non-obvious technical facts
+
+### Ball-snap boss mesh disconnection (pre-existing, NOT fixed)
+`groove_w = w - sw + 0.6` leaves only `(sw−0.6)/2 ≈ 0.7–0.9mm` of side-wall lip after the groove cut. The boss cylinder (`boss_d = ball_d*2 + noz*4 ≈ 8.8mm`) overlaps this lip but CGAL cannot form a topological bond at near-degenerate contact. The ball-dimple `difference()` then severs the tenuous connection → 4 mesh components instead of 2. Affects **both External and Rabbet** styles, all box heights. **Tab snap is the workaround** (no boss/dimple on box side → clean 2-component mesh).
+
+### Part_To_Build, not Intent
+MasterBuilder uses `Part_To_Build` (not `Intent`). CLI: `-D "Part_To_Build=\"7-Day Pill Box\""`.
+
+### component_bboxes.py
+`python build/sandbox/component_bboxes.py <stl>` — connected-component count. Target: exactly 2 per box+lid intent. Manifold check does NOT catch inter-component disconnection.
+
+### Flip lids — frozen
+Flip lids frozen after failed print test (sideways slide, weak retention). No work to be done there. See `flip_lid_frozen.md` in memory.
+
+### Build system architecture
+```
+SCAD (MasterBuilder.scad) ← single source of truth for Customizer vars
+  ↓ -D KEY=value
+mastertray.py (core builder) → STL + report.yaml + report.html
+  ↑ wrapped by
+  ├── build.py (terse shorthand CLI)
+  ├── build_server.mjs (local API for web page)
+  └── builder.astro (web customizer UI)
+```
+`just meta` runs all sync checks + regenerates mapping.json + intents.json.
+
+---
+
+## Next session prompt
 
 ```
-We're continuing MasterTray on branch refactor/code-clarity-and-safety.
-Read docs/HANDOFF.md first — it has the full list of what was fixed and
-what's still open.
+Continue MasterTray work on branch refactor/code-clarity-and-safety.
+See docs/HANDOFF.md for full context.
 
-All STLs are currently non-manifold-free. Open items are LOW-priority
-cosmetic bugs F6, F14, F15. After any fixes, push branch + open PR.
+Last commits (newest first):
+  feat: docs, web builder, and dev utilities
+  feat(build): mastertray.py build tooling + mapping/config layer
+  chore: add .gitattributes + normalize all line endings to LF
+  e5db572 — pillbox refactor + Glide-External groove_z fix
+
+Suggested next:
+1. Verify MasterBuilder.scad defaults: part_width=140, part_length=70,
+   part_height=20 (confirm stable on branch, haven't reverted).
+2. Finish builder.astro — wire up the POST /build → build_server.mjs
+   → mastertray.py flow; add basic result display (STL download + report).
+3. Consider Glide ball-snap long-term fix: widen side-wall lip by reducing
+   groove_w (requires updating lid width formula + Rabbet branch in tandem).
 ```

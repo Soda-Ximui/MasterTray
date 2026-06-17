@@ -10,6 +10,10 @@
 # just e2e       — run Playwright tests
 # just render    — render MasterBuilder.scad to output/preview.png (smoke test)
 # just render-all — render all 23 intents to output/
+# just mapping   — regenerate build/mapping.json from build/mapping.yaml
+# just intents   — regenerate build/intents.json (public/internal classification)
+# just check-configs — verify build/configs/*.yaml match MasterBuilder.scad defaults
+# just meta      — regenerate mapping.json + intents.json, check config sync
 # ──────────────────────────────────────────────────────────────────────────────
 
 set shell := ["powershell.exe", "-NoProfile", "-Command"]
@@ -18,6 +22,7 @@ astro_dir := "astro"
 dist_dir  := "astro/dist"
 out_dir   := "output"
 openscad  := "C:/Program Files/OpenSCAD/openscad.com"
+perl      := "C:/Strawberry/perl/bin/perl.exe"
 
 # ── default ───────────────────────────────────────────────────────────────────
 default: dev
@@ -88,3 +93,32 @@ render-all:
     --colorscheme=DeepOcean -D "Part_To_Build=`"$_`"" MasterBuilder.scad; `
     Write-Host "  → $out" `
     }
+
+# ── regenerate build/mapping.json from build/mapping.yaml ─────────────────────
+[group('build')]
+mapping:
+    & "{{perl}}" build/scripts/export_mapping.pl
+
+# ── regenerate build/intents.json (public/internal classification) ────────────
+[group('build')]
+intents:
+    & "{{perl}}" build/scripts/export_intents.pl
+
+# ── verify build/configs/*.yaml match MasterBuilder.scad @CONFIG_SECTION defaults ──
+[group('build')]
+check-configs:
+    & "{{perl}}" build/scripts/check_config_sync.pl
+
+# ── regenerate all generated build-tooling JSON ────────────────────────────────
+[group('build')]
+meta: mapping intents check-configs
+
+# ── regenerate build/docs/README.html from build/docs/README.md (pandoc) ──────
+[group('build')]
+docs:
+    pwsh -NoProfile -File build/scripts/build_docs.ps1
+
+# ── local-only live build server for the /builder web page ────────────────────
+[group('build')]
+build-server:
+    node build/scripts/build_server.mjs

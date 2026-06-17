@@ -1,0 +1,47 @@
+AGENTS.md
+*.STL
+*.stl
+*.jpg
+*.png
+*.bmp
+*.gif
+*.svg
+*.zip
+*.tar.gz
+*.7z
+STL/
+output/
+MyOutput/
+*output/
+Render/
+Images/
+.gitignore
+.vstags
+.fix-links.lua
+*.echo
+
+# Generated build tooling artifacts
+build/mapping.json
+build/intents.json
+build/docs/README.html
+build/__pycache__/
+build/*.stl
+build/*.report.html
+build/*.report.yaml
+
+# Sandbox output artifacts — keep source files, ignore generated outputs
+build/sandbox/output/
+build/sandbox/__pycache__/
+!build/sandbox/README.md
+!build/sandbox/component_bboxes.py
+!build/sandbox/count_components.py
+
+# Local / personal configs — never commit
+.claude/settings.local.json
+
+# Incomplete template — not ready to commit
+quickstart.md
+
+
+
+
