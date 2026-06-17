@@ -50,6 +50,11 @@ Flip_Double = false;
 Nesting = true;
 Peg     = true;
 
+/* [Pillbox] */
+// Compartment columns for the pillbox intents (7-Day Pill Box, 7-Day AM/PM Box,
+// 1-Day AM/PM Box). Box width is divided into this many compartments.
+Pillbox_Days = 7; // [1:7]
+
 /* [Jar] */
 jar_shape = "Circle"; // ["Circle", "Quad", "Hexa", "Octa", "Dodeca"]
 // Yes = threaded jar + screw lid.  No = open-top jar, no lid.
@@ -179,6 +184,7 @@ ui_payload = [
     [WALL_MODIFY,        modify_wall], 
     [WALL_TARGET,        target_wall], 
     [GRID_LAYOUT,        grid_layout],
+    [PILLBOX_DAYS,       Pillbox_Days],
     [PLAQUE_TARGET,      plaque_target],
     [CLIP_TYPE,          clip_type],
     [PLAQUE_W,           plaque_w],

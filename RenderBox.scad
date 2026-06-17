@@ -159,9 +159,10 @@ module factory_render_box(data, opts, phys) {
         // The ball dimple sphere (diameter = ball_d + glide_tol) needs noz*2 of wall
         // on each Z face to avoid cutting to the groove edge.
         groove_h   = max(sl_glide_ + glide_tol, ball_d + glide_tol + noz * 4);
-        // ceil() snaps the 1mm drop up to the nearest full layer boundary.
-        // At 0.28mm lh: ceil(1.0/0.28)=4 layers → 1.12mm — groove sits on a clean layer.
-        groove_z   = h - sl - m_lh(data) * ceil(1.0 / m_lh(data));
+        // groove_z: top of groove is (h - sl - lh*ceil(1/lh)), leaving that margin of solid
+        // wall above the groove. groove_z is the BOTTOM; groove_h extends it upward from there.
+        // ceil() snaps to the nearest layer boundary so the groove top lands on a clean layer.
+        groove_z   = h - sl - m_lh(data) * ceil(1.0 / m_lh(data)) - groove_h;
         lid_w      = groove_w - glide_tol;       // must match RenderLid lid_w formula
         lid_l      = l - sw / 2;
         ball_y     = lid_l / 2 - ball_r * 2.5;  // same formula as in RenderLid

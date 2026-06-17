@@ -21,6 +21,7 @@ STRUT_WALL   = "STRUT_WALL";
 STRUT_FLOOR  = "STRUT_FLOOR";
 STRUT_LID    = "STRUT_LID";
 GRID_LAYOUT = "GRID_LAYOUT";
+PILLBOX_DAYS = "PILLBOX_DAYS";   // 1-7 — compartment columns for pillbox intents
 GRID_HAS_BASE = "GRID_HAS_BASE";
 GRID_TYPE = "GRID_TYPE";
 PLAQUE_STYLE = "PLAQUE_STYLE";   // "Label" | "Text"

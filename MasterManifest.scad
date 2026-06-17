@@ -250,16 +250,10 @@ function compile_manifest(intent, data) =
     )
   :
   // --- PILL BOX INTENTS ---
+  // Box with an N-column internal grid + a single Glide lid covering the whole top.
+  // Compartment labels are not engraved — add them post-print (e.g. in the slicer).
   (intent == "1-Day AM/PM Box") ?
-    let(phys  = get_physics_profile(data),
-        w     = get_val(WIDTH, data, WIDTH0),
-        lid_l = flip_half_lid_l(data),
-        box_d = concat([[GRID_LAYOUT, "1x2"], [HAS_BUILTIN_GRID, true]], data))
-    [
-      ["BOX", box_d,                                                                    [["LID_TYPE", "Flip_Double"]], phys],
-      ["LID", concat([[LENGTH, lid_l], [WIDTH, w - 0.6], [PLAQUE_TEXT, "AM"]], data),  [["LID_TYPE", "Flip_Single"]], phys],
-      ["LID", concat([[LENGTH, lid_l], [WIDTH, w - 0.6], [PLAQUE_TEXT, "PM"]], data),  [["LID_TYPE", "Flip_Single"]], phys]
-    ]
+    compile_manifest("7-Day AM/PM Box", concat([[PILLBOX_DAYS, 1]], data))
   :
   (intent == "1-Day 2-Compartment (Single Lid)") ?
     let(phys = get_physics_profile(data),
@@ -272,30 +266,25 @@ function compile_manifest(intent, data) =
   :
   (intent == "7-Day Pill Box") ?
     let(phys = get_physics_profile(data),
-        w = get_val(WIDTH, data, WIDTH0), l = get_val(LENGTH, data, LENGTH0),
-        cw = w / 7,
-        days = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
-        box_d = concat([[GRID_LAYOUT, "7x1"], [HAS_BUILTIN_GRID, true]], data))
-    concat(
-      [["BOX", box_d, [["LID_TYPE", "Flip_Single"]], phys]],
-      [for (i = [0:6])
-        ["LID", concat([[WIDTH, cw - 0.6], [PLAQUE_TEXT, days[i]]], data), [["LID_TYPE", "Flip_Single"]], phys]]
-    )
+        days = max(1, min(7, get_val(PILLBOX_DAYS, data, 7))),
+        // GLIDE_SNAP="Tab": tab stop on lid trailing edge — no ball-boss geometry on box
+        // so the box stays a single manifold component (ball-snap boss causes CGAL disconnect).
+        box_d = concat([[GRID_LAYOUT, str(days, "x1")], [HAS_BUILTIN_GRID, true],
+                         [GLIDE_SNAP, "Tab"]], data))
+    [
+      ["BOX", box_d, [["LID_TYPE", "Glide"]], phys],
+      ["LID", box_d, [["LID_TYPE", "Glide"]], phys]
+    ]
   :
   (intent == "7-Day AM/PM Box") ?
-    let(phys  = get_physics_profile(data),
-        w     = get_val(WIDTH, data, WIDTH0),
-        lid_l = flip_half_lid_l(data),
-        cw    = w / 7,
-        days = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
-        box_d = concat([[GRID_LAYOUT, "7x2"], [HAS_BUILTIN_GRID, true]], data))
-    concat(
-      [["BOX", box_d, [["LID_TYPE", "Flip_Double"]], phys]],
-      [for (i = [0:6])
-        ["LID", concat([[WIDTH, cw - 0.6], [LENGTH, lid_l], [PLAQUE_TEXT, str(days[i], " AM")]], data), [["LID_TYPE", "Flip_Single"]], phys]],
-      [for (i = [0:6])
-        ["LID", concat([[WIDTH, cw - 0.6], [LENGTH, lid_l], [PLAQUE_TEXT, str(days[i], " PM")]], data), [["LID_TYPE", "Flip_Single"]], phys]]
-    )
+    let(phys = get_physics_profile(data),
+        days = max(1, min(7, get_val(PILLBOX_DAYS, data, 7))),
+        box_d = concat([[GRID_LAYOUT, str(days, "x2")], [HAS_BUILTIN_GRID, true],
+                         [GLIDE_SNAP, "Tab"]], data))
+    [
+      ["BOX", box_d, [["LID_TYPE", "Glide"]], phys],
+      ["LID", box_d, [["LID_TYPE", "Glide"]], phys]
+    ]
   :
   (intent == "Pillbox Set (Double Lid)") ?
     concat(compile_manifest("7-Day AM/PM Box", data), compile_manifest("1-Day AM/PM Box", data))
