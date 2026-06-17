@@ -74,10 +74,10 @@ TOL_CLIP0 = 0.1;                // Default clip tolerance (mm)
 // Boolean operation epsilon — prevents Z-fighting and non-manifold edges in preview.
 // EPS  = single-sided cutter overlap. 0.01mm = 10 microns — below any FDM resolution,
 //        dimensionally invisible, sits in the floating-point Goldilocks zone for CGAL.
-// EPS2 = double-sided cutter overlap = one nozzle line width. Overridden in
+// LINE_W = double-sided cutter overlap = one nozzle line width. Overridden in
 //        MasterBuilder to Nozzle_Diameter so it scales with printer settings.
 EPS  = 0.01;
-EPS2 = 0.4;   // default: one line width at 0.4mm nozzle; overridden in MasterBuilder
+LINE_W = 0.4;   // default: one line width at 0.4mm nozzle; overridden in MasterBuilder
 
 PLATTER_GAP0 = 15;              // Default part spacing on bed (mm)
 THREAD_PITCH0 = 2.0;            // Default thread pitch (mm)
@@ -93,7 +93,14 @@ GRID_HAS_BASE0 = false;         // Default grid base
 /// Universal parameter extractor using array search.
 /// The data array is structured as: [["KEY1", val1], ["KEY2", val2], ...]
 /// This function searches for the key and returns its value, or fallback if not found.
+// STRICT_KEYS: when true (-D STRICT_KEYS=true), get_val asserts the key constant
+// is actually defined. A typo'd KEY constant (e.g. get_val(WIDHT, ...)) evaluates
+// to undef in OpenSCAD and would otherwise silently return the fallback. Off by
+// default so production builds are unaffected; turn on in the test gate / CI.
+STRICT_KEYS = false;
 function get_val(key, data, fallback) =
+  assert(!STRICT_KEYS || !is_undef(key),
+         "get_val: key constant is undef — likely a typo in a KEY name")
   let (idx = search([key], data)[0])
   (idx == []) ? fallback : data[idx][1];
 

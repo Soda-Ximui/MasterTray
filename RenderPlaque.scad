@@ -67,10 +67,10 @@ module _pl_socket(pin_d, socket_h, tol, noz) {
     difference() {
         cyl(d = od, h = socket_h, anchor = BOTTOM, $fn = 36);
         translate([0, 0, -EPS])
-            cyl(d = id, h = socket_h + EPS2, anchor = BOTTOM, $fn = 36);
+            cyl(d = id, h = socket_h + LINE_W, anchor = BOTTOM, $fn = 36);
         // C-opening slab at +X
         translate([od / 4, 0, socket_h / 2])
-            cuboid([od / 2 + EPS, gap, socket_h + EPS2], anchor = CENTER);
+            cuboid([od / 2 + EPS, gap, socket_h + LINE_W], anchor = CENTER);
     }
 }
 
@@ -90,7 +90,7 @@ module _uclip_vertical(sw, tol, clip_wall, clip_h, pin_d, pin_h, chamf) {
             cuboid([cw, arm_d, clip_h], chamfer = chamf, anchor = BOTTOM);
             // U channel: open at −Y, full height, back_t wall at +Y
             translate([0, -back_t / 2, -EPS])
-                cuboid([gap, arm_d - back_t + EPS, clip_h + EPS2], anchor = BOTTOM);
+                cuboid([gap, arm_d - back_t + EPS, clip_h + LINE_W], anchor = BOTTOM);
         }
         translate([0, arm_d / 2 - back_t / 2, clip_h])
             _pl_pin(pin_d, pin_h);
@@ -158,7 +158,7 @@ module plaque_peg_patch(data, phys, lid_depth) {
     spacing = p_h / 4;
     for (sz = [-spacing, spacing])
         translate([0, 0, p_h / 2 + sz])
-            cuboid([patch_w, lid_depth + EPS2, patch_w], anchor = CENTER);
+            cuboid([patch_w, lid_depth + LINE_W, patch_w], anchor = CENTER);
 }
 
 // ── Public: hole pattern to punch in a lid for Lid_Peg mount ─────────────────
@@ -173,7 +173,7 @@ module plaque_get_peg_holes(data, phys) {
     for (sz = [-spacing, spacing])
         translate([0, 0, p_h / 2 + sz])
             rotate([90, 0, 0])
-                cyl(d = hole_d, h = _PL_PEG_H + EPS2, anchor = BOTTOM, $fn = 24);
+                cyl(d = hole_d, h = _PL_PEG_H + LINE_W, anchor = BOTTOM, $fn = 24);
 }
 
 // ── Face plate (shared by all targets) ───────────────────────────────────────

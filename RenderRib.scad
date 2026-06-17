@@ -178,21 +178,21 @@ module _render_hub(shape_str, h, div_t, sw) {
         if (first == "C")
             if (hollow) difference() {
                 cyl(d=eff,   h=h,       anchor=BOTTOM);
-                down(EPS) cyl(d=inner, h=h+EPS2, anchor=BOTTOM);
+                down(EPS) cyl(d=inner, h=h+LINE_W, anchor=BOTTOM);
             } else
                 cyl(d=eff, h=h, anchor=BOTTOM);
 
         if (first == "S")
             if (hollow) difference() {
                 cuboid([eff,   eff,   h],       anchor=CENTER+BOTTOM);
-                down(EPS) cuboid([inner, inner, h+EPS2], anchor=CENTER+BOTTOM);
+                down(EPS) cuboid([inner, inner, h+LINE_W], anchor=CENTER+BOTTOM);
             } else
                 cuboid([eff, eff, h], anchor=CENTER+BOTTOM);
 
         if (first == "D")
             if (hollow) difference() {
                 zrot(45) cuboid([eff,   eff,   h],       anchor=CENTER+BOTTOM);
-                down(EPS) zrot(45) cuboid([inner, inner, h+EPS2], anchor=CENTER+BOTTOM);
+                down(EPS) zrot(45) cuboid([inner, inner, h+LINE_W], anchor=CENTER+BOTTOM);
             } else
                 zrot(45) cuboid([eff, eff, h], anchor=CENTER+BOTTOM);
 
@@ -203,7 +203,7 @@ module _render_hub(shape_str, h, div_t, sw) {
                 difference() {
                     linear_extrude(h)
                         polygon([[-eff/2, -ht/3],   [eff/2, -ht/3],   [0, 2*ht/3]]);
-                    down(EPS) linear_extrude(h+EPS2)
+                    down(EPS) linear_extrude(h+LINE_W)
                         polygon([[-inner/2, -ht_i/3], [inner/2, -ht_i/3], [0, 2*ht_i/3]]);
                 }
             } else

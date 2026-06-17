@@ -275,9 +275,9 @@ module factory_render_box(data, opts, phys) {
                     translate([-int_w/2 + i*(int_w/cols), l/2 - clip_od, sf - EPS])
                         cuboid([div_t, clip_od, axle_z+cc_z-sf], chamfer=m_chamf(data),
                                edges=TOP, anchor=BOTTOM+FRONT);
-            // Axle pin — EPS2 so ends at ±(w/2−sw+EPS), past box inner wall face.
+            // Axle pin — LINE_W so ends at ±(w/2−sw+EPS), past box inner wall face.
             translate([0, l/2 - hinge_y, axle_z])
-                yrot(90) cyl(d=hinge_d, h=w - sw*2 + EPS2, chamfer=0.5, $fn=36);
+                yrot(90) cyl(d=hinge_d, h=w - sw*2 + LINE_W, chamfer=0.5, $fn=36);
             } // end clip_len > 0 guard
             // Diamond latch recess — cutter matches lid tab shape.
             // Z-tips widened to noz*1.05 to mirror the truncated lid tab (same extrusion width).
@@ -374,11 +374,11 @@ module factory_render_box(data, opts, phys) {
                 translate([0, 0, sf - EPS])
                     cuboid([int_w - sw*6, spine_w, axle_z+cc_z-sf],
                            chamfer=m_chamf(data), edges=TOP, anchor=BOTTOM);
-            // Two axle pins — EPS2 so ends at ±(w/2−sw+EPS), past box inner wall face.
+            // Two axle pins — LINE_W so ends at ±(w/2−sw+EPS), past box inner wall face.
             translate([0, -hinge_y, axle_z])
-                yrot(90) cyl(d=hinge_d, h=w - sw*2 + EPS2, chamfer=0.5, $fn=36);
+                yrot(90) cyl(d=hinge_d, h=w - sw*2 + LINE_W, chamfer=0.5, $fn=36);
             translate([0,  hinge_y, axle_z])
-                yrot(90) cyl(d=hinge_d, h=w - sw*2 + EPS2, chamfer=0.5, $fn=36);
+                yrot(90) cyl(d=hinge_d, h=w - sw*2 + LINE_W, chamfer=0.5, $fn=36);
             // Diamond latch recesses on both Y faces — Z-tips truncated to match lid tab.
             // EPS shrink on Y: hull root face at sy*(l/2−EPS) — inside wall, not coplanar.
             // B5 fix: bulge at -sy*0.8 so the cutter goes into the wall (toward box

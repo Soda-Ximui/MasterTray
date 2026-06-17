@@ -60,11 +60,11 @@ module render_cartesian_walls(cols, rows, spans, int_w, int_l, default_h, div_t)
         translate([pos_x, pos_y, 0])
             if (inner_w > 0 && inner_l > 0)
                 difference() {
-                    cuboid([s_w + EPS2, s_l + EPS2, h], anchor=BOTTOM);
-                    up(-EPS) cuboid([inner_w, inner_l, h + EPS2], anchor=BOTTOM);
+                    cuboid([s_w + LINE_W, s_l + LINE_W, h], anchor=BOTTOM);
+                    up(-EPS) cuboid([inner_w, inner_l, h + LINE_W], anchor=BOTTOM);
                 }
             else
-                cuboid([s_w + EPS2, s_l + EPS2, h], anchor=BOTTOM);
+                cuboid([s_w + LINE_W, s_l + LINE_W, h], anchor=BOTTOM);
     }
 }
 

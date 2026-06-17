@@ -39,6 +39,25 @@ function grid_variants(data, phys, is_jar=false) =
     ["GRID", concat([[GRID_HAS_BASE, true]],  data), opts, phys]
   ];
 
+// box_lid_variant — shared skeleton for the single-mechanism box intents
+// (Snap/Glide × External/Rabbet, plus Flip Single). Emits a box + its matching
+// lid, and a second built-in-grid box when a grid layout is present. Collapses
+// five formerly copy-pasted branches in compile_manifest into one definition.
+//   lid_type — "Snap" | "Glide" | "Flip_Single"
+//   style    — "External" (over-wall groove) | "Rabbet" (inside-wall groove)
+function box_lid_variant(lid_type, style, data) =
+  let(phys = get_physics_profile(data),
+      hg   = has_grid(data),
+      sty  = [LID_STYLE, style],
+      d0   = concat([[HAS_BUILTIN_GRID, false], sty], data),
+      d1   = concat([[HAS_BUILTIN_GRID, true],  sty], data),
+      dl   = concat([sty], data))
+  concat(
+    [["BOX", d0, [["LID_TYPE", lid_type]], phys],
+     ["LID", dl, [["LID_TYPE", lid_type]], phys]],
+    hg ? [["BOX", d1, [["LID_TYPE", lid_type]], phys]] : []
+  );
+
 // Desiccant mesh overrides — prepended to data so they take priority over Customizer.
 // rect: box/wedge surfaces.   cyl: jar surfaces.
 DESICCANT_MESH_RECT = [
@@ -157,71 +176,15 @@ function compile_manifest(intent, data) =
   // emitted once by the public aggregator intents (Box, Simple Tray).
   // These may be exposed in the Customizer dropdown individually in the future.
 
-  // --- Snap box variants ---
-  (intent == "Snap Box (External)") ?
-    let(phys = get_physics_profile(data), hg = has_grid(data),
-        ext  = [LID_STYLE, "External"],
-        d0   = concat([[HAS_BUILTIN_GRID, false], ext], data),
-        d1   = concat([[HAS_BUILTIN_GRID, true],  ext], data),
-        dl   = concat([ext], data))
-    concat(
-      [["BOX", d0, [["LID_TYPE", "Snap"]], phys],
-       ["LID", dl, [["LID_TYPE", "Snap"]], phys]],
-      hg ? [["BOX", d1, [["LID_TYPE", "Snap"]], phys]] : []
-    )
-  :
-  (intent == "Snap Box (Internal)") ?
-    let(phys = get_physics_profile(data), hg = has_grid(data),
-        rab  = [LID_STYLE, "Rabbet"],
-        d0   = concat([[HAS_BUILTIN_GRID, false], rab], data),
-        d1   = concat([[HAS_BUILTIN_GRID, true],  rab], data),
-        dl   = concat([rab], data))
-    concat(
-      [["BOX", d0, [["LID_TYPE", "Snap"]], phys],
-       ["LID", dl, [["LID_TYPE", "Snap"]], phys]],
-      hg ? [["BOX", d1, [["LID_TYPE", "Snap"]], phys]] : []
-    )
-  :
-
-  // --- Glide box variants ---
-  (intent == "Glide Box (External)") ?
-    let(phys = get_physics_profile(data), hg = has_grid(data),
-        ext  = [LID_STYLE, "External"],
-        d0   = concat([[HAS_BUILTIN_GRID, false], ext], data),
-        d1   = concat([[HAS_BUILTIN_GRID, true],  ext], data),
-        dl   = concat([ext], data))
-    concat(
-      [["BOX", d0, [["LID_TYPE", "Glide"]], phys],
-       ["LID", dl, [["LID_TYPE", "Glide"]], phys]],
-      hg ? [["BOX", d1, [["LID_TYPE", "Glide"]], phys]] : []
-    )
-  :
-  (intent == "Glide Box (Internal)") ?
-    let(phys = get_physics_profile(data), hg = has_grid(data),
-        rab  = [LID_STYLE, "Rabbet"],
-        d0   = concat([[HAS_BUILTIN_GRID, false], rab], data),
-        d1   = concat([[HAS_BUILTIN_GRID, true],  rab], data),
-        dl   = concat([rab], data))
-    concat(
-      [["BOX", d0, [["LID_TYPE", "Glide"]], phys],
-       ["LID", dl, [["LID_TYPE", "Glide"]], phys]],
-      hg ? [["BOX", d1, [["LID_TYPE", "Glide"]], phys]] : []
-    )
-  :
-
-  // --- Flip box variants ---
-  (intent == "Flip Box" || intent == "Flip Box (Single)") ?
-    let(phys = get_physics_profile(data), hg = has_grid(data),
-        ext  = [LID_STYLE, "External"],
-        d0   = concat([[HAS_BUILTIN_GRID, false], ext], data),
-        d1   = concat([[HAS_BUILTIN_GRID, true],  ext], data),
-        dl   = concat([ext], data))
-    concat(
-      [["BOX", d0, [["LID_TYPE", "Flip_Single"]], phys],
-       ["LID", dl, [["LID_TYPE", "Flip_Single"]], phys]],
-      hg ? [["BOX", d1, [["LID_TYPE", "Flip_Single"]], phys]] : []
-    )
-  :
+  // --- Single-mechanism box variants (table-driven; see box_lid_variant) ---
+  // Snap/Glide × External/Rabbet and Flip Single all share one skeleton:
+  // box + matching lid (+ built-in-grid box when a grid layout is present).
+  (intent == "Snap Box (External)")  ? box_lid_variant("Snap",        "External", data) :
+  (intent == "Snap Box (Internal)")  ? box_lid_variant("Snap",        "Rabbet",   data) :
+  (intent == "Glide Box (External)") ? box_lid_variant("Glide",       "External", data) :
+  (intent == "Glide Box (Internal)") ? box_lid_variant("Glide",       "Rabbet",   data) :
+  (intent == "Flip Box" || intent == "Flip Box (Single)")
+                                     ? box_lid_variant("Flip_Single", "External", data) :
   (intent == "Double Flip Box" || intent == "Flip Box (Double)") ?
     let(phys  = get_physics_profile(data), hg = has_grid(data),
         ext   = [LID_STYLE, "External"],
@@ -577,7 +540,9 @@ function compile_manifest(intent, data) =
     ]
   :
 
-  // Unrecognised intent — fall back to a plain tray and warn in console.
-  // TODO: add manifest entries for remaining intents.
-  let(_ = echo(str("WARNING: Unknown intent '", intent, "' — rendering as Simple Tray")))
-  [["TRAY", data, [],                                 get_physics_profile(data)]];
+  // Unrecognised intent — fail loud. Previously this silently fell back to a
+  // plain tray, so a typo'd Part_To_Build produced a wrong (but valid-looking)
+  // model with only a buried console warning. The trailing expression is never
+  // reached; it satisfies the ternary's value branch.
+  assert(false, str("compile_manifest: unknown intent '", intent, "'"))
+  [["TRAY", data, [], get_physics_profile(data)]];

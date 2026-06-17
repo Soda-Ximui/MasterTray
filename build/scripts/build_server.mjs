@@ -23,7 +23,7 @@ const PORT = Number(process.argv[2]) || 5180;
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const BUILD_DIR = path.resolve(SCRIPT_DIR, '..');
 const REPO_ROOT = path.resolve(BUILD_DIR, '..');
-const PYTHON = 'C:\\Python314\\python.exe';
+const PYTHON = process.env.MASTERTRAY_PYTHON || 'python';
 const SANDBOX_OUT = path.join(BUILD_DIR, 'sandbox', 'output');
 
 const ALLOWED_ORIGIN = 'http://localhost:4321';
@@ -123,17 +123,36 @@ async function handleBuild(req, res) {
 	}
 }
 
+async function handleReport(req, res) {
+	const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
+	const name = sanitizeFilename(url.searchParams.get('name') || '', 'unknown');
+	const reportPath = path.join(SANDBOX_OUT, name.replace(/\.stl$/i, '.report.yaml'));
+	try {
+		const yaml = await readFile(reportPath, 'utf-8');
+		res.writeHead(200, {
+			'Content-Type': 'text/yaml; charset=utf-8',
+			'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+		});
+		res.end(yaml);
+	} catch {
+		sendJson(res, 404, { error: `report not found: ${name}` });
+	}
+}
+
 const server = createServer((req, res) => {
 	if (req.method === 'OPTIONS') {
 		res.writeHead(204, {
 			'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
-			'Access-Control-Allow-Methods': 'POST, OPTIONS',
+			'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 			'Access-Control-Allow-Headers': 'Content-Type',
 		});
 		return res.end();
 	}
 	if (req.method === 'GET' && req.url === '/health') {
 		return sendJson(res, 200, { ok: true });
+	}
+	if (req.method === 'GET' && req.url?.startsWith('/api/report')) {
+		return handleReport(req, res);
 	}
 	if (req.method === 'POST' && req.url === '/api/build') {
 		return handleBuild(req, res);

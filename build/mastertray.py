@@ -19,6 +19,7 @@ to match and this script needs no code changes.
 import argparse
 import datetime
 import html
+import json
 import re
 import shutil
 import subprocess
@@ -38,6 +39,14 @@ DEFAULT_OPENSCAD = r"C:\Program Files\OpenSCAD\openscad.exe"
 
 class RawLiteral(str):
     """Marker: pass through to OpenSCAD -D verbatim (developer escape hatch)."""
+
+
+# Dev-only -D variables that aren't Customizer parameters in MasterBuilder.scad,
+# so --set validation shouldn't warn about them. STRICT_KEYS toggles get_val's
+# typo assertion (see MasterEngine.scad).
+KNOWN_DEV_VARS = {"STRICT_KEYS"}
+
+DEFAULTS_JSON = BUILD_DIR / "scad_defaults.json"
 
 
 yaml.add_representer(RawLiteral, lambda dumper, data: dumper.represent_str(str(data)))
@@ -218,6 +227,19 @@ def cmd_init_config(args, mapping):
         print(f"  wrote: {dst}")
 
 
+def cmd_dump_defaults(args, mapping):
+    """Write MasterBuilder.scad's parsed Customizer defaults to JSON so other
+    front-ends (e.g. astro/src/pages/builder.astro) consume Python's single
+    parser instead of re-implementing parse_scad_defaults() themselves. Run via
+    `just defaults` (folded into `just meta`) whenever MasterBuilder.scad changes."""
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(parse_scad_defaults(), f, indent=2, sort_keys=True)
+        f.write("\n")
+    print(f"  wrote: {out}")
+
+
 def build_overrides(args, mapping):
     overrides = {}
 
@@ -268,11 +290,19 @@ def build_overrides(args, mapping):
         overrides["Glide_Snap"] = mapping["slide_catch"][args.slide_catch]
 
     # --- Raw escape hatch (developers only) ---
-    for raw in args.set or []:
-        if "=" not in raw:
-            sys.exit(f"ERROR: --set must be VAR=value, got '{raw}'")
-        key, value = raw.split("=", 1)
-        overrides[key] = RawLiteral(value)
+    # Values pass through verbatim, but warn on a key that is neither a known
+    # Customizer variable nor a recognised dev var -- catches typos like
+    # --set chamfre_size=0.6 that would otherwise silently do nothing.
+    if args.set:
+        known_keys = set(parse_scad_defaults()) | KNOWN_DEV_VARS
+        for raw in args.set:
+            if "=" not in raw:
+                sys.exit(f"ERROR: --set must be VAR=value, got '{raw}'")
+            key, value = raw.split("=", 1)
+            if key not in known_keys:
+                print(f"WARNING: --set '{key}' is not a known Customizer variable "
+                      f"(typo?). Passing through verbatim.", file=sys.stderr)
+            overrides[key] = RawLiteral(value)
 
     return overrides
 
@@ -472,6 +502,11 @@ def main():
     p_list_lids = list_sub.add_parser("lids", help="List lid types for an intent")
     p_list_lids.add_argument("--intent", required=True)
 
+    p_defaults = sub.add_parser("dump-defaults",
+                                 help="Write MasterBuilder.scad Customizer defaults to JSON")
+    p_defaults.add_argument("--out", default=str(DEFAULTS_JSON),
+                             help=f"Output JSON path (default: {DEFAULTS_JSON})")
+
     p_init = sub.add_parser("init-config", help="Copy example --config override files")
     p_init.add_argument("--out", default=str(SANDBOX_DIR),
                          help=f"Directory to write example configs into (default: {SANDBOX_DIR})")
@@ -512,6 +547,8 @@ def main():
             cmd_list_intents(args, mapping)
         elif args.what == "lids":
             cmd_list_lids(args, mapping)
+    elif args.command == "dump-defaults":
+        cmd_dump_defaults(args, mapping)
     elif args.command == "init-config":
         cmd_init_config(args, mapping)
     elif args.command == "build":

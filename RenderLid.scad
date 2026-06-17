@@ -160,10 +160,10 @@ module factory_render_lid(data, opts, phys) {
                     difference() {
                         union() {
                             intersection() {
-                                // EPS2 so cylinder ends at ±(clip_len/2+EPS), burying the
+                                // LINE_W so cylinder ends at ±(clip_len/2+EPS), burying the
                                 // connection block face (±clip_len/2) inside the cylinder solid.
                                 // h=clip_len → both at ±clip_len/2 → coplanar X faces in union().
-                                yrot(90) cyl(d=clip_outer_d, h=clip_len+EPS2, chamfer=noz*3, $fn=36);
+                                yrot(90) cyl(d=clip_outer_d, h=clip_len+LINE_W, chamfer=noz*3, $fn=36);
                                 cuboid([clip_len+2, clip_outer_d,
                                         clip_outer_d - flat_belly*2], anchor=CENTER);
                             }
@@ -191,7 +191,7 @@ module factory_render_lid(data, opts, phys) {
                         // Bridge embeds +2mm total (1mm into clip, 1mm into lid body) so
                         // the slicer sees one continuous solid — no micro-gap shell split.
                         translate([0, 0, clip_outer_d/2])
-                            cuboid([clip_len+2, clip_gap, clip_outer_d + EPS2], anchor=CENTER);
+                            cuboid([clip_len+2, clip_gap, clip_outer_d + LINE_W], anchor=CENTER);
                     }
             }
             // Diamond latch arm — single solid block + diamond click tip.

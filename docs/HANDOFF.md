@@ -1,120 +1,176 @@
 # Session Handoff — MasterTray
-_Last updated: 2026-06-17 — Build tooling committed; line endings normalized_
+_Last updated: 2026-06-17 — Architecture review (Opus) + hardening pass: 8 fixes applied & verified_
 
 ---
 
 ## Branch
 `refactor/code-clarity-and-safety`
 
-## Recent Commits (newest first)
+---
 
-| SHA | Message |
-|-----|---------|
-| _(pending)_ | feat: docs, web builder, and dev utilities |
-| _(pending)_ | feat(build): mastertray.py build tooling + mapping/config layer |
-| _(pending)_ | chore: add .gitattributes + normalize all line endings to LF |
-| `e5db572` | feat(pillbox): add PILLBOX_DAYS param + fix Glide-External groove geometry |
-| `b520422` | rename: 14-Day AM/PM Box -> 7-Day AM/PM Box |
-| `d87d22f` | fix: B5-B9 flip-lid fix pass — clasp recess direction, hinge sizing, spine gap, gusset |
-| `ce1f83d` | fix: close out baseline lid set — Glide-Ball, Flip latch, arm root |
-| `6b24215` | fix: eliminate floor-wall coplanar NM edges in core_tray_chassis |
+## ✅ HARDENING PASS (this session — all verified by the build-matrix gate)
+
+The critical review below drove a fix pass. Status of each item:
+
+| # | Item | Status |
+|---|------|--------|
+| 1 | Untyped data model / silent fallback | **Mitigated** — `STRICT_KEYS` mode asserts typo'd KEY constants (MasterEngine.scad); gate runs with it on. Full struct redesign still open. |
+| 2 | 583-line ternary, 6 copy-pasted box branches | **Done** — 5 collapsed into `box_lid_variant()` (MasterManifest.scad). |
+| 3 | Silent dispatcher/intent misses | **Done** — both now `assert(false, …)`; bogus intent → exit 1. |
+| 4 | mapping.yaml not true source of truth (two SCAD parsers) | **Done** — `mastertray.py dump-defaults` → `build/scad_defaults.json`; builder.astro consumes it; JS parser deleted. |
+| 5 | `drop_redundant_overrides` regex can drop real overrides | **Open** — see review #5. Not yet addressed. |
+| 6 | `--set` bypasses validation | **Done** — warns on unknown Customizer var (mastertray.py). |
+| 7 | Layer-2 doing Layer-1 geometry (flip_hinge_y etc.) | **Open** — see review #7. Deliberately not moved (risky; flip lids frozen). |
+| 8 | `EPS2` name pun | **Done** — renamed `LINE_W` across all SCAD. |
+| 9 | No automated gate | **Done** — `build/scripts/build_matrix.py` (`just check-build`). |
+| 10 | Hardcoded machine paths | **Done** — `python` from PATH / `$env:MASTERTRAY_PYTHON`; .ps1 self-guards on repo root. |
+
+**Build-matrix gate** (`just check-build`): builds all 26 public-surface cases (every
+intent + every Container/Container-Lid lid type) with `STRICT_KEYS=true`, asserts exit 0,
+reports connected-component counts. `just check-build-strict` adds `--hardwarnings`.
+
+Component-count observations from the gate (informational, NOT failures):
+- `Container / Slide (Outer/Inner Wall)` = **4 components** — the known ball-snap boss
+  disconnection (default catch is "Ball"). Tab snap → 2. Still the frozen workaround.
+- `Grid` needs a layout that fits the footprint or it emits an empty object; the gate
+  passes it `grid_layout="2x3"`.
+
+Remaining open items: review #1 (full data-model redesign), #5 (override-diff regex),
+#7 (layer violation). All deliberately deferred — each needs a design decision.
+
+---
+
+## ⚠️ CRITICAL ARCHITECTURE REVIEW (the backlog that drove the pass above)
+
+Real, cited liabilities. Items marked Done above are kept here for context. **Do NOT
+"fix" the remaining ones blind — each needs a deliberate decision; several are load-bearing.**
+
+### 1. Core data model = untyped dynamic-scope association list (BIGGEST RISK)
+- `ui_payload` (MasterBuilder.scad:164) is ~55 `[KEY, value]` pairs threaded everywhere as `data`.
+- Reads: `get_val(KEY, data, fallback)` — linear O(n), **first-match-wins**.
+- Overrides: `concat([[KEY,val]], data)` — prepend, so the array **grows unbounded** through layers.
+- **A typo in a key silently returns the fallback. No error.** The system fails open into
+  "plausible but wrong." This is the root cause behind most of the subtle geometry bugs.
+- Highest-leverage mitigation: a debug mode where `get_val` of an unknown key *errors*
+  instead of returning the fallback. Cheap, catches a whole bug class.
+
+### 2. `compile_manifest` is a 583-line single-function ternary chain (MasterManifest.scad:82+)
+- Dispatch by `intent == "string"` cascade.
+- Six near-identical box blocks (Snap Ext/Int, Glide Ext/Int, Flip Single/Double) differ
+  only in `LID_TYPE`/`LID_STYLE`. Should be one table-driven branch
+  (`style → {lid_type, lid_style}`).
+
+### 3. Stringly-typed contracts in 3 unsynced places
+- Intent names live in: `mapping.yaml intents:`, `compile_manifest` equality checks, and
+  manifest type strings (`"BOX"`,`"LID"`) re-matched in `build_part` (MasterBuilder.scad:234).
+- Dispatcher miss = `echo("WARNING")`, a **silent console warning, not an error** → typo
+  yields a partial/empty STL.
+
+### 4. `mapping.yaml` is NOT the single source of truth it claims to be
+- Private intents (`Snap Box (External)`, pillbox internals, …) are **not in mapping.yaml** —
+  the real vocabulary is in the SCAD ternary. Two vocabularies (public YAML vs actual SCAD).
+- `parse_scad_defaults()` (mastertray.py:85) and `parseScadDefaults()` (builder.astro:19) are
+  **two regex implementations of the same parser in two languages** → will drift.
+
+### 5. "Diff from defaults" can silently drop real overrides
+- `drop_redundant_overrides` (mastertray.py:108) strips overrides matching a regex that only
+  sees top-level `Var = literal;` *before the first include*. Expression-defined or post-include
+  defaults are invisible → may drop a genuine override → wrong model, **no error**. No test backs it.
+
+### 6. `--set` escape hatch bypasses all validation (mastertray.py:271)
+- Raw `VAR=value` → `-D` verbatim, no key/type check. The `yaml.RepresenterError` fixed this
+  session (RawLiteral not registered on SafeDumper) proves this path shipped un-exercised.
+
+### 7. Layer violation: Layer 2 doing Layer 1 geometry
+- `flip_hinge_y` / `flip_half_lid_l` (MasterManifest.scad:69-80) are mm-level geometry math
+  living in the *intent compiler*. This is why flip-lid latch bugs were painful.
+
+### 8. `EPS2` name pun (MasterBuilder.scad:157)
+- `EPS2 = Nozzle_Diameter`, but the name reads as "2×EPS" (architecture memory even records
+  `EPS2 = EPS*2`). One name, two meanings across files. Rename one.
+
+### 9. No automated verification gate
+- `component_bboxes.py` is run by hand. No CI builds the intent matrix and asserts
+  "2 components / manifold / NoError." Both known defects (flip lid, ball-snap) were caught by
+  **physical prints**, not software. This is the most consequential *process* gap.
+
+### 10. Hardcoded machine-specific paths
+- `PYTHON = 'C:\Python314\python.exe'` (build_server.mjs:26) and
+  `REPO_ROOT = 'C:\repos\3D\MasterTray'` in client JS (builder.astro:343). Web layer only
+  works on this one machine.
+
+### What's genuinely good (keep)
+- `mastertray.py` core is clean; front-end-wraps-core layering is sound.
+- SCAD file-level decomposition (Render/Engine/Tolerance/Enum) is reasonable — the rot is
+  *inside* `compile_manifest` and the data model, not the file map.
+- Friendly-name CLI/web abstraction is a real QA win.
+
+### Fix priority (least churn, most risk reduction first)
+1. Build-matrix test gate (CI: build all intents → assert 2 components/manifold/NoError).
+2. `get_val` fail-loud debug mode for unknown keys.
+3. Table-drive the box-variant branches in `compile_manifest`.
+4. Unify the two SCAD-default parsers; reconcile mapping.yaml's source-of-truth claim.
+5. De-hardcode paths in the web layer.
 
 ---
 
 ## What's committed and verified
 
 ### Pillbox refactor (`e5db572`)
+- `7-Day Pill Box`, `7-Day AM/PM Box`, `1-Day AM/PM Box` intents. All 14 variants
+  (7 days × 2 Glide intents) → **2 components, manifold, NoError**.
+- Glide-External `groove_z` fix: `groove_z = h - sl - lh·ceil(1/lh) - groove_h` (boss was
+  floating above the box for all heights).
 
-**MasterEnum.scad**: `PILLBOX_DAYS = "PILLBOX_DAYS"` key added.
+### Build tooling
+- `build/mastertray.py` — core builder (mapping → `-D` overrides → OpenSCAD → report.yaml/html).
+- `build/mapping.yaml` — friendly names ↔ Customizer vars (see review #4 for caveats).
+- `build/build.py`, `build/scripts/build_server.mjs`, `astro/src/pages/builder.astro` — wrappers.
 
-**MasterBuilder.scad**: `Pillbox_Days = 7; // [1:7]` in a `[Pillbox]` customizer section, wired into `ui_payload`.
-
-**MasterManifest.scad** — three intents:
-- `"7-Day Pill Box"` → Nx1 Glide grid, PILLBOX_DAYS columns, `GLIDE_SNAP="Tab"`
-- `"7-Day AM/PM Box"` → Nx2 Glide grid, PILLBOX_DAYS columns, `GLIDE_SNAP="Tab"`
-- `"1-Day AM/PM Box"` → delegates to 7-Day AM/PM Box with `PILLBOX_DAYS=1`, `Flip_Single` lid
-
-Verified: all 14 pillbox variants (7 days × 2 Glide intents) → **2 connected components, manifold, Status: NoError**.
-
-**RenderBox.scad**: Fixed Glide-External `groove_z`.
-
-### Build tooling (this session)
-
-**build/mastertray.py** — core builder: parses `build/mapping.yaml`, builds `-D` override list, runs OpenSCAD, writes `report.yaml` + `report.html`. All front-ends (build.py, builder.astro, build_server.mjs) wrap this; none bypass it.
-
-**build/mapping.yaml** — single source of truth for friendly intent/lid names ↔ Customizer vars.
-
-**build/configs/** — example `--config` templates (printer / mesh / advanced). `just check-configs` verifies these stay in sync with `@CONFIG_SECTION_START/END` defaults in MasterBuilder.scad.
-
-**build/scripts/** — Perl export/sync utilities + Node build server.
-
-**justfile** — new targets: `mapping`, `intents`, `check-configs`, `meta`, `docs`, `build-server`.
-
-**astro/src/pages/builder.astro** — web customizer UI (in-progress). Reads `mapping.yaml` + parses MasterBuilder.scad defaults; POSTs to `build_server.mjs`.
-
-**docs/PRINT_PARAMS.md** — complete reference: how nozzle, layer height, wall loops, and filament type drive geometry.
-
-**docs/diags/buildtool.mmd** — Mermaid architecture diagram for the build system.
-
-**Line endings** — `.gitattributes` added; all tracked files normalized to LF. No more CRLF noise in diffs.
+### This session (Opus)
+- **Fixed `yaml.RepresenterError`** on `--set` builds: `RawLiteral` now registered on BOTH
+  `yaml.add_representer` and `yaml.SafeDumper.add_representer` (mastertray.py:43-44).
+  `safe_dump` uses SafeDumper's separate registry — registering on the default Dumper alone
+  was insufficient.
+- **build_server.mjs**: added `GET /api/report?name=<stl>` → returns `<name>.report.yaml`.
+- **builder.astro**: server health indicator (pings `/health` on load + tab focus, colored
+  online/offline/error) and a collapsible build-report `<details>` block fetched after build.
+  Verified rendering via preview (page loads clean, indicator resolves to offline when server down).
+- **RECAP.md** (repo root) — architecture overview + recommendations.
+- **learning.md** (repo root) — cross-session lessons (yaml SafeDumper, groove_z, ball-snap,
+  flip lid, EPS overlap, C-clip hinge).
 
 ---
 
-## Key bug fixed — Glide-External groove_z
-
-**Was**: `groove_z = h - sl - lh·ceil(1/lh)`
-→ groove bottom ≈ `h − 1.8mm`, groove top ≈ `h + 3.6mm` — boss floated above box for **all** box heights.
-
-**Now**: `groove_z = h - sl - lh·ceil(1/lh) - groove_h`
-→ groove top = `h − sl − lh·ceil(1/lh)` with a solid-wall lip above; boss at `groove_z + groove_h/2` stays inside the box.
+## Known frozen / won't-fix
+- **Flip lids** — frozen after failed print (sideways slide, weak retention). See `flip_lid_frozen.md`.
+- **Ball-snap boss mesh disconnection** — `groove_w` cuts too close to side wall (~0.7–0.9mm lip);
+  CGAL can't bond the boss → 4 components. **Tab snap is the workaround** (no boss on box side).
+  Long-term fix: widen lip by reducing `groove_w`, update lid width formula + Rabbet branch in tandem.
 
 ---
 
 ## Non-obvious technical facts
-
-### Ball-snap boss mesh disconnection (pre-existing, NOT fixed)
-`groove_w = w - sw + 0.6` leaves only `(sw−0.6)/2 ≈ 0.7–0.9mm` of side-wall lip after the groove cut. The boss cylinder (`boss_d = ball_d*2 + noz*4 ≈ 8.8mm`) overlaps this lip but CGAL cannot form a topological bond at near-degenerate contact. The ball-dimple `difference()` then severs the tenuous connection → 4 mesh components instead of 2. Affects **both External and Rabbet** styles, all box heights. **Tab snap is the workaround** (no boss/dimple on box side → clean 2-component mesh).
-
-### Part_To_Build, not Intent
-MasterBuilder uses `Part_To_Build` (not `Intent`). CLI: `-D "Part_To_Build=\"7-Day Pill Box\""`.
-
-### component_bboxes.py
-`python build/sandbox/component_bboxes.py <stl>` — connected-component count. Target: exactly 2 per box+lid intent. Manifold check does NOT catch inter-component disconnection.
-
-### Flip lids — frozen
-Flip lids frozen after failed print test (sideways slide, weak retention). No work to be done there. See `flip_lid_frozen.md` in memory.
-
-### Build system architecture
-```
-SCAD (MasterBuilder.scad) ← single source of truth for Customizer vars
-  ↓ -D KEY=value
-mastertray.py (core builder) → STL + report.yaml + report.html
-  ↑ wrapped by
-  ├── build.py (terse shorthand CLI)
-  ├── build_server.mjs (local API for web page)
-  └── builder.astro (web customizer UI)
-```
-`just meta` runs all sync checks + regenerates mapping.json + intents.json.
+- **`Part_To_Build`, not `Intent`** is the Customizer var. CLI: `-D "Part_To_Build=\"7-Day Pill Box\""`.
+- **`component_bboxes.py`** — `python build/sandbox/component_bboxes.py <stl>` counts connected
+  components. Target: exactly 2 per box+lid. Manifold check does NOT catch inter-component disconnect.
+- **EPS overlap rule** — all `union()` geometry must overlap parent by `EPS=0.1mm`; face-to-face
+  zero-overlap = disconnected shells in the slicer.
 
 ---
 
 ## Next session prompt
 
 ```
-Continue MasterTray work on branch refactor/code-clarity-and-safety.
-See docs/HANDOFF.md for full context.
+Continue MasterTray on branch refactor/code-clarity-and-safety.
+Read docs/HANDOFF.md — start with the CRITICAL ARCHITECTURE REVIEW section.
 
-Last commits (newest first):
-  feat: docs, web builder, and dev utilities
-  feat(build): mastertray.py build tooling + mapping/config layer
-  chore: add .gitattributes + normalize all line endings to LF
-  e5db572 — pillbox refactor + Glide-External groove_z fix
+Build/web wiring is done (report endpoint + health indicator in builder.astro).
+The yaml.RepresenterError on --set is fixed.
 
-Suggested next:
-1. Verify MasterBuilder.scad defaults: part_width=140, part_length=70,
-   part_height=20 (confirm stable on branch, haven't reverted).
-2. Finish builder.astro — wire up the POST /build → build_server.mjs
-   → mastertray.py flow; add basic result display (STL download + report).
-3. Consider Glide ball-snap long-term fix: widen side-wall lip by reducing
-   groove_w (requires updating lid width formula + Rabbet branch in tandem).
+Highest-value next work (from the review, worst-first):
+1. Add a build-matrix test gate (build all intents, assert 2 components/manifold/NoError).
+2. get_val fail-loud debug mode for unknown keys.
+3. Table-drive the 6 duplicated box-variant branches in MasterManifest.scad compile_manifest.
+Confirm intent before large refactors — items 1-3 are deliberate, not mechanical.
 ```

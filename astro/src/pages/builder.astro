@@ -11,27 +11,20 @@ const repoRoot = path.resolve(process.cwd(), '..');
 const mapping = parseYaml(fs.readFileSync(path.join(repoRoot, 'build/mapping.yaml'), 'utf-8'));
 const printerDefaults = parseYaml(fs.readFileSync(path.join(repoRoot, 'build/configs/printer.yaml'), 'utf-8'));
 
-// {Customizer var: value} for every top-level `Var = value;` Customizer
-// assignment in MasterBuilder.scad (everything before the first `include
-// <...>`). Mirrors mastertray.py's parse_scad_defaults() -- used to drop
-// -D overrides that match MasterBuilder.scad's own defaults, so the preview
-// shows the same "diff from defaults" the build script actually runs.
-function parseScadDefaults(scadText) {
-	const head = scadText.split(/\ninclude </)[0];
-	const defaults = {};
-	for (const m of head.matchAll(/^(\w+)\s*=\s*(.+?);/gm)) {
-		const [, name, raw] = m;
-		const trimmed = raw.trim();
-		if (trimmed === 'true') defaults[name] = true;
-		else if (trimmed === 'false') defaults[name] = false;
-		else if (/^"(.*)"$/.test(trimmed)) defaults[name] = trimmed.slice(1, -1);
-		else if (/^-?\d+(\.\d+)?$/.test(trimmed)) defaults[name] = Number(trimmed);
-		else defaults[name] = trimmed;
-	}
-	return defaults;
+// {Customizer var: value} for MasterBuilder.scad's top-level defaults, used to
+// drop -D overrides that match those defaults so the preview shows the same
+// "diff from defaults" the build script runs. Parsing is owned solely by
+// Python (mastertray.py dump-defaults -> build/scad_defaults.json, regenerated
+// via `just meta`); this page consumes that artifact rather than duplicating
+// the SCAD parser in JS.
+const defaultsPath = path.join(repoRoot, 'build/scad_defaults.json');
+if (!fs.existsSync(defaultsPath)) {
+	throw new Error(
+		`Missing ${defaultsPath}. Run: just defaults ` +
+		`(or: python build/mastertray.py dump-defaults)`,
+	);
 }
-
-const scadDefaults = parseScadDefaults(fs.readFileSync(path.join(repoRoot, 'MasterBuilder.scad'), 'utf-8'));
+const scadDefaults = JSON.parse(fs.readFileSync(defaultsPath, 'utf-8'));
 
 const intentNames = Object.keys(mapping.intents);
 const containerLidNames = Object.keys(mapping.container_lid_types);
@@ -146,11 +139,17 @@ const data = {
 				<pre id="cmd-overrides"></pre>
 
 				<h2>Run it</h2>
+				<p class="server-status" id="server-status">Build server: <span id="server-dot">…</span></p>
 				<div class="actions">
 					<button type="button" id="download-ps1">Download .ps1 script</button>
 					<button type="button" id="build-stl">Build STL (local server)</button>
 				</div>
 				<p class="hint" id="build-status"></p>
+
+				<details id="report-details" hidden>
+					<summary>Build report</summary>
+					<pre id="report-content"></pre>
+				</details>
 			</section>
 		</main>
 		<Footer />
@@ -340,8 +339,6 @@ const data = {
 			updateLidOptions();
 			build();
 
-			const REPO_ROOT = 'C:\\repos\\3D\\MasterTray';
-			const PYTHON = 'C:\\Python314\\python.exe';
 			const BUILD_SERVER = 'http://127.0.0.1:5180';
 
 			function downloadBlob(blob, filename) {
@@ -357,7 +354,12 @@ const data = {
 			// for $ or backticks, but a literal "'@" can't appear in the YAML values.
 			function buildPs1(p) {
 				const lines = [];
-				lines.push(`Set-Location "${REPO_ROOT}"`);
+				// Portable: run from the MasterTray repo root. No machine-specific
+				// paths baked in — python comes from PATH (override via $env:MASTERTRAY_PYTHON).
+				lines.push('if (-not (Test-Path "build/mastertray.py")) {');
+				lines.push('  Write-Error "Run this from the MasterTray repo root (build/mastertray.py not found)."; exit 1');
+				lines.push('}');
+				lines.push('$python = if ($env:MASTERTRAY_PYTHON) { $env:MASTERTRAY_PYTHON } else { "python" }');
 				lines.push('');
 				lines.push('$printerConfig = New-TemporaryFile | Rename-Item -NewName { $_.Name + ".yaml" } -PassThru');
 				lines.push("@'");
@@ -369,7 +371,7 @@ const data = {
 				lines.push("'@ | Set-Content $printerConfig");
 				lines.push('');
 
-				const args = [`"${PYTHON}"`, 'build/mastertray.py', 'build', '--intent', `"${p.intent}"`];
+				const args = ['$python', 'build/mastertray.py', 'build', '--intent', `"${p.intent}"`];
 				if (p.lid) args.push('--lid', `"${p.lid}"`);
 				if (p.width) args.push('--width', p.width);
 				if (p.length) args.push('--length', p.length);
@@ -396,10 +398,29 @@ const data = {
 				downloadBlob(new Blob([script], { type: 'text/plain' }), 'build_part.ps1');
 			});
 
+			// --- Server health indicator ---
+			const dot = $('server-dot');
+			async function checkHealth() {
+				try {
+					const r = await fetch(`${BUILD_SERVER}/health`, { signal: AbortSignal.timeout(1500) });
+					const ok = r.ok;
+					dot.textContent = ok ? 'online' : 'error';
+					dot.className = ok ? 'online' : 'error';
+				} catch {
+					dot.textContent = 'offline — run: just build-server';
+					dot.className = 'offline';
+				}
+			}
+			checkHealth();
+			document.addEventListener('visibilitychange', () => { if (!document.hidden) checkHealth(); });
+
 			$('build-stl').addEventListener('click', async () => {
 				const status = $('build-status');
+				const reportDetails = $('report-details');
+				const reportContent = $('report-content');
 				const p = currentParams;
-				status.textContent = 'Building...';
+				status.textContent = 'Building…';
+				reportDetails.hidden = true;
 				try {
 					const res = await fetch(`${BUILD_SERVER}/api/build`, {
 						method: 'POST',
@@ -425,9 +446,19 @@ const data = {
 					const blob = await res.blob();
 					downloadBlob(blob, p.out);
 					status.textContent = `Done — saved to ${sandboxPath} and downloaded.`;
+
+					// Fetch and display the build report
+					try {
+						const rpt = await fetch(`${BUILD_SERVER}/api/report?name=${encodeURIComponent(p.out)}`);
+						if (rpt.ok) {
+							reportContent.textContent = await rpt.text();
+							reportDetails.hidden = false;
+						}
+					} catch { /* report display is best-effort */ }
 				} catch (err) {
-					status.textContent = `Build server unavailable (${err.message}). `
-						+ `Start it with: just build-server`;
+					status.textContent = `Build failed: ${err.message}. `
+						+ `Server offline? Run: just build-server`;
+					checkHealth();
 				}
 			});
 		</script>
@@ -469,6 +500,22 @@ const data = {
 			.hint {
 				font-size: 0.85em;
 				color: rgb(var(--gray));
+			}
+			.server-status {
+				font-size: 0.85em;
+				margin: 0.25em 0 0.5em;
+			}
+			#server-dot.online  { color: #2a9d5c; font-weight: bold; }
+			#server-dot.offline { color: rgb(var(--gray)); }
+			#server-dot.error   { color: #c0392b; font-weight: bold; }
+			#report-details {
+				margin-top: 1em;
+			}
+			#report-details summary {
+				cursor: pointer;
+				font-weight: bold;
+				font-size: 0.9em;
+				margin-bottom: 0.4em;
 			}
 			.actions {
 				display: flex;

@@ -481,7 +481,13 @@ in comparisons.
 
 ---
 
-## 9. Boolean Epsilon (`EPS` / `EPS2`) — what it is and when to change it
+## 9. Boolean Epsilon (`EPS` / `LINE_W`) — what it is and when to change it
+
+> **Naming note (2026-06-17):** the variable formerly called `EPS2` is now `LINE_W`.
+> It is **`= Nozzle_Diameter`** (one extrusion line width, ~0.4mm at default), used as
+> double-sided cutter overlap (~`LINE_W/2` per face). Older text below that frames it as
+> "`EPS * 2`" describes the *general* "extend both ends" principle, not this variable's
+> value — `LINE_W` is a full line width, not `2 × EPS`. When in doubt, `LINE_W = Nozzle_Diameter`.
 
 ### What the problem is
 
@@ -510,7 +516,7 @@ Without EPS:                   With EPS = 0.1:
 ```
 
 `EPS = 0.1` extends one end of a cutter by 0.1mm.  
-`EPS2 = EPS * 2` extends both ends — used when a cutter must pierce through completely
+`LINE_W = EPS * 2` extends both ends — used when a cutter must pierce through completely
 (e.g., a socket hole that starts above the solid and exits below).
 
 ### Effect on printed geometry
@@ -520,7 +526,7 @@ makes the hole 0.1mm deeper than the nominal dimension. At FDM tolerances (±0.1
 this is invisible. The rule is:
 
 > If the cutter is subtracted from a face, add `EPS` on that end.  
-> If it must pierce both faces, use `EPS2` total (split as `up(-EPS)` + `h + EPS2`).
+> If it must pierce both faces, use `LINE_W` total (split as `up(-EPS)` + `h + LINE_W`).
 
 ### When to change the slider
 
@@ -539,11 +545,11 @@ hinge sockets.
 
 ### Where it is used in code
 
-Every `difference()` cutter that cuts a face at a shared boundary uses `EPS` or `EPS2`.
+Every `difference()` cutter that cuts a face at a shared boundary uses `EPS` or `LINE_W`.
 Defined in `MasterEngine.scad`; overridden by `bool_overlap_eps` from the Customizer
 (the MasterBuilder assignment runs after all includes, so it wins).
 
-Files that consume `EPS` / `EPS2`:
+Files that consume `EPS` / `LINE_W`:
 
 | File | Use |
 |------|-----|
@@ -813,9 +819,9 @@ If any computed face coordinate equals the chassis wall coordinate exactly → a
 | Thumb notch in box end wall | `RenderBox.scad` | Top face at groove_z (groove cutter bottom) | translate Z += EPS |
 | Snap lid retention bead (both styles) | `RenderLid.scad` | Degenerate EPS-thin flat face (chamfer = height/2) | `chamfer = (height - m_lh) / 2` (see §11c) |
 | Flip_Double spine pillar ±Y faces | `RenderBox.scad` | Pillar ±Y faces exactly tangent to axle cylinders (pillar face = cylinder tangent point) | `spine_w = hinge_y*2 + hinge_d + EPS*2` (see §11f) |
-| Flip_Single lid C-opening cutter | `RenderLid.scad` | Cutter top coplanar with connection-block top at local z=0 | `clip_outer_d + EPS2` on cutter height (see §11d) |
+| Flip_Single lid C-opening cutter | `RenderLid.scad` | Cutter top coplanar with connection-block top at local z=0 | `clip_outer_d + LINE_W` on cutter height (see §11d) |
 | Flip_Single lid diamond tip hull | `RenderLid.scad` | Hull cuboid X face coplanar with latch arm X face | Hull width `lid_w-sw*4+EPS` (see §11e) |
-| Flip_Single/Double axle pins | `RenderBox.scad` | Pin end cap at ±(w/2−sw) = inner wall X face | `h=w−sw*2+EPS2` (see §11h) |
+| Flip_Single/Double axle pins | `RenderBox.scad` | Pin end cap at ±(w/2−sw) = inner wall X face | `h=w−sw*2+LINE_W` (see §11h) |
 | Flip_Single lid C-clip foot | `RenderLid.scad` | Connection block X = cylinder X = ±clip_len/2, coplanar in inner `union()` | Block width `clip_len−EPS` (see §11i) |
 | Flip_Single lid latch arm root | `RenderLid.scad` | Arm ±X side faces passing through lid body front-bottom chamfer zone (Z=0 to chamf) | Raise arm bottom to `chamf+EPS`, reduce height by `chamf+EPS` to keep top fixed (see §11k) |
 
@@ -989,17 +995,17 @@ translate([0, 0, -clip_outer_d/2])
     cuboid([clip_len+2, clip_gap, clip_outer_d], anchor=CENTER);
 // cutter top = -clip_outer_d/2 + clip_outer_d/2 = 0  ← coplanar with block top ✗
 
-// FIX: extend cutter by EPS2 so its top goes to local z = EPS
+// FIX: extend cutter by LINE_W so its top goes to local z = EPS
 translate([0, 0, -clip_outer_d/2])
-    cuboid([clip_len+2, clip_gap, clip_outer_d + EPS2], anchor=CENTER);
-// cutter top = -clip_outer_d/2 + (clip_outer_d + EPS2)/2 = EPS ✓
+    cuboid([clip_len+2, clip_gap, clip_outer_d + LINE_W], anchor=CENTER);
+// cutter top = -clip_outer_d/2 + (clip_outer_d + LINE_W)/2 = EPS ✓
 ```
 
-**Why `EPS2` and not `EPS`:** Adding `EPS` to the height moves the center by `EPS/2` and
-the top by `EPS/2 + EPS/2 = EPS/2` — only `EPS/2 = 0.05mm` past the face. Adding `EPS2`
-to the height with a fixed center moves the top by `EPS2/2 = EPS = 0.1mm`. Alternatively:
+**Why `LINE_W` and not `EPS`:** Adding `EPS` to the height moves the center by `EPS/2` and
+the top by `EPS/2 + EPS/2 = EPS/2` — only `EPS/2 = 0.05mm` past the face. Adding `LINE_W`
+to the height with a fixed center moves the top by `LINE_W/2 = EPS = 0.1mm`. Alternatively:
 `translate z += EPS/2` + `height += EPS` also gives top at `EPS`. Either is fine; using
-`clip_outer_d + EPS2` on a fixed-center cuboid is cleaner to read.
+`clip_outer_d + LINE_W` on a fixed-center cuboid is cleaner to read.
 
 **General rule:** For any `difference()` where the cutter has a face that might be
 coplanar with the solid's face (not just the bottom/entry face), extend that cutter
@@ -1138,7 +1144,7 @@ difference          = 0  ← coplanar ✗
 
 With typical values (w=40, sw=2.4): both = ±17.6mm.
 
-**Fix:** Add `EPS2` to the span so both ends protrude `EPS` past the inner wall faces into the wall
+**Fix:** Add `LINE_W` to the span so both ends protrude `EPS` past the inner wall faces into the wall
 material — the wall's solid body absorbs the tiny protrusion cleanly via `union()`:
 
 ```scad
@@ -1146,15 +1152,15 @@ material — the wall's solid body absorbs the tiny protrusion cleanly via `unio
 yrot(90) cyl(d=hinge_d, h=w - sw*2, chamfer=0.5, $fn=36);
 
 // GOOD — ends at ±(w/2 − sw + EPS), inside wall material
-yrot(90) cyl(d=hinge_d, h=w - sw*2 + EPS2, chamfer=0.5, $fn=36);
+yrot(90) cyl(d=hinge_d, h=w - sw*2 + LINE_W, chamfer=0.5, $fn=36);
 ```
 
 **Detection rule:** Any cylinder or rod that spans the full interior width (or depth) with
-`h = w - sw*2` (or `h = l - sw*2`) has coplanar ends. Always add `EPS2` to these spans.
+`h = w - sw*2` (or `h = l - sw*2`) has coplanar ends. Always add `LINE_W` to these spans.
 
 **Applies to:** Flip_Single axle pin (1 pin), Flip_Double axle pins (2 pins). Both use the
 same formula. Each coplanar end cap produces multiple non-manifold edges at the circular
-boundary — a single `EPS2` fix on `h` resolves all of them.
+boundary — a single `LINE_W` fix on `h` resolves all of them.
 
 ---
 
@@ -1177,7 +1183,7 @@ Both have X end faces at exactly ±clip_len/2. In the overlap region in YZ, the 
 After the outer `difference()` subtracts the bore and C-opening, the remaining connection block
 still has X faces at ±clip_len/2 coplanar with the cylinder's chamfered ends.
 
-**Fix:** Extend the cylinder by `EPS2` so it protrudes `EPS` past the block on each side, burying
+**Fix:** Extend the cylinder by `LINE_W` so it protrudes `EPS` past the block on each side, burying
 the block X face inside the cylinder solid:
 
 ```scad
@@ -1186,7 +1192,7 @@ yrot(90) cyl(d=clip_outer_d, h=clip_len, chamfer=noz*3, $fn=36);
 cuboid([clip_len, ...], anchor=CENTER);
 
 // GOOD — cylinder ends at ±(clip_len/2+EPS); block face at ±clip_len/2 is interior ✓
-yrot(90) cyl(d=clip_outer_d, h=clip_len+EPS2, chamfer=noz*3, $fn=36);
+yrot(90) cyl(d=clip_outer_d, h=clip_len+LINE_W, chamfer=noz*3, $fn=36);
 cuboid([clip_len, ...], anchor=CENTER);
 ```
 
@@ -1470,7 +1476,7 @@ difference() {
 | Constant | Value | Meaning | Parametric? |
 |----------|-------|---------|-------------|
 | `EPS` | 0.01mm | Single-sided cutter overlap. 10 microns — below any FDM resolution, dimensionally invisible. The Goldilocks zone for CGAL: large enough to register as a distinct surface, small enough that no physical dimension shifts. | Customizer: `bool_overlap_eps` |
-| `EPS2` | `Nozzle_Diameter` | Double-sided cutter overlap = one full nozzle line width (0.4mm at default). Scales with printer settings; at 0.6mm nozzle = 0.6mm. | `MasterBuilder.scad`: `EPS2 = Nozzle_Diameter` |
+| `LINE_W` | `Nozzle_Diameter` | Double-sided cutter overlap = one full nozzle line width (0.4mm at default). Scales with printer settings; at 0.6mm nozzle = 0.6mm. | `MasterBuilder.scad`: `LINE_W = Nozzle_Diameter` |
 
 Why 0.01mm and not 0.1mm: 0.1mm is 1/4 of the nozzle diameter — borderline measurable.
 EPS appears on interior shared faces and cutter extensions, never on visible outer surfaces,
@@ -1480,10 +1486,10 @@ is generated using floating-point `sin()`/`cos()` for arc vertices. Below ~0.005
 vertex-position error from trig rounding can match the EPS value — the separation disappears.
 0.01mm is safely above that floor. Verified: nm_hunt.py passes identically at 0.01mm.
 
-Why `EPS2 = Nozzle_Diameter` and not `EPS * 2`: EPS2 is used where a cutter must pierce
+Why `LINE_W = Nozzle_Diameter` and not `EPS * 2`: LINE_W is used where a cutter must pierce
 BOTH faces symmetrically (axle pin ends, slot cutters, hub hollow cores). Tying it to one
 nozzle line width gives a semantically meaningful unit — the minimum printable increment —
-and scales correctly as nozzle size changes. `EPS2/2` per face is the per-face overlap.
+and scales correctly as nozzle size changes. `LINE_W/2` per face is the per-face overlap.
 
 Defined in `MasterEngine.scad`; overridden by the Customizer assignments after all includes.
 

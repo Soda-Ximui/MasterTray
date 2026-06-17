@@ -154,7 +154,7 @@ include <RenderPlaque.scad>
 
 // Override MasterEngine defaults with Customizer values (must follow all includes).
 EPS  = bool_overlap_eps;
-EPS2 = Nozzle_Diameter;   // one line width — scales with printer; EPS2/2 per cutter face
+LINE_W = Nozzle_Diameter;   // one line width — scales with printer; LINE_W/2 per cutter face
 
 // --- AUTO-MATH ENGINE ---
 raw_w = (dimension_mode == "Usable") ? part_width + (wall_thickness * 2) : part_width;
@@ -245,7 +245,7 @@ module build_part(name, data) {
             else if (type == "GRID")             { factory_render_grid(payload, options, physics); }
             else if (type == "PEG")              { factory_render_peg(payload, options, physics); }
             else if (type == "PLAQUE")           { factory_render_plaque(payload, options, physics); }
-            else { echo(str("WARNING: Unknown component type: ", type)); }
+            else { assert(false, str("Unknown component type: ", type, " (manifest bug)")); }
         }
     }
 }

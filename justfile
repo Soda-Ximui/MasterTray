@@ -8,12 +8,15 @@
 # just serve     — Caddy serves astro/dist/ (production-like, auto-HTTPS on localhost)
 # just open      — open http://localhost:4321 in default browser
 # just e2e       — run Playwright tests
+# just check-build — build every public intent under STRICT_KEYS (regression gate)
+# just check-build-strict — check-build + promote OpenSCAD warnings to failures
 # just render    — render MasterBuilder.scad to output/preview.png (smoke test)
 # just render-all — render all 23 intents to output/
 # just mapping   — regenerate build/mapping.json from build/mapping.yaml
 # just intents   — regenerate build/intents.json (public/internal classification)
+# just defaults  — regenerate build/scad_defaults.json from MasterBuilder.scad
 # just check-configs — verify build/configs/*.yaml match MasterBuilder.scad defaults
-# just meta      — regenerate mapping.json + intents.json, check config sync
+# just meta      — regenerate mapping.json + intents.json + scad_defaults.json, check config sync
 # ──────────────────────────────────────────────────────────────────────────────
 
 set shell := ["powershell.exe", "-NoProfile", "-Command"]
@@ -109,14 +112,29 @@ intents:
 check-configs:
     & "{{perl}}" build/scripts/check_config_sync.pl
 
+# ── regenerate build/scad_defaults.json from MasterBuilder.scad ───────────────
+[group('build')]
+defaults:
+    python build/mastertray.py dump-defaults
+
 # ── regenerate all generated build-tooling JSON ────────────────────────────────
 [group('build')]
-meta: mapping intents check-configs
+meta: mapping intents defaults check-configs
 
 # ── regenerate build/docs/README.html from build/docs/README.md (pandoc) ──────
 [group('build')]
 docs:
     pwsh -NoProfile -File build/scripts/build_docs.ps1
+
+# ── build-matrix regression gate: every public intent builds under STRICT_KEYS ──
+[group('test')]
+check-build:
+    python build/scripts/build_matrix.py
+
+# ── build-matrix gate with OpenSCAD warnings promoted to failures ──────────────
+[group('test')]
+check-build-strict:
+    python build/scripts/build_matrix.py --hardwarnings
 
 # ── local-only live build server for the /builder web page ────────────────────
 [group('build')]

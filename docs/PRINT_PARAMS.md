@@ -35,9 +35,9 @@ chamf_max = nozzle_d × 2.5
 All edge chamfers are capped at 2.5 × nozzle. Beyond that, the chamfer face
 becomes a bridging span the slicer can't print without support.
 
-### EPS2 (boolean overlap / cutter extension)
+### LINE_W (boolean overlap / cutter extension)
 ```
-EPS2 = nozzle_d
+LINE_W = nozzle_d
 ```
 Every difference() cutter that must bury its face inside a solid (to avoid
 coplanar non-manifold edges) extends by exactly one nozzle width. At 0.8 mm
@@ -183,7 +183,7 @@ keeping stress below PLA's elastic limit.
 
 | You change | Primary effect | Secondary effects |
 |---|---|---|
-| Nozzle diameter ↑ | Walls thicker (if loops fixed), circles coarser | Chamfers larger, all noz× features scale up, EPS2 larger |
+| Nozzle diameter ↑ | Walls thicker (if loops fixed), circles coarser | Chamfers larger, all noz× features scale up, LINE_W larger |
 | Layer height ↑ | Floor/lid thicker (rounded up), bead taller | Diamond lz snaps to coarser grid, groove_z shifts |
 | Wall loops ↑ | Walls thicker, latch arm narrower, C-clip shorter | May hit clip_len > 0 assert on narrow boxes |
 | Filament PLA→PETG | Gaps wider (parts fit looser raw) | Clasp deeper, C-clip gap narrower (arms flex more) |
