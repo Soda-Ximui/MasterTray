@@ -420,9 +420,13 @@ to find the real cost (OpenSCAD's non-deduplicating `include` re-parsing BOSL2 ~
 
 ## Known frozen / won't-fix
 - **Flip lids** — frozen after failed print (sideways slide, weak retention). See `flip_lid_frozen.md`.
-- **Ball-snap boss mesh disconnection** — `groove_w` cuts too close to side wall (~0.7–0.9mm lip);
-  CGAL can't bond the boss → 4 components. **Tab snap is the workaround** (no boss on box side).
-  Long-term fix: widen lip by reducing `groove_w`, update lid width formula + Rabbet branch in tandem.
+- **Ball-snap boss mesh disconnection** — `Slide + Ball` = 4 components (box + lid + 2 floating
+  ball bosses). **Tab snap is the workaround/standard** (no boss on box side → clean 2 components).
+  **Lip-widening DISPROVEN (2026-06-18):** tried `groove_w` `w-sw+0.6`→`w-sw-0.6` (lip 0.9→1.5mm)
+  with lockstep lid_w — gate STILL 4. The ball dimple (r≈1.18mm) is centered at the groove edge
+  and cuts inward, so material left behind = `lip − ~1.08mm`; CGAL-bondable ~1.5mm would need
+  lip >2.6mm > wall (2.4mm) — impossible. Reverted. A real fix needs a SMALLER/shallower ball
+  detent or relocating it off the thin wall (mechanism redesign, print-validated), not a lip tweak.
 
 ---
 
@@ -465,10 +469,12 @@ gate exists — run it after any SCAD or build-tooling change and treat a red as
 4. ~~**`mapping.yaml` has no schema.**~~ **Done this session.** `validate_mapping()` runs at
    every `load_mapping()` call; `just validate` / `just meta` expose it standalone.
    `build/scripts/test_mapping_schema.py` has 7 pinning tests.
-5. **Ball-snap long-term fix.** The gate confirms `Slide + Ball` = 4 components (CGAL can't
-   bond the boss). Widen the side-wall lip by reducing `groove_w`; update the lid width
-   formula AND the Rabbet branch in lockstep. Contained but multi-file. Tab snap is today's
-   workaround.
+5. **Ball-snap fix — lip-widening DISPROVEN (2026-06-18).** Attempted `groove_w` `w-sw+0.6`→
+   `w-sw-0.6` (lip 0.9→1.5mm) + lockstep `lid_w`; gate STILL 4 components. The ball dimple
+   (r≈1.18mm) centered at the groove edge cuts inward, leaving `lip − ~1.08mm` behind it; a
+   CGAL-bondable ~1.5mm would need lip >2.6mm > wall (2.4mm) — impossible. Reverted. A real fix
+   = smaller/shallower detent or relocating it off the thin wall (mechanism redesign, needs a
+   print). **Tab detent is the standard.** Don't retry lip-widening — it's geometrically ruled out.
 
 **Paste-to-next-session prompt:**
 ```
