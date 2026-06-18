@@ -1,5 +1,5 @@
 # Session Handoff — MasterTray
-_Last updated: 2026-06-17 — mapping.yaml schema validation (Sonnet, item #4)_
+_Last updated: 2026-06-18 — EPS hardening, jar seam/chamfer fixes, printability gate (Sonnet)_
 
 ---
 
@@ -102,7 +102,84 @@ should *drive* wall thickness (today `thick_wall` dominates; at 2 loops + 0.6mm 
 
 ---
 
-## ✅ THIS SESSION (items #4, #1, #2, #3 + font portability)
+## ✅ THIS SESSION — EPS hardening, jar seam fixes, printability gate
+
+_2026-06-18 (Sonnet)_
+
+Three related problems surfaced and were fixed: (1) an OrcaSlicer "empty layer" warning on
+the threaded jar coupon, (2) missing chamfer on the jar's first printed layer, and (3) stale
+key references + missing empty-layer check in `check_printable --slicer`.
+
+### Jar neck seam — empty layer at 17.92–18.54 mm
+
+**Root cause:** `RenderJar.scad` placed the neck cone with its bottom face at exactly
+`sf + cyl_wall_h` — the same z as the wall top. Face-to-face union with no EPS overlap →
+CGAL degenerate cross-section → OrcaSlicer "object can't be printed for empty layer."
+Same issue at cone→thread junction.
+
+**Fix (`RenderJar.scad`, commit `a7cb835`):** EPS overlap at both junctions:
+- Wall→cone: `up(sf + cyl_wall_h - EPS)`, cone `h = sw*1.5 + EPS`
+- Cone→thread: `up(sf + cyl_wall_h + sw*1.5 - EPS)`, rod `l = lip_h + EPS`
+
+Both EPS terms cancel — jar total height `h` is preserved exactly. Tagged
+`[GEOM-FIX: jar neck seam]`.
+
+### Jar floor — chamfer from first printed layer
+
+**Root cause:** The floor ring used `linear_extrude(height=sf)` — no chamfer on 2D
+extrusion. Sharp 90° corner at z=0 (first layer). The cylindrical wall's rim chamfer
+only starts at z=sf (above the floor).
+
+**Fix (`RenderJar.scad`, commit `f52d228`):** Replaced `linear_extrude` with BOSL2
+`cyl(d=w, h=sf, chamfer1=rim_chamf, anchor=CENTER)`. `rim_chamf = noz * 4` — same value
+used by `cylindrical_mesh_wall` — so the bevel is continuous from z=0 through the wall.
+Inner bore extended to `h=sf+EPS*2` (satisfies EPS cutter rule, was zero-extension before).
+
+### EPS overlap — HARD SYSTEM REQUIREMENT (full audit)
+
+All renderer files audited for EPS compliance. Results:
+
+| Site | File | Op | Status |
+|------|------|----|--------|
+| jar floor disc→ring seam | RenderJar.scad | union | ✅ disc grown EPS*2 |
+| jar floor→wall seam | RenderJar.scad | union | ✅ `up(sf-EPS)`, `h=cyl_wall_h+EPS` |
+| jar wall→cone seam | RenderJar.scad | union | ✅ this session |
+| jar cone→thread seam | RenderJar.scad | union | ✅ this session |
+| jar floor ring inner bore | RenderJar.scad | difference | ✅ `h=sf+EPS*2` |
+| screw lid plate→cap seam | RenderLid.scad | union | ✅ `up(sl-EPS)`, `h=cap_h+EPS` |
+| slide groove chamfer seam | RenderBox.scad | union | ✅ base dropped EPS |
+| snap-inner prismoid cutter | RenderBox.scad | difference | ✅ `h=bead_h+EPS` |
+| rabbet glide cutter | RenderBox.scad | difference | ✅ `h=rabbet_h+EPS` |
+| mesh wall inner bore | RenderMesh.scad | difference | ✅ `down(1) h=h+2` (1 mm each side) |
+
+**Formalized in `MasterEngine.scad`** — 35-line comment block immediately before `EPS = 0.01`:
+- WHY: CGAL seam edges → non-manifold STL and "empty layer" slicer warnings
+- `union()` rule: shift join piece DOWN EPS + extend height EPS (terms cancel in algebra)
+- `difference()` rule: extend cutter ≥ EPS beyond every face being cut
+- Inventory of all verified fix sites
+- Obligation: every new union join or difference cut must apply this rule before commit
+
+**This is now a hard system requirement** — see AGENTS.md (root) for the coding standard.
+
+### `check_printable.py` — empty-layer gate + key fixes (commit `a7cb835`)
+
+| Fix | Detail |
+|-----|--------|
+| New `_empty_layers()` | Scans `; layer_z =` sequence for gaps > 1.5× median layer height. Returns `[(z_start, z_end)]`. Hard-fails the gate if non-empty. |
+| Stale key references | `main()` referenced `fl_islands`, `fl_min_island_mm`, `struct_overhang_mm`, `struct_overhang_runs` — all removed in a prior refactor. Replaced with `fl_coverage_pct`, `overhang_mm`, `empty_layer_gaps`. |
+| G2/G3 arc false-positive | OrcaSlicer uses arc moves (G2/G3) for circular perimeters; `_extruded()` only handles G1/G0 → `fl_coverage_pct=0%` even on a jar that prints fine. Gate now only fires when `fl_coverage_pct > 0`. |
+| CLI flag renamed | `--min-island-mm` → `--min-coverage-pct` (default 10%) — name matches the metric. |
+
+**Gate result:** all 5 test-print STLs → `PRINTABLE`, no empty-layer gaps, no false coverage fails.
+
+**Remaining open after this session:**
+- Slide: 1 residual slicer overhang feature (solid structural) — likely tab detent underside.
+- Closing-zone lip-height guarantee + STRICT assert — deferred.
+- Fold structural slicer gate into one command (auto slice mesh-off for overhang check) — deferred.
+
+---
+
+## ✅ PREV SESSION (items #4, #1, #2, #3 + font portability)
 
 _Items #4/#1/#2 done under Sonnet; #3 + font + performance pass under Opus._
 

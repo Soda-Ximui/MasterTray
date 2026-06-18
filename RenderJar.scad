@@ -14,9 +14,12 @@ module factory_render_jar(data, opts, phys) {
     sf  = m_safe_floor(data);
     sw  = m_safe_wall(data);
     noz = m_noz(data);
-    // rim_chamf: matches cylindrical_mesh_wall's rim value (noz×4) so the bevel
-    // is consistent from the first printed layer all the way up the wall.
-    rim_chamf = noz * 4;
+    // rim_chamf: noz×4 gives a tactile bevel, but capped to (sw-noz) so the floor
+    // ring always retains at least 1 perimeter of width at z=0.  Without the cap,
+    // a 0.6mm nozzle produces rim_chamf=2.4mm = sw → zero annulus at the bed face
+    // → OrcaSlicer "empty layer" + "floating cantilever" (GEOM-FIX: chamf-clamp).
+    // cylindrical_mesh_wall uses the same clamp on its own rim_chamf (see RenderMesh.scad).
+    rim_chamf = min(noz * 4, sw - noz);
     is_threaded = get_val("IS_THREADED", opts, false);
 
     // JAR_SIDES: 0 = circle, 4/6/8/12 = polygon. Overrides $fn on all jar geometry.

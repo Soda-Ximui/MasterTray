@@ -1,0 +1,621 @@
+---
+import DocsPage from '../../layouts/DocsPage.astro';
+---
+
+<DocsPage title="Build & Check Pipeline" description="End-to-end flow from CLI to verified STL — scripts, artifacts, gates, and test coupons.">
+
+<h1>Build &amp; Check Pipeline</h1>
+
+<p>
+  Every MasterTray model goes through three independent checks before it is
+  considered print-ready: a <strong>build gate</strong> (does OpenSCAD produce a
+  valid STL?), a <strong>manifold gate</strong> (is the mesh watertight?), and a
+  <strong>slicer gate</strong> (does OrcaSlicer find empty layers or adhesion
+  risks?). This page diagrams the full flow, including which artifacts are
+  temporary and which persist.
+</p>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PIPELINE DIAGRAM
+════════════════════════════════════════════════════════════ -->
+<div class="diagram-wrap">
+<svg viewBox="0 0 820 970" xmlns="http://www.w3.org/2000/svg"
+     role="img" font-family="system-ui,sans-serif" font-size="12.5"
+     class="pipeline-svg">
+  <title>MasterTray build and check pipeline</title>
+  <desc>Six-lane flow: User Inputs, mastertray.py, OpenSCAD, Manifold Validate, Slicer Gate, Regression Gate</desc>
+
+  <defs>
+    <marker id="a"  markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#555"/></marker>
+    <marker id="ag" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#1e7e34"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#b91c1c"/></marker>
+    <marker id="ad" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#aaa"/></marker>
+  </defs>
+
+  <!-- ── lane bands ── -->
+  <rect x="8" y="8"   width="804" height="132" rx="6" fill="#f0f4ff" opacity=".55"/>
+  <rect x="8" y="152" width="804" height="170" rx="6" fill="#e8f0fe" opacity=".55"/>
+  <rect x="8" y="334" width="804" height="106" rx="6" fill="#f0f4ff" opacity=".55"/>
+  <rect x="8" y="452" width="804" height="106" rx="6" fill="#e8f0fe" opacity=".55"/>
+  <rect x="8" y="570" width="804" height="120" rx="6" fill="#f0f4ff" opacity=".55"/>
+  <rect x="8" y="702" width="804" height="116" rx="6" fill="#e8f0fe" opacity=".55"/>
+
+  <!-- ── lane labels ── -->
+  <text x="18" y="28"  font-size="10.5" font-weight="700" fill="#555" letter-spacing=".8">USER / INPUTS</text>
+  <text x="18" y="172" font-size="10.5" font-weight="700" fill="#555" letter-spacing=".8">MASTERTRAY.PY</text>
+  <text x="18" y="354" font-size="10.5" font-weight="700" fill="#555" letter-spacing=".8">OPENSCAD</text>
+  <text x="18" y="472" font-size="10.5" font-weight="700" fill="#555" letter-spacing=".8">MANIFOLD GATE</text>
+  <text x="18" y="590" font-size="10.5" font-weight="700" fill="#555" letter-spacing=".8">SLICER GATE  (--slicer)</text>
+  <text x="18" y="722" font-size="10.5" font-weight="700" fill="#555" letter-spacing=".8">REGRESSION GATE  (build_matrix.py)</text>
+
+  <!-- ══════ LANE 1: USER/INPUTS ══════ -->
+  <!-- CLI -->
+  <rect x="18"  y="36" width="162" height="92" rx="5" fill="#c7d7fd"/>
+  <text x="99"  y="58"  text-anchor="middle" font-weight="700" fill="#1e3a8a">CLI</text>
+  <text x="99"  y="75"  text-anchor="middle" fill="#1e3a8a">mastertray.py build</text>
+  <text x="99"  y="91"  text-anchor="middle" fill="#1e3a8a">--intent … --lid …</text>
+  <text x="99"  y="107" text-anchor="middle" fill="#1e3a8a">--width … --height …</text>
+  <text x="99"  y="120" text-anchor="middle" fill="#64748b" font-size="10.5">or builder.astro</text>
+
+  <!-- mapping.yaml -->
+  <rect x="204" y="36" width="162" height="92" rx="5" fill="#bbf7d0"/>
+  <text x="285" y="58"  text-anchor="middle" font-weight="700" fill="#14532d">build/mapping.yaml</text>
+  <text x="285" y="75"  text-anchor="middle" fill="#14532d">friendly names →</text>
+  <text x="285" y="91"  text-anchor="middle" fill="#14532d">Customizer vars</text>
+  <text x="285" y="107" text-anchor="middle" fill="#14532d">schema-validated</text>
+  <text x="285" y="120" text-anchor="middle" fill="#14532d" font-size="10.5">on every load</text>
+
+  <!-- configs/*.yaml -->
+  <rect x="390" y="36" width="162" height="92" rx="5" fill="#bbf7d0"/>
+  <text x="471" y="58"  text-anchor="middle" font-weight="700" fill="#14532d">build/configs/*.yaml</text>
+  <text x="471" y="75"  text-anchor="middle" fill="#14532d">printer / mesh /</text>
+  <text x="471" y="91"  text-anchor="middle" fill="#14532d">advanced settings</text>
+  <text x="471" y="107" text-anchor="middle" fill="#14532d">friendly keys</text>
+  <text x="471" y="120" text-anchor="middle" fill="#14532d" font-size="10.5">translated on load</text>
+
+  <!-- scad_defaults.json -->
+  <rect x="576" y="36" width="162" height="92" rx="5" fill="#bbf7d0"/>
+  <text x="657" y="58"  text-anchor="middle" font-weight="700" fill="#14532d">build/scad_defaults.json</text>
+  <text x="657" y="75"  text-anchor="middle" fill="#14532d">parsed Customizer</text>
+  <text x="657" y="91"  text-anchor="middle" fill="#14532d">defaults (cache)</text>
+  <text x="657" y="107" text-anchor="middle" fill="#14532d">used to drop</text>
+  <text x="657" y="120" text-anchor="middle" fill="#14532d" font-size="10.5">redundant -D flags</text>
+
+  <!-- ══════ LANE 2: MASTERTRAY.PY ══════ -->
+  <!-- validate_mapping -->
+  <rect x="18"  y="165" width="148" height="80" rx="5" fill="#c7d7fd"/>
+  <text x="92"  y="183" text-anchor="middle" font-weight="700" fill="#1e3a8a">validate_mapping()</text>
+  <text x="92"  y="200" text-anchor="middle" fill="#1e3a8a">8 schema + cross-ref</text>
+  <text x="92"  y="216" text-anchor="middle" fill="#1e3a8a">rules; exits loud</text>
+  <text x="92"  y="232" text-anchor="middle" fill="#1e3a8a" font-size="10.5">on any violation</text>
+
+  <!-- build_overrides -->
+  <rect x="186" y="165" width="148" height="80" rx="5" fill="#c7d7fd"/>
+  <text x="260" y="183" text-anchor="middle" font-weight="700" fill="#1e3a8a">build_overrides()</text>
+  <text x="260" y="200" text-anchor="middle" fill="#1e3a8a">intent + lid + dims</text>
+  <text x="260" y="216" text-anchor="middle" fill="#1e3a8a">→ Customizer var</text>
+  <text x="260" y="232" text-anchor="middle" fill="#1e3a8a" font-size="10.5">dict</text>
+
+  <!-- drop_redundant -->
+  <rect x="354" y="165" width="148" height="80" rx="5" fill="#c7d7fd"/>
+  <text x="428" y="183" text-anchor="middle" font-weight="700" fill="#1e3a8a">drop_redundant()</text>
+  <text x="428" y="200" text-anchor="middle" fill="#1e3a8a">strip vars that</text>
+  <text x="428" y="216" text-anchor="middle" fill="#1e3a8a">match Customizer</text>
+  <text x="428" y="232" text-anchor="middle" fill="#1e3a8a" font-size="10.5">defaults</text>
+
+  <!-- run_build -->
+  <rect x="522" y="165" width="148" height="80" rx="5" fill="#c7d7fd"/>
+  <text x="596" y="183" text-anchor="middle" font-weight="700" fill="#1e3a8a">run_build()</text>
+  <text x="596" y="200" text-anchor="middle" fill="#1e3a8a">openscad.exe -o</text>
+  <text x="596" y="216" text-anchor="middle" fill="#1e3a8a">with -D flags +</text>
+  <text x="596" y="232" text-anchor="middle" fill="#1e3a8a" font-size="10.5">MasterBuilder.scad</text>
+
+  <!-- report artifacts -->
+  <rect x="354" y="262" width="110" height="50" rx="5" fill="#bbf7d0"/>
+  <text x="409" y="280" text-anchor="middle" font-weight="700" fill="#14532d" font-size="11.5">*.report.yaml</text>
+  <text x="409" y="296" text-anchor="middle" fill="#14532d" font-size="10.5">build params</text>
+  <text x="409" y="310" text-anchor="middle" fill="#14532d" font-size="10.5">persistent</text>
+
+  <rect x="480" y="262" width="110" height="50" rx="5" fill="#bbf7d0"/>
+  <text x="535" y="280" text-anchor="middle" font-weight="700" fill="#14532d" font-size="11.5">*.report.html</text>
+  <text x="535" y="296" text-anchor="middle" fill="#14532d" font-size="10.5">human-readable</text>
+  <text x="535" y="310" text-anchor="middle" fill="#14532d" font-size="10.5">persistent</text>
+
+  <!-- ══════ LANE 3: OPENSCAD ══════ -->
+  <!-- openscad.exe -->
+  <rect x="280" y="350" width="220" height="72" rx="5" fill="#c7d7fd"/>
+  <text x="390" y="371" text-anchor="middle" font-weight="700" fill="#1e3a8a">openscad.exe</text>
+  <text x="390" y="388" text-anchor="middle" fill="#1e3a8a">MasterBuilder.scad → CGAL → mesh</text>
+  <text x="390" y="404" text-anchor="middle" fill="#1e3a8a" font-size="10.5">~1.6 s  (after include dedup fix)</text>
+
+  <!-- output STL -->
+  <rect x="540" y="350" width="162" height="72" rx="5" fill="#bbf7d0"/>
+  <text x="621" y="371" text-anchor="middle" font-weight="700" fill="#14532d">output.stl</text>
+  <text x="621" y="388" text-anchor="middle" fill="#14532d">binary or asciistl</text>
+  <text x="621" y="404" text-anchor="middle" fill="#14532d">⬅ feeds all three</text>
+  <text x="621" y="418" text-anchor="middle" fill="#14532d" font-size="10.5">check gates below</text>
+
+  <!-- ══════ LANE 4: MANIFOLD GATE ══════ -->
+  <!-- validSTL.py -->
+  <rect x="18"  y="466" width="210" height="72" rx="5" fill="#c7d7fd"/>
+  <text x="123" y="487" text-anchor="middle" font-weight="700" fill="#1e3a8a">validSTL.py  /  check_manifold()</text>
+  <text x="123" y="503" text-anchor="middle" fill="#1e3a8a">pymeshlab topology scan</text>
+  <text x="123" y="519" text-anchor="middle" fill="#1e3a8a" font-size="10.5">just validate-stl "dir"</text>
+
+  <!-- pass label -->
+  <text x="290" y="493" text-anchor="middle" font-weight="700" fill="#15803d" font-size="14">nm = 0</text>
+  <text x="290" y="511" text-anchor="middle" fill="#15803d" font-size="12">PASS ✓</text>
+  <text x="290" y="527" text-anchor="middle" fill="#64748b" font-size="10.5">watertight + closed</text>
+
+  <!-- fail label -->
+  <text x="440" y="493" text-anchor="middle" font-weight="700" fill="#b91c1c" font-size="14">nm &gt; 0</text>
+  <text x="440" y="511" text-anchor="middle" fill="#b91c1c" font-size="12">FAIL — do not print</text>
+  <text x="440" y="527" text-anchor="middle" fill="#64748b" font-size="10.5">non-manifold / open boundary</text>
+
+  <!-- ══════ LANE 5: SLICER GATE ══════ -->
+  <!-- check_printable -->
+  <rect x="18"  y="582" width="148" height="96" rx="5" fill="#c7d7fd"/>
+  <text x="92"  y="601" text-anchor="middle" font-weight="700" fill="#1e3a8a">check_printable.py</text>
+  <text x="92"  y="618" text-anchor="middle" fill="#1e3a8a">--slicer</text>
+  <text x="92"  y="635" text-anchor="middle" fill="#1e3a8a">just check-</text>
+  <text x="92"  y="651" text-anchor="middle" fill="#1e3a8a">printable-slicer</text>
+  <text x="92"  y="668" text-anchor="middle" fill="#64748b" font-size="10.5">calls OrcaSlicer once</text>
+
+  <!-- OrcaSlicer -->
+  <rect x="186" y="582" width="148" height="96" rx="5" fill="#c7d7fd"/>
+  <text x="260" y="601" text-anchor="middle" font-weight="700" fill="#1e3a8a">OrcaSlicer</text>
+  <text x="260" y="618" text-anchor="middle" fill="#1e3a8a">subprocess  ~1 s</text>
+  <text x="260" y="635" text-anchor="middle" fill="#1e3a8a">--slice 0</text>
+  <text x="260" y="651" text-anchor="middle" fill="#1e3a8a">--load-settings</text>
+  <text x="260" y="668" text-anchor="middle" fill="#64748b" font-size="10.5">GUI app, console-silent</text>
+
+  <!-- temp gcode -->
+  <rect x="354" y="582" width="148" height="96" rx="5" fill="#fef9c3" stroke="#d97706" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="428" y="601" text-anchor="middle" font-weight="700" fill="#78350f">TEMP</text>
+  <text x="428" y="618" text-anchor="middle" fill="#78350f">%TEMP%\orca-pc-*\</text>
+  <text x="428" y="635" text-anchor="middle" fill="#78350f">*.gcode</text>
+  <text x="428" y="651" text-anchor="middle" fill="#78350f">auto-deleted on</text>
+  <text x="428" y="668" text-anchor="middle" fill="#78350f">context-manager exit</text>
+
+  <!-- analyze_gcode -->
+  <rect x="522" y="582" width="148" height="96" rx="5" fill="#c7d7fd"/>
+  <text x="596" y="601" text-anchor="middle" font-weight="700" fill="#1e3a8a">analyze_gcode()</text>
+  <text x="596" y="618" text-anchor="middle" fill="#1e3a8a">_empty_layers()</text>
+  <text x="596" y="635" text-anchor="middle" fill="#1e3a8a">fl_coverage_pct</text>
+  <text x="596" y="651" text-anchor="middle" fill="#1e3a8a">overhang_mm</text>
+  <text x="596" y="668" text-anchor="middle" fill="#64748b" font-size="10.5">(hint on meshed parts)</text>
+
+  <!-- slicer note banner -->
+  <rect x="18" y="688" width="652" height="20" rx="3" fill="#f1f5f9"/>
+  <text x="344" y="702" text-anchor="middle" font-size="10.5" fill="#475569">
+    empty_layer_gaps → HARD FAIL  |  fl_coverage &lt; 10% → FAIL (skip if 0% — arcs)  |  overhang_mm → hint only
+  </text>
+
+  <!-- ══════ LANE 6: REGRESSION GATE ══════ -->
+  <!-- build_matrix -->
+  <rect x="18"  y="716" width="180" height="88" rx="5" fill="#c7d7fd"/>
+  <text x="108" y="736" text-anchor="middle" font-weight="700" fill="#1e3a8a">build_matrix.py</text>
+  <text x="108" y="753" text-anchor="middle" fill="#1e3a8a">26 cases</text>
+  <text x="108" y="769" text-anchor="middle" fill="#1e3a8a">STRICT_KEYS=true</text>
+  <text x="108" y="785" text-anchor="middle" fill="#64748b" font-size="10.5">just check-build[-manifold]</text>
+  <text x="108" y="798" text-anchor="middle" fill="#64748b" font-size="10.5">loops mastertray.py per case</text>
+
+  <!-- temp STLs -->
+  <rect x="218" y="716" width="186" height="88" rx="5" fill="#fef9c3" stroke="#d97706" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="311" y="736" text-anchor="middle" font-weight="700" fill="#78350f">TEMP</text>
+  <text x="311" y="753" text-anchor="middle" fill="#78350f">%TEMP%\mastertray-matrix-*\</text>
+  <text x="311" y="769" text-anchor="middle" fill="#78350f">*.stl  (one per case)</text>
+  <text x="311" y="785" text-anchor="middle" fill="#78350f">deleted on success</text>
+  <text x="311" y="798" text-anchor="middle" fill="#78350f" font-size="10.5">kept on fail or --keep</text>
+
+  <!-- component_count + manifold_nm -->
+  <rect x="424" y="716" width="186" height="88" rx="5" fill="#c7d7fd"/>
+  <text x="517" y="736" text-anchor="middle" font-weight="700" fill="#1e3a8a">per-STL checks</text>
+  <text x="517" y="753" text-anchor="middle" fill="#1e3a8a">component_count()</text>
+  <text x="517" y="769" text-anchor="middle" fill="#1e3a8a">component_bboxes.py</text>
+  <text x="517" y="785" text-anchor="middle" fill="#1e3a8a">manifold_nm()</text>
+  <text x="517" y="798" text-anchor="middle" fill="#1e3a8a" font-size="10.5">pymeshlab</text>
+
+  <!-- gate summary -->
+  <rect x="630" y="716" width="172" height="88" rx="5" fill="#bbf7d0"/>
+  <text x="716" y="736" text-anchor="middle" font-weight="700" fill="#14532d">gate summary</text>
+  <text x="716" y="753" text-anchor="middle" fill="#14532d">PASS / FAIL</text>
+  <text x="716" y="769" text-anchor="middle" fill="#14532d">components = N</text>
+  <text x="716" y="785" text-anchor="middle" fill="#14532d">nm = N</text>
+  <text x="716" y="798" text-anchor="middle" fill="#14532d" font-size="10.5">exit 0 only if all pass</text>
+
+  <!-- ══════════════════════════
+       ARROWS
+  ══════════════════════════ -->
+
+  <!-- INPUT → validate_mapping -->
+  <line x1="99"  y1="128" x2="92"  y2="163" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="285" y1="128" x2="180" y2="163" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="471" y1="128" x2="330" y2="163" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="657" y1="128" x2="490" y2="163" stroke="#aaa" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ad)"/>
+  <text x="575" y="140" text-anchor="middle" font-size="10" fill="#aaa">just defaults</text>
+
+  <!-- validate → build_overrides → drop_redundant → run_build -->
+  <line x1="166" y1="205" x2="184" y2="205" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="334" y1="205" x2="352" y2="205" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="502" y1="205" x2="520" y2="205" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- run_build → report (down) -->
+  <line x1="596" y1="245" x2="596" y2="256" stroke="#555" stroke-width="1.5"/>
+  <line x1="596" y1="256" x2="535" y2="256" stroke="#555" stroke-width="1.5"/>
+  <line x1="535" y1="256" x2="535" y2="260" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="534" y1="262" x2="465" y2="262" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- run_build → openscad -->
+  <line x1="596" y1="245" x2="450" y2="348" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- openscad → STL -->
+  <line x1="500" y1="386" x2="538" y2="386" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- STL → manifold gate (vertical line down, then left) -->
+  <line x1="621" y1="422" x2="621" y2="440" stroke="#555" stroke-width="1.5"/>
+  <line x1="621" y1="440" x2="123" y2="440" stroke="#555" stroke-width="1.5"/>
+  <line x1="123" y1="440" x2="123" y2="464" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- manifold → PASS / FAIL labels (arrow implied by proximity) -->
+
+  <!-- STL → slicer gate -->
+  <line x1="621" y1="422" x2="621" y2="556" stroke="#555" stroke-width="1.5"/>
+  <line x1="621" y1="556" x2="92"  y2="556" stroke="#555" stroke-width="1.5"/>
+  <line x1="92"  y1="556" x2="92"  y2="580" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- slicer chain -->
+  <line x1="166" y1="630" x2="184" y2="630" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="334" y1="630" x2="352" y2="630" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="502" y1="630" x2="520" y2="630" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- STL → regression gate -->
+  <line x1="621" y1="422" x2="621" y2="678" stroke="#555" stroke-width="1.5"/>
+  <line x1="621" y1="678" x2="108" y2="678" stroke="#555" stroke-width="1.5"/>
+  <line x1="108" y1="678" x2="108" y2="714" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- matrix chain -->
+  <line x1="198" y1="760" x2="216" y2="760" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="404" y1="760" x2="422" y2="760" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="610" y1="760" x2="628" y2="760" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- LEGEND -->
+  <rect x="650" y="464" width="158" height="88" rx="4" fill="white" stroke="#ddd" stroke-width="1"/>
+  <text x="660" y="483" font-size="11" font-weight="700" fill="#374151">Legend</text>
+  <rect x="660" y="492" width="12" height="10" rx="2" fill="#c7d7fd"/>
+  <text x="678" y="502" fill="#374151" font-size="11">script / process</text>
+  <rect x="660" y="508" width="12" height="10" rx="2" fill="#bbf7d0"/>
+  <text x="678" y="518" fill="#374151" font-size="11">persistent artifact</text>
+  <rect x="660" y="524" width="12" height="10" rx="2" fill="#fef9c3" stroke="#d97706" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="678" y="534" fill="#374151" font-size="11">temporary artifact</text>
+  <text x="660" y="548" fill="#64748b" font-size="10">auto-deleted after check</text>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     ARTIFACT TABLE
+════════════════════════════════════════════════════════════ -->
+<h2>Artifacts</h2>
+
+<table class="artifact-table">
+  <thead>
+    <tr><th>Artifact</th><th>Where</th><th>Lifetime</th><th>Created by</th></tr>
+  </thead>
+  <tbody>
+    <tr class="persist">
+      <td><code>output.stl</code></td>
+      <td>caller's working directory (<code>--out</code>)</td>
+      <td>Permanent</td>
+      <td><code>mastertray.py build</code></td>
+    </tr>
+    <tr class="persist">
+      <td><code>*.report.yaml</code></td>
+      <td>same directory as the STL</td>
+      <td>Permanent</td>
+      <td><code>write_build_report()</code> (unless <code>--no-report</code>)</td>
+    </tr>
+    <tr class="persist">
+      <td><code>*.report.html</code></td>
+      <td>same directory as the STL</td>
+      <td>Permanent</td>
+      <td><code>write_build_report()</code></td>
+    </tr>
+    <tr class="persist">
+      <td><code>build/scad_defaults.json</code></td>
+      <td><code>build/</code></td>
+      <td>Permanent (regenerated by <code>just defaults</code>)</td>
+      <td><code>mastertray.py dump-defaults</code></td>
+    </tr>
+    <tr class="temp">
+      <td><code>%TEMP%\orca-pc-*\*.gcode</code></td>
+      <td>system temp, random prefix</td>
+      <td><strong>Auto-deleted</strong> — Python <code>TemporaryDirectory</code> context manager</td>
+      <td><code>_slice_to_gcode()</code> in <code>check_printable.py</code></td>
+    </tr>
+    <tr class="temp">
+      <td><code>%TEMP%\mastertray-matrix-*\*.stl</code></td>
+      <td>system temp, random prefix</td>
+      <td><strong>Auto-deleted</strong> on success; kept on failure or <code>--keep</code></td>
+      <td><code>build_matrix.py</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════
+     STAGE DESCRIPTIONS
+════════════════════════════════════════════════════════════ -->
+<h2>Stage Details</h2>
+
+<div class="stages">
+
+<div class="stage">
+  <h3>1 — User / Inputs</h3>
+  <p>
+    Three persistent inputs feed every build. <strong>mapping.yaml</strong> translates
+    friendly names (<em>Container</em>, <em>Snap (Outer Wall)</em>) to OpenSCAD
+    Customizer variable names (<code>Part_To_Build</code>, <code>LID_SNAP_EXT</code>).
+    It is schema-validated on every load via <code>validate_mapping()</code>.
+    <strong>configs/*.yaml</strong> carry printer-specific settings (nozzle size,
+    layer height, filament type). <strong>scad_defaults.json</strong> is a cache of
+    MasterBuilder.scad's own Customizer defaults, generated by
+    <code>just defaults</code>; it lets <code>drop_redundant()</code> skip passing
+    <code>-D</code> flags whose value already matches the default.
+  </p>
+</div>
+
+<div class="stage">
+  <h3>2 — mastertray.py</h3>
+  <p>
+    The build pipeline has four steps. <code>validate_mapping()</code> checks
+    structural and cross-reference rules in mapping.yaml and exits loudly on any
+    violation — before OpenSCAD is ever invoked.
+    <code>build_overrides()</code> translates the CLI arguments into a dict of
+    Customizer variable names and values.
+    <code>drop_redundant()</code> removes any entry whose value already matches the
+    Customizer default (keeping the <code>-D</code> list minimal).
+    <code>run_build()</code> assembles the final <code>openscad.exe -D …
+    MasterBuilder.scad -o output.stl</code> command and runs it as a subprocess.
+    Unless <code>--no-report</code> is passed, <code>write_build_report()</code>
+    emits <code>*.report.yaml</code> and <code>*.report.html</code> alongside the STL.
+  </p>
+</div>
+
+<div class="stage">
+  <h3>3 — OpenSCAD</h3>
+  <p>
+    OpenSCAD evaluates MasterBuilder.scad with the supplied <code>-D</code>
+    overrides. The CGAL kernel computes the boolean mesh from the
+    <code>compile_manifest()</code> → factory chain, exports the STL, and exits.
+    Build time is approximately 1.6 s per part after the BOSL2 include-dedup fix
+    (was ~23 s before — re-parsing BOSL2 through ~11 redundant includes).
+    All sub-files are included transitively through MasterBuilder.scad; none
+    re-include BOSL2 or MasterEngine directly.
+  </p>
+</div>
+
+<div class="stage">
+  <h3>4 — Manifold Gate</h3>
+  <p>
+    <code>validSTL.py</code> (or <code>check_manifold()</code> inside
+    <code>mastertray.py --validate</code>) loads the STL with pymeshlab and
+    queries <code>non_two_manifold_edges</code> and <code>boundary_edges</code>.
+    Both must be zero. <strong>Component count alone does not detect non-manifold
+    edges</strong> — this was the gap that allowed non-manifold jar coupons to
+    reach the print bed. Run <code>just validate-stl "STL/Test Prints"</code>
+    before every batch print.
+  </p>
+</div>
+
+<div class="stage">
+  <h3>5 — Slicer Gate</h3>
+  <p>
+    <code>check_printable.py --slicer</code> slices the STL via OrcaSlicer
+    (headless subprocess, ~1 s per part) into a temporary directory.
+    The gcode is parsed for three signals:
+  </p>
+  <ul>
+    <li><strong>Empty layers</strong> (<code>_empty_layers()</code>) — scans
+    <code>; layer_z =</code> comments for z-gaps &gt; 1.5× the median layer
+    height. A gap means the geometry had zero cross-section at that height
+    (CGAL seam edge from face-to-face union). <em>Hard fail.</em></li>
+    <li><strong>First-layer coverage</strong> — sums G1 extrusion path length
+    on the first layer, divides by the bounding-box area × linewidth. Low
+    coverage (&lt;10%) means sparse bed adhesion. Skipped when
+    <code>fl_coverage_pct = 0%</code> (circular geometry uses G2/G3 arc moves
+    which the parser does not yet handle). <em>Hard fail when &gt; 0%.</em></li>
+    <li><strong>Overhang length</strong> — total extrusion length tagged
+    <code>; FEATURE: Overhang</code>. Reliable only on solid (mesh-off)
+    geometry; mesh teardrops are also tagged Overhang. <em>Hint only.</em></li>
+  </ul>
+  <p>
+    The gcode file is held in a <code>TemporaryDirectory</code> context manager
+    and is automatically deleted when analysis completes.
+  </p>
+</div>
+
+<div class="stage">
+  <h3>6 — Regression Gate</h3>
+  <p>
+    <code>build_matrix.py</code> runs every public intent (26 cases) through
+    <code>mastertray.py</code> with <code>STRICT_KEYS=true</code> (typo'd KEY
+    constants cause a loud exit). Each STL lands in a temporary directory.
+    After building, <code>component_bboxes.py</code> reports the connected-
+    component count (topology check) and pymeshlab reports
+    <code>non_two_manifold_edges</code>. On success the temp directory is
+    deleted; on failure or with <code>--keep</code> the STLs are retained for
+    inspection. <code>just check-build</code> runs the gate;
+    <code>just check-build-manifold</code> additionally fails on any
+    non-manifold edge.
+  </p>
+</div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TEST COUPONS
+════════════════════════════════════════════════════════════ -->
+<h2>Test Coupons</h2>
+
+<p>
+  Five small mechanism coupons live in <code>STL/Test Prints/</code>.
+  Because the tolerance system uses absolute millimetres (not part-scaled
+  values), a 40 mm coupon validates the exact same snap clearance as a
+  140 mm production box — minimal filament, faithful fit.
+</p>
+
+<table class="coupon-table">
+  <thead>
+    <tr>
+      <th>File</th><th>Dims (mm)</th><th>Mechanism</th><th>Parts</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>snap-outer_40x40x15.stl</code></td>
+      <td>40 × 40 × 15</td>
+      <td>Snap lid, over-wall (External)</td>
+      <td>2 — box + lid</td>
+    </tr>
+    <tr>
+      <td><code>snap-inner_40x40x15.stl</code></td>
+      <td>40 × 40 × 15</td>
+      <td>Snap lid, inner-wall Rabbet</td>
+      <td>2 — box + lid</td>
+    </tr>
+    <tr>
+      <td><code>slide-outer-tab_55x55x22.stl</code></td>
+      <td>55 × 55 × 22</td>
+      <td>Glide lid + Tab detent (≥ 55 mm required)</td>
+      <td>2 — box + lid</td>
+    </tr>
+    <tr>
+      <td><code>threaded-jar_d35h30.stl</code></td>
+      <td>Ø 35 × 30</td>
+      <td>Screw-cap jar</td>
+      <td>2 — jar + cap</td>
+    </tr>
+    <tr>
+      <td><code>jar_d55h55.stl</code></td>
+      <td>Ø 55 × 55</td>
+      <td>Open jar (full-size mesh stress test)</td>
+      <td>1 — jar only</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Verify before printing</h3>
+
+<pre><code>just validate-stl "STL/Test Prints"           # manifold hard gate
+just check-printable-slicer "STL/Test Prints"  # empty-layer + coverage gate</code></pre>
+
+<h3>Regeneration commands</h3>
+
+<pre><code># snap-outer
+python build/mastertray.py build --intent Container --lid "Snap (Outer Wall)" `
+  --width 40 --length 40 --height 15 --export-format asciistl `
+  --out "STL/Test Prints/snap-outer_40x40x15.stl" --no-report
+
+# snap-inner
+python build/mastertray.py build --intent Container --lid "Snap (Inner Wall)" `
+  --width 40 --length 40 --height 15 --export-format asciistl `
+  --out "STL/Test Prints/snap-inner_40x40x15.stl" --no-report
+
+# slide-outer + tab detent  (footprint must be >= 55 mm)
+python build/mastertray.py build --intent Container --lid "Slide (Outer Wall)" `
+  --slide-catch "Tab Detent" `
+  --width 55 --length 55 --height 22 --export-format asciistl `
+  --out "STL/Test Prints/slide-outer-tab_55x55x22.stl" --no-report
+
+# threaded jar
+python build/mastertray.py build --intent "Threaded Jar" `
+  --width 35 --height 30 --export-format asciistl `
+  --out "STL/Test Prints/threaded-jar_d35h30.stl" --no-report
+
+# open jar (full-size)
+python build/mastertray.py build --intent "Jar" `
+  --width 55 --height 55 --export-format asciistl `
+  --out "STL/Test Prints/jar_d55h55.stl" --no-report</code></pre>
+
+<p class="note">
+  The stress-test config uses <strong>0.6 mm nozzle / 2 wall loops / 0.30 mm
+  layer / PLA / Teardrop mesh</strong>.  Add
+  <code>--set Nozzle_Diameter=0.6 --set Wall_Loops=2 --set Layer_Height=0.30</code>
+  to match.  See <code>STL/Test Prints/README.md</code> for the full printer
+  config and what to evaluate from each print.
+</p>
+
+</DocsPage>
+
+<style>
+  /* Diagram */
+  .diagram-wrap {
+    margin: 1.5em 0 2em;
+    overflow-x: auto;
+  }
+  .pipeline-svg {
+    width: 100%;
+    max-width: 820px;
+    display: block;
+  }
+
+  /* Artifact table */
+  .artifact-table,
+  .coupon-table {
+    font-size: 0.82em;
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0 2em;
+  }
+  .artifact-table th,
+  .artifact-table td,
+  .coupon-table th,
+  .coupon-table td {
+    border: 1px solid rgb(var(--gray-light));
+    padding: 0.45em 0.7em;
+    vertical-align: top;
+    line-height: 1.4;
+  }
+  .artifact-table thead th,
+  .coupon-table thead th {
+    background: rgb(var(--gray-light));
+    font-weight: 700;
+  }
+  .artifact-table tr.persist td:last-child { color: #15803d; font-weight: 600; }
+  .artifact-table tr.temp    td:last-child { color: #b45309; font-weight: 600; }
+
+  /* Stage descriptions */
+  .stages { margin: 1em 0; }
+  .stage {
+    border-left: 3px solid var(--accent);
+    padding: 0.2em 0 0.2em 1em;
+    margin-bottom: 1.8em;
+  }
+  .stage h3 {
+    font-size: 1.1em;
+    margin: 0 0 0.4em;
+    color: rgb(var(--black));
+  }
+  .stage p, .stage ul { font-size: 0.88em; margin: 0.4em 0; line-height: 1.6; }
+  .stage ul { padding-left: 1.2em; }
+  .stage li { margin-bottom: 0.4em; }
+
+  /* Code */
+  pre {
+    background: rgb(var(--gray-light));
+    padding: 1em 1.2em;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.78em;
+    line-height: 1.5;
+  }
+
+  /* Note */
+  .note {
+    font-size: 0.82em;
+    background: #f8fafc;
+    border: 1px solid rgb(var(--gray-light));
+    border-radius: 5px;
+    padding: 0.7em 1em;
+    line-height: 1.5;
+  }
+</style>
