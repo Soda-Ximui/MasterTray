@@ -60,6 +60,14 @@ The BOSL2 threads were clean all along.
 coplanar with the groove cutter top (coincident edge → nm=2 at 0.6/0.30). Dropped the base by
 EPS to overlap. (Gate Slide-Outer still nm=10 = the separate ball-snap boss, documented.)
 
+**⚠ Groove "prints on air" overhangs (print-quality, NOT manifold):** any inner-wall groove with
+a trapping/retaining lip above it has the lip underside bridging the groove void — printed
+bottom-up the ceiling prints on air. Caught on physical prints, not validSTL (it's a slicer
+overhang, not a topology defect). Two instances:
+- **Slide-Outer groove** — FIXED with a 45° self-supporting ceiling ramp ([GEOM-FIX: slide chamfer]).
+- **Snap-Inner (Rabbet) groove** — FLAGGED, fix pending ([GEOM-WARN: snap-inner groove], RenderBox.scad).
+  Confirmed on print + render; ~0.84mm (bead_h) overhang. The same 45° ramp treatment applies.
+
 **Manifold safeguards added:**
 - Gate reports `nm=` per case (pymeshlab-gated); `just check-build-manifold` / `--strict-manifold` fail on it.
 - `mastertray.py --validate` / `--strict-validate`: post-build pymeshlab check; a reminder prints otherwise.

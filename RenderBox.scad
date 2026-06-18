@@ -62,6 +62,14 @@ module factory_render_box(data, opts, phys) {
             // Ring groove on inner wall face: bead snaps into defined closed position.
             // Groove occupies h−2·bead_h to h−bead_h; bead_h wall above traps the bead.
             // Lid bead at sl−2·bead_h → when seated (bottom at h−sl) bead aligns with groove.
+            //
+            // [GEOM-WARN: snap-inner groove PRINTS ON AIR — flagged, not yet fixed]
+            // The bead-trapping lip above the groove (h−bead_h .. h) has its underside
+            // bridging the groove void: printed bottom-up, that ceiling prints on air
+            // (~bead_h ≈ 0.84mm overhang into the wall). Confirmed on print + render.
+            // Same overhang class as the slide-outer groove, which was fixed with a 45°
+            // self-supporting ceiling ramp (see [GEOM-FIX: slide chamfer] in the Glide
+            // External branch). The same ramp treatment applies here — pending go-ahead.
             groove_z = h - 2 * bead_h;
             difference() {
                 apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
