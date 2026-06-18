@@ -156,6 +156,13 @@ check-build-manifold:
 validate-stl dir='STL':
     python validSTL.py "{{dir}}"
 
+# ── printability gate before sending STLs: manifold/watertight (hard) + overhang hint ──
+# Manifold is auto-verified; overhang is a HINT only (mesh/thread false-positives) —
+# confirm overhangs with a slicer preview / test print. `just check-printable "STL/Test Prints"`
+[group('test')]
+check-printable dir='STL':
+    python build/scripts/check_printable.py "{{dir}}"
+
 # ── local-only live build server for the /builder web page ────────────────────
 [group('build')]
 build-server:
