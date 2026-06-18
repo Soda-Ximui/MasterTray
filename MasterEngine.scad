@@ -83,11 +83,41 @@ LID_MIN_SOLID0 = 10;            // Default min solid lid area (%)
 TOL_SNAP_GAP0 = 0.1;            // Default snap clearance (mm)
 TOL_CLIP0 = 0.1;                // Default clip tolerance (mm)
 
-// Boolean operation epsilon — prevents Z-fighting and non-manifold edges in preview.
-// EPS  = single-sided cutter overlap. 0.01mm = 10 microns — below any FDM resolution,
-//        dimensionally invisible, sits in the floating-point Goldilocks zone for CGAL.
-// LINE_W = double-sided cutter overlap = one nozzle line width. Overridden in
-//        MasterBuilder to Nozzle_Diameter so it scales with printer settings.
+// ── HARD SYSTEM REQUIREMENT: EPS / epsilon overlap rule ─────────────────────────
+//
+// ALL geometric primitives that share a face in a union() MUST overlap by EPS.
+// ALL boolean cutters in a difference() MUST extend EPS (or more) beyond every face
+// they cut through — never stop flush.
+//
+// Why this is mandatory:
+//   CGAL's mesh boolean treats two faces that share the exact same plane as a seam
+//   edge. Seam edges are non-manifold (shared by more than 2 triangles) and cause:
+//     • Non-manifold STL warnings from pymeshlab / validSTL.py
+//     • "Empty layer" gaps in OrcaSlicer (degenerate cross-section at the seam)
+//     • Printability failures that pass all lower-level checks
+//
+// The rule has two forms depending on the operation:
+//   union()      — shift the joining piece DOWN by EPS and extend its HEIGHT by EPS
+//                  so it overlaps the piece below by 0.01mm. The shift cancels out
+//                  in algebra so the nominal dimension is preserved.
+//                  Example: floor→wall  →  up(sf - EPS), h = cyl_wall_h + EPS
+//
+//   difference() — extend the CUTTER by ≥ EPS (typically 1-2mm for clarity) beyond
+//                  each face it is meant to cut through. The extra material is fully
+//                  inside the cutter so it is never printed.
+//                  Example: inner bore  →  down(1) cyl(d=bore, h=wall+2)
+//
+// Verified fixes logged with [GEOM-FIX: ...] tags at each site:
+//   jar floor disc→ring seam      [manifold]  RenderJar.scad
+//   jar floor→wall seam           [manifold]  RenderJar.scad
+//   jar wall→cone seam            [empty-layer] RenderJar.scad
+//   jar cone→thread seam          [empty-layer] RenderJar.scad
+//   jar floor ring inner bore     [EPS cutter]  RenderJar.scad
+//   screw lid plate→cap seam      [manifold]  RenderLid.scad
+//   slide groove chamfer seam     [manifold]  RenderBox.scad
+//
+// When adding any new union() join or difference() cut: apply this rule before commit.
+// ─────────────────────────────────────────────────────────────────────────────────
 EPS  = 0.01;
 LINE_W = 0.4;   // default: one line width at 0.4mm nozzle; overridden in MasterBuilder
 

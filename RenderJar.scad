@@ -13,6 +13,10 @@ module factory_render_jar(data, opts, phys) {
     h   = m_bh(data);
     sf  = m_safe_floor(data);
     sw  = m_safe_wall(data);
+    noz = m_noz(data);
+    // rim_chamf: matches cylindrical_mesh_wall's rim value (noz×4) so the bevel
+    // is consistent from the first printed layer all the way up the wall.
+    rim_chamf = noz * 4;
     is_threaded = get_val("IS_THREADED", opts, false);
 
     // JAR_SIDES: 0 = circle, 4/6/8/12 = polygon. Overrides $fn on all jar geometry.
@@ -51,8 +55,16 @@ module factory_render_jar(data, opts, phys) {
         up(sf / 2) union() {
             // Outer solid ring — structural, hidden under wall. Ring hole stays at the
             // true inner_d (so its polygon matches the wall exactly on low-facet jars).
-            linear_extrude(height=sf, center=true)
-                difference() { circle(d=w, $fn=jar_fn); circle(d=inner_d, $fn=jar_fn); }
+            // chamfer1=rim_chamf puts the bevel at z=0 (first printed layer) so the
+            // base has no sharp 90° corner — matches the cylindrical_mesh_wall's bottom
+            // rim chamfer that starts one floor-height higher at z=sf. Linear_extrude
+            // had no chamfer at all ("chamfering above the floor"); this fixes it.
+            // Inner bore cutter uses anchor=CENTER + h=sf+EPS*2 so it extends EPS
+            // beyond both faces of the ring (EPS cutter rule — no zero-thickness bottom).
+            difference() {
+                cyl(d=w, h=sf, chamfer1=rim_chamf, anchor=CENTER, $fn=jar_fn);
+                cyl(d=inner_d, h=sf + EPS*2, anchor=CENTER, $fn=jar_fn);
+            }
             // [GEOM-FIX: jar floor union seam non-manifold] Inner disc grown by EPS*2 so it
             // OVERLAPS the ring's inner edge instead of meeting it face-to-face — coincident
             // faces left non-manifold seam edges along the inner_d boundary (Jar/Threaded Jar
