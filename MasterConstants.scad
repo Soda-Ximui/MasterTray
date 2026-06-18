@@ -29,6 +29,19 @@ MAX_FLOOR_THICKNESS_PCT = 35; // Floors capped at 35% of total height (prevent s
 MAX_LID_THICKNESS_PCT = 35; // Lids capped at 35% of total height
 MAX_WALL_THICKNESS_PCT = 45; // Walls capped at 45% of XY footprint (prevent thick shells)
 
+// === MINIMUM STRUCTURAL THICKNESS ===
+// [GEOM-FIX: under-thin floor/lid] m_safe_floor/m_safe_lid previously floored at ONE layer
+// (m_lh) — a 1-layer floor/lid won't hold a container's contents. If the user-specified
+// thickness is below these structural minimums, m_safe_* bumps it up (the slicer then fills
+// the extra with perimeters/infill). Bump only RAISES sub-minimum values, so the 2.0/2.4mm
+// defaults are unaffected. Minimums are clamped to the MAX_*_PCT caps so a very short/small
+// part can't be over-bumped. Tunable — conservative sound minimums for typical containers.
+MIN_FLOOR_MM      = 1.0;  // floor never thinner than 1.0mm ...
+MIN_FLOOR_LAYERS  = 3;    // ... or 3 layers, whichever is greater
+MIN_LID_MM        = 1.0;  // lid never thinner than 1.0mm ...
+MIN_LID_LAYERS    = 3;    // ... or 3 layers
+MIN_WALL_LOOPS    = 2;    // wall never thinner than 2 perimeters (2 × nozzle)
+
 // === FLIP BOX STRUCTURAL IMPROVEMENTS (v4.11) ===
 // Reinforcement constants for flip lid geometry fixes
 // Problem: Original flip box lid warps, sags, and has snap-fit failures

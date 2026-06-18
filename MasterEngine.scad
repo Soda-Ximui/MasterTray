@@ -471,29 +471,31 @@ function m_fil(data) = get_val(FILAMENT_TYPE, data, "PLA");
 /// CONSTRAINT 2: Cap at 35% of total height
 ///   REASON: Prevents accidentally creating solid bricks for small trays
 ///           Example: 10mm tall container shouldn't have 3.5mm floor
+// [GEOM-FIX: under-thin floor] Floor is bumped to a structural minimum (>= MIN_FLOOR_MM and
+// >= MIN_FLOOR_LAYERS layers) if the user spec is thinner — was floored at one layer, which
+// won't hold contents. Structural min is clamped to the MAX_FLOOR cap so a short box isn't
+// over-bumped. Only ever raises a too-thin value; the 2.0mm default is unaffected.
 function m_safe_floor(data) =
+  let(lh = m_lh(data),
+      cap = m_bh(data) * (MAX_FLOOR_THICKNESS_PCT / 100),
+      struct = min(cap, max(MIN_FLOOR_MM, MIN_FLOOR_LAYERS * lh)))
   max(
-    m_lh(data),
-    round(
-      min(
-        get_val(THICK_FLOOR, data, THICK_FLOOR0),
-        m_bh(data) * (MAX_FLOOR_THICKNESS_PCT / 100)
-      ) / m_lh(data)
-    ) * m_lh(data)
+    struct,
+    round(min(get_val(THICK_FLOOR, data, THICK_FLOOR0), cap) / lh) * lh
   );
 
 /// m_safe_lid(data): Safe Lid Thickness
 /// Same logic as m_safe_floor—rounds to layer height multiples.
 /// Lids need alignment to prevent warping when they're large and flat.
+// [GEOM-FIX: under-thin lid] Same structural-minimum bump as m_safe_floor — a 1-layer lid
+// flexes/cracks and can't seat a closing mechanism. Clamped to MAX_LID cap; only raises.
 function m_safe_lid(data) =
+  let(lh = m_lh(data),
+      cap = m_bh(data) * (MAX_LID_THICKNESS_PCT / 100),
+      struct = min(cap, max(MIN_LID_MM, MIN_LID_LAYERS * lh)))
   max(
-    m_lh(data),
-    round(
-      min(
-        get_val(THICK_LID, data, THICK_LID0),
-        m_bh(data) * (MAX_LID_THICKNESS_PCT / 100)
-      ) / m_lh(data)
-    ) * m_lh(data)
+    struct,
+    round(min(get_val(THICK_LID, data, THICK_LID0), cap) / lh) * lh
   );
 
 /// m_safe_wall(data): Safe Wall Thickness
@@ -513,15 +515,19 @@ function m_safe_lid(data) =
 ///
 /// CONSTRAINT 3: Cap at 45% of smallest XY dimension
 ///   REASON: Prevents excessively thick walls that waste material and print time
+// [GEOM-FIX: under-thin wall] Minimum is now max(wall_loops, MIN_WALL_LOOPS) perimeters, so a
+// user setting Wall_Loops=1 still gets a structurally-sound 2-perimeter wall. For loops>=2 and
+// the default thick_wall this is unchanged. Only ever raises a too-thin value.
 function m_safe_wall(data) =
+  let(noz = m_noz(data))
   max(
-    m_noz(data) * m_wloops(data),  // Minimum: nozzle_diameter × wall_loops
+    noz * max(m_wloops(data), MIN_WALL_LOOPS),  // structural floor: >= MIN_WALL_LOOPS perimeters
     round(
       min(
         get_val(THICK_WALL, data, THICK_WALL0),
         min(m_bw(data), m_bl(data)) * (MAX_WALL_THICKNESS_PCT / 100)
-      ) / m_noz(data)
-    ) * m_noz(data)
+      ) / noz
+    ) * noz
   );
 
 /// m_c_rad(data): Master Corner Radius
