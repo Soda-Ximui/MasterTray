@@ -613,4 +613,80 @@ that layer 1 no longer shows the floating bump/gap.
 
 ---
 
-_Add new entries as B10, B11, … in order of discovery._
+---
+
+## B10 — rim_chamf = noz×4 erases hollow-cylinder annulus when noz×4 ≥ sw
+
+**Status:** Fixed in `RenderJar.scad` line 19 and `RenderMesh.scad` (cylindrical_mesh_wall) line 110 — `2c3639a` (2026-06-18)
+**Severity:** High — OrcaSlicer refuses to print; "empty layer" + "floating cantilever" hard errors
+**Reported:** 2026-06-18 (OrcaSlicer screenshot showing `jar_d55h55.stl` warnings with 0.6mm nozzle)
+**Affects:** `factory_render_jar` floor ring + `cylindrical_mesh_wall` (any caller, not just jar)
+
+### Root cause
+
+A 45° chamfer of size `c` at the **outer edge** of a hollow cylinder removes `c` from the outer
+radius at the bottom face. The annulus width at z=0 is therefore:
+
+```
+annulus_at_base = sw - rim_chamf
+```
+
+`rim_chamf = noz * 4` and `sw = round(THICK_WALL0 / noz) * noz`. When `THICK_WALL0` is an exact
+multiple of `noz`, `sw` is also an exact multiple of `noz`, and `noz * 4` can equal `sw` exactly.
+
+With the 0.6mm stress-test nozzle:
+
+```
+rim_chamf = 0.6 * 4 = 2.4 mm
+sw        = round(2.4 / 0.6) * 0.6 = round(4) * 0.6 = 2.4 mm
+annulus   = 2.4 - 2.4 = 0.0 mm   ← zero, no printable material
+```
+
+Two symptoms resulted:
+
+| Warning | Cause |
+|---------|-------|
+| "empty layer between 2.1 and 3" | Wall cylinder (starts at z=sf−EPS=1.99mm) has rim_chamf=2.4mm bottom bevel zone. In [1.99, 4.39mm] annulus grows from 0 → sw. Sub-perimeter cross-sections in the lower half of this zone → OrcaSlicer can't generate toolpaths. |
+| "floating cantilever" | Floor ring annulus at z=0 (bed) is 0mm wide → ring has no bed contact. Only the inner mesh disc touches the build plate. OrcaSlicer flags the ring as unsupported. |
+
+Note: the 0.4mm nozzle config was unaffected because `rim_chamf = 1.6mm < sw = 2.4mm` → 0.8mm annulus (2 perimeters).
+
+### Fix
+
+Cap `rim_chamf` to `sw - noz` so the annulus is always ≥ 1 perimeter at z=0:
+
+```scad
+// RenderJar.scad — floor ring
+rim_chamf = min(noz * 4, sw - noz);
+
+// RenderMesh.scad — cylindrical_mesh_wall
+rim_chamf = let(noz = m_noz(data)) min(noz * 4, wall_t - noz);
+```
+
+For 0.6mm nozzle: `min(2.4, 2.4 - 0.6) = 1.8mm`. Annulus at z=0 = 0.6mm = 1 perimeter. ✓
+For 0.4mm nozzle: `min(1.6, 2.4 - 0.4) = 1.6mm`. Unchanged. ✓
+
+Tagged `GEOM-FIX: chamf-clamp` in both files.
+
+### Invariant
+
+> For any hollow cylinder (annulus) with outer diameter d, inner diameter `d - 2*wall_t`, and
+> a chamfer of size c on the outer edge: `c < wall_t` is required to maintain non-zero annulus
+> at the base face. Use `c ≤ wall_t - noz` to guarantee ≥ 1 perimeter.
+> The same rule applies symmetrically to the inner edge (an inner chamfer must satisfy `c < wall_t`).
+
+### Test
+
+```
+python build/mastertray.py build --intent Jar --width 55 --height 55 \
+  --set Nozzle_Diameter=0.6 --set Wall_Loops=2 --set Layer_Height=0.30 \
+  --export-format asciistl --out /tmp/jar_d55h55.stl
+just validate-stl /tmp
+just check-printable-slicer /tmp
+```
+
+Expected: `PRINTABLE`, no "empty layer" or "floating cantilever" warnings.
+
+---
+
+_Add new entries as B11, B12, … in order of discovery._
