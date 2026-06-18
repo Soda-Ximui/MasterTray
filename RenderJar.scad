@@ -49,17 +49,24 @@ module factory_render_jar(data, opts, phys) {
         // strut% then operates within the area the user actually sees.
         inner_d = w - sw * 2;
         up(sf / 2) union() {
-            // Outer solid ring — structural, hidden under wall
+            // Outer solid ring — structural, hidden under wall. Ring hole stays at the
+            // true inner_d (so its polygon matches the wall exactly on low-facet jars).
             linear_extrude(height=sf, center=true)
                 difference() { circle(d=w, $fn=jar_fn); circle(d=inner_d, $fn=jar_fn); }
-            // Inner meshed disc — strut% relative to visible area
-            framed_mesh(data, inner_d, inner_d, sf, true,
+            // Inner disc grown by EPS*2 so it OVERLAPS the ring's inner edge instead of
+            // meeting it face-to-face — coincident faces left non-manifold seam edges
+            // along the inner_d boundary (the EPS-overlap rule). Growing the disc (rather
+            // than shrinking the ring) keeps the ring/wall polygons vertex-aligned, which
+            // matters for low-facet jars (Quad/Spool) where a shrunk ring mis-meshed. [manifold]
+            framed_mesh(data, inner_d + EPS*2, inner_d + EPS*2, sf, true,
                         get_mesh_cfg(data, HOLE_FLOOR, STRUT_FLOOR), jar_fn);
         }
 
-        // Wall
-        up(sf)
-            cylindrical_mesh_wall(data, w, cyl_wall_h, sw,
+        // Wall — dropped EPS into the floor (height +EPS) so the wall base OVERLAPS the
+        // floor top instead of meeting it face-to-face (same non-manifold seam). Wall top
+        // stays at sf+cyl_wall_h, so the neck still aligns. [manifold]
+        up(sf - EPS)
+            cylindrical_mesh_wall(data, w, cyl_wall_h + EPS, sw,
                                   get_mesh_cfg(data, HOLE_WALL, STRUT_WALL), jar_fn);
 
         if (is_threaded) {
