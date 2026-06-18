@@ -4,9 +4,9 @@
 // PURPOSE: Context-aware parsing for Cartesian, Radial, and Custom Spans
 // ==============================================================================
 
-include <BOSL2/std.scad>
+// BOSL2/std comes via MasterEngine — do NOT re-include (OpenSCAD has no include dedup; re-parse cost ~21s) [perf]
 include <MasterEnum.scad>
-include <MasterEngine.scad>
+// MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included here [perf]
 
 // --- CORE PARSER UTILITIES ---
 function get_grid_tokens(g_str) = [for (t = str_split(g_str, " ")) if (t != "") t];

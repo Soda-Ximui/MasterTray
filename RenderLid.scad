@@ -14,8 +14,8 @@
 //   "Screw"       — internally threaded cap for jars (face-down: flat top on bed).
 //   default/Slip  — plain press-fit slab, no retention.
 // ==============================================================================
-include <BOSL2/std.scad>
-include <MasterEngine.scad>
+// BOSL2/std comes via MasterEngine — do NOT re-include (OpenSCAD has no include dedup; re-parse cost ~21s) [perf]
+// MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included here [perf]
 include <MasterTolerance.scad>
 include <RenderMesh.scad>
 

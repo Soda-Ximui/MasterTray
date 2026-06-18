@@ -42,6 +42,9 @@ build/sandbox/__pycache__/
 # Incomplete template — not ready to commit
 quickstart.md
 
+# Local AI chat-log artifact — not part of the project
+gemini
+
 
 
 

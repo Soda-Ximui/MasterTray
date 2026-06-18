@@ -16,7 +16,8 @@
 # just intents   — regenerate build/intents.json (public/internal classification)
 # just defaults  — regenerate build/scad_defaults.json from MasterBuilder.scad
 # just check-configs — verify build/configs/*.yaml match MasterBuilder.scad defaults
-# just meta      — regenerate mapping.json + intents.json + scad_defaults.json, check config sync
+# just validate  — validate mapping.yaml schema and cross-references
+# just meta      — regenerate mapping.json + intents.json + scad_defaults.json, check config sync + validate
 # ──────────────────────────────────────────────────────────────────────────────
 
 set shell := ["powershell.exe", "-NoProfile", "-Command"]
@@ -117,9 +118,14 @@ check-configs:
 defaults:
     python build/mastertray.py dump-defaults
 
+# ── validate mapping.yaml schema and cross-references ─────────────────────────
+[group('build')]
+validate:
+    python build/mastertray.py validate
+
 # ── regenerate all generated build-tooling JSON ────────────────────────────────
 [group('build')]
-meta: mapping intents defaults check-configs
+meta: mapping intents defaults check-configs validate
 
 # ── regenerate build/docs/README.html from build/docs/README.md (pandoc) ──────
 [group('build')]

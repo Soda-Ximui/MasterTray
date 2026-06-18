@@ -16,8 +16,8 @@
 //   boss_d   = socket_d + sw*2  — outer boss cylinder diameter
 //   Boss sits at each corner, inset from outer wall, runs full tray height.
 // ==============================================================================
-include <BOSL2/std.scad>
-include <MasterEngine.scad>
+// BOSL2/std comes via MasterEngine — do NOT re-include (OpenSCAD has no include dedup; re-parse cost ~21s) [perf]
+// MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included here [perf]
 include <RenderMesh.scad>
 include <RenderGrid.scad>
 

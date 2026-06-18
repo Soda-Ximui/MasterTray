@@ -7,8 +7,8 @@
 // prevents it rolling during print). Length = PEG_HEIGHT, fits socket_d = 8mm.
 // Tolerance (CLEARANCE from phys) subtracted from diameter for sliding fit.
 // ==============================================================================
-include <BOSL2/std.scad>
-include <MasterEngine.scad>
+// BOSL2/std comes via MasterEngine — do NOT re-include (OpenSCAD has no include dedup; re-parse cost ~21s) [perf]
+// MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included here [perf]
 
 module factory_render_peg(data, opts, phys) {
     p_len = get_val(PEG_HEIGHT, data, 80);

@@ -52,6 +52,138 @@ DEFAULTS_JSON = BUILD_DIR / "scad_defaults.json"
 yaml.add_representer(RawLiteral, lambda dumper, data: dumper.represent_str(str(data)))
 yaml.SafeDumper.add_representer(RawLiteral, lambda dumper, data: dumper.represent_str(str(data)))
 
+# Top-level keys that must exist in mapping.yaml.
+_REQUIRED_MAPPING_KEYS = {
+    "config", "intents", "container_lid_types", "container_lid_flags",
+    "standalone_lid_types", "slide_direction", "slide_catch",
+    "dimension_mode", "cli_aliases",
+}
+_CONFIG_GROUPS = {"printer", "mesh", "advanced"}
+
+
+def validate_mapping(mapping):
+    """Validate mapping.yaml structure and cross-references.
+
+    Exits with a clear error listing every violation found.  Called
+    automatically by load_mapping() so every mastertray.py entry point is
+    protected; also exposed as ``mastertray.py validate`` for standalone use.
+
+    Design notes (item #4 from the architecture review):
+    - A malformed intent previously crashed as a bare KeyError deep in
+      build_overrides(); this surfaces the same mistake as a clear message
+      before any OpenSCAD invocation.
+    - Structural checks (types, required keys) run first; cross-reference
+      checks (cli_aliases → intents, container_lid_types flags) run after so
+      missing keys don't mask the real error.
+    - RawLiteral / KNOWN_DEV_VARS live in build logic, not here — this
+      function only validates the static schema of the YAML file itself.
+    """
+    errors = []
+
+    def err(msg):
+        errors.append(msg)
+
+    # ── 1. Required top-level keys ────────────────────────────────────────────
+    for key in sorted(_REQUIRED_MAPPING_KEYS):
+        if key not in mapping:
+            err(f"missing top-level key: '{key}'")
+
+    if errors:
+        _fail_mapping_validation(errors)
+
+    # ── 2. config: three sub-groups, each a str→str dict ─────────────────────
+    config = mapping["config"]
+    if not isinstance(config, dict):
+        err("'config' must be a mapping")
+    else:
+        for group in sorted(_CONFIG_GROUPS):
+            if group not in config:
+                err(f"config: missing group '{group}'")
+            elif not isinstance(config[group], dict):
+                err(f"config.{group}: must be a mapping")
+            else:
+                for k, v in config[group].items():
+                    if not isinstance(v, str):
+                        err(f"config.{group}.{k!r}: value must be a string, "
+                            f"got {type(v).__name__}")
+
+    # ── 3. intents: str→str ───────────────────────────────────────────────────
+    intents = mapping["intents"]
+    if not isinstance(intents, dict):
+        err("'intents' must be a mapping")
+    else:
+        for k, v in intents.items():
+            if not isinstance(v, str):
+                err(f"intents.{k!r}: value must be a string, got {type(v).__name__}")
+    known_intents = set(intents) if isinstance(intents, dict) else set()
+
+    # ── 4. container_lid_flags: list of strings ───────────────────────────────
+    lid_flags = mapping["container_lid_flags"]
+    if not isinstance(lid_flags, list) or not all(isinstance(f, str) for f in lid_flags):
+        err("'container_lid_flags' must be a list of strings")
+    lid_flags_set = set(lid_flags) if isinstance(lid_flags, list) else set()
+
+    # ── 5. container_lid_types: {name: {flag: bool}}, flags must be known ─────
+    clt = mapping["container_lid_types"]
+    if not isinstance(clt, dict):
+        err("'container_lid_types' must be a mapping")
+    else:
+        for name, flags in clt.items():
+            if not isinstance(flags, dict):
+                err(f"container_lid_types.{name!r}: must be a mapping of {{flag: bool}}")
+            else:
+                for flag, val in flags.items():
+                    if lid_flags_set and flag not in lid_flags_set:
+                        err(f"container_lid_types.{name!r}: "
+                            f"flag '{flag}' not in container_lid_flags")
+                    if not isinstance(val, bool):
+                        err(f"container_lid_types.{name!r}.{flag}: "
+                            f"value must be bool, got {type(val).__name__}")
+
+    # ── 6. standalone_lid_types: {name: non-empty dict} ──────────────────────
+    slt = mapping["standalone_lid_types"]
+    if not isinstance(slt, dict):
+        err("'standalone_lid_types' must be a mapping")
+    else:
+        for name, overrides in slt.items():
+            if not isinstance(overrides, dict):
+                err(f"standalone_lid_types.{name!r}: must be a mapping")
+            elif not overrides:
+                err(f"standalone_lid_types.{name!r}: must have at least one override key")
+
+    # ── 7. slide_direction / slide_catch / dimension_mode: str→str ───────────
+    for section in ("slide_direction", "slide_catch", "dimension_mode"):
+        d = mapping[section]
+        if not isinstance(d, dict):
+            err(f"'{section}' must be a mapping")
+        else:
+            for k, v in d.items():
+                if not isinstance(v, str):
+                    err(f"{section}.{k!r}: value must be a string, "
+                        f"got {type(v).__name__}")
+
+    # ── 8. cli_aliases: values must reference existing intent names ───────────
+    aliases = mapping["cli_aliases"]
+    if not isinstance(aliases, dict):
+        err("'cli_aliases' must be a mapping")
+    else:
+        for alias, intent_name in aliases.items():
+            if intent_name not in known_intents:
+                err(f"cli_aliases.{alias!r}: references unknown intent "
+                    f"'{intent_name}' (not in intents)")
+
+    if errors:
+        _fail_mapping_validation(errors)
+
+
+def _fail_mapping_validation(errors):
+    lines = "\n".join(f"  - {e}" for e in errors)
+    sys.exit(
+        f"ERROR: mapping.yaml validation failed ({len(errors)} issue(s)):\n"
+        f"{lines}\n"
+        f"Fix {MAPPING_FILE} and retry."
+    )
+
 
 def load_yaml(path):
     with open(path, "r", encoding="utf-8") as f:
@@ -61,7 +193,9 @@ def load_yaml(path):
 def load_mapping():
     if not MAPPING_FILE.exists():
         sys.exit(f"ERROR: mapping file not found: {MAPPING_FILE}")
-    return load_yaml(MAPPING_FILE)
+    m = load_yaml(MAPPING_FILE)
+    validate_mapping(m)
+    return m
 
 
 def fmt_value(value):
@@ -106,23 +240,48 @@ def parse_scad_defaults():
 
 def values_equal(value, default):
     """Compare an override value to a parsed Customizer default, tolerant of
-    int/float mismatches (e.g. -D part_width=50.0 vs Customizer's 50)."""
+    int/float mismatches (e.g. -D part_width=50.0 vs Customizer's 50).
+
+    Booleans are never equal to integers even when Python's == says otherwise
+    (True == 1 in Python, but true != 1 in OpenSCAD).  Requiring both sides
+    to be bool prevents incorrectly dropping an int override of a bool default."""
     if isinstance(value, bool) or isinstance(default, bool):
-        return value == default
+        return isinstance(value, bool) and isinstance(default, bool) and value == default
     if isinstance(value, (int, float)) and isinstance(default, (int, float)):
         return float(value) == float(default)
     return value == default
 
 
-def drop_redundant_overrides(overrides):
+def drop_redundant_overrides(overrides, verbose=False):
     """Remove overrides whose value matches MasterBuilder.scad's own
-    Customizer default for that variable. RawLiteral (--set) values are a
-    developer escape hatch and always pass through unchanged."""
+    Customizer default for that variable.  RawLiteral (--set) values are a
+    developer escape hatch and always pass through unchanged.
+
+    When verbose=True (or MASTERTRAY_VERBOSE env var is set), prints each
+    dropped key to stderr so the optimisation is auditable rather than silent.
+
+    Design note (item #2 from the architecture review, 2026-06-17):
+        parse_scad_defaults() only sees top-level `Var = literal;` assignments
+        in MasterBuilder.scad's preamble (everything before the first include).
+        In practice ALL Customizer variables are simple literals in that preamble,
+        so the parser covers the full set.  Expression-defined vars (raw_w,
+        raw_l, raw_h) and post-include vars are never passed as -D overrides, so
+        they never appear in `overrides` and the gap is inert.  Tests in
+        build/scripts/test_drop_redundant_overrides.py pin this contract."""
+    import os
+    verbose = verbose or bool(os.environ.get("MASTERTRAY_VERBOSE"))
     defaults = parse_scad_defaults()
-    return {
-        key: value for key, value in overrides.items()
-        if isinstance(value, RawLiteral) or not values_equal(value, defaults.get(key, object()))
-    }
+    result = {}
+    for key, value in overrides.items():
+        if isinstance(value, RawLiteral):
+            result[key] = value
+        elif values_equal(value, defaults.get(key, object())):
+            if verbose:
+                print(f"  [drop-redundant] {key}={value!r} matches Customizer default",
+                      file=sys.stderr)
+        else:
+            result[key] = value
+    return result
 
 
 def friendly_config_keys(mapping):
@@ -227,6 +386,12 @@ def cmd_init_config(args, mapping):
         print(f"  wrote: {dst}")
 
 
+def cmd_validate(args, mapping):
+    """validate subcommand: load_mapping() already ran validate_mapping(), so
+    reaching here means the file is valid.  Just confirm to the caller."""
+    print(f"OK: {MAPPING_FILE} is valid.")
+
+
 def cmd_dump_defaults(args, mapping):
     """Write MasterBuilder.scad's parsed Customizer defaults to JSON so other
     front-ends (e.g. astro/src/pages/builder.astro) consume Python's single
@@ -288,6 +453,10 @@ def build_overrides(args, mapping):
         overrides["Glide_Direction"] = mapping["slide_direction"][args.slide_direction]
     if args.slide_catch:
         overrides["Glide_Snap"] = mapping["slide_catch"][args.slide_catch]
+
+    # --- 2D laser/CNC export: slice the model at Z=0 (projection cut) ---
+    if getattr(args, "export_2d", None):
+        overrides["Export_2D"] = True
 
     # --- Raw escape hatch (developers only) ---
     # Values pass through verbatim, but warn on a key that is neither a known
@@ -459,8 +628,10 @@ def run_build(args, mapping, overrides):
 
     openscad = args.openscad or DEFAULT_OPENSCAD
     cmd = [openscad, "-o", args.out]
-    if args.export_format:
-        cmd += ["--export-format", args.export_format]
+    # --export-2d picks the format (svg/dxf) unless --export-format overrides it.
+    export_format = args.export_format or getattr(args, "export_2d", None)
+    if export_format:
+        cmd += ["--export-format", export_format]
     if args.hardwarnings:
         cmd.append("--hardwarnings")
 
@@ -496,6 +667,8 @@ def main():
     parser = argparse.ArgumentParser(description="MasterTray friendly build wrapper")
     sub = parser.add_subparsers(dest="command", required=True)
 
+    sub.add_parser("validate", help="Validate mapping.yaml structure and cross-references")
+
     p_list = sub.add_parser("list", help="List available intents or lid types")
     list_sub = p_list.add_subparsers(dest="what", required=True)
     list_sub.add_parser("intents", help="List build intents")
@@ -528,8 +701,12 @@ def main():
                                "examples); repeatable, applied in order given. "
                                "Unset values fall back to MasterBuilder.scad's own "
                                "Customizer defaults.")
-    p_build.add_argument("--out", required=True, help="Output file (.stl, .3mf, .png)")
+    p_build.add_argument("--out", required=True, help="Output file (.stl, .3mf, .png, .svg, .dxf)")
     p_build.add_argument("--export-format", help='e.g. "binstl", "3mf"')
+    p_build.add_argument("--export-2d", choices=["svg", "dxf"],
+                          help="Laser/CNC 2D derivation: slice the model at Z=0 "
+                               "(projection cut) and export a flat .svg/.dxf outline. "
+                               "Sets Export_2D=true; use a .svg/.dxf --out path.")
     p_build.add_argument("--hardwarnings", action="store_true",
                           help="Promote OpenSCAD warnings to errors (exit 1 on geometry issues)")
     p_build.add_argument("--openscad", help=f"Path to openscad executable (default: {DEFAULT_OPENSCAD})")
@@ -542,7 +719,9 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == "list":
+    if args.command == "validate":
+        cmd_validate(args, mapping)
+    elif args.command == "list":
         if args.what == "intents":
             cmd_list_intents(args, mapping)
         elif args.what == "lids":

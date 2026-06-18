@@ -106,3 +106,24 @@ function engagement_depth(component, data) =
     (component == COMP_BELLY) ?
         ((fil == FIL_PETG) ? ENG_BELLY_PETG : (fil == FIL_TPU) ? ENG_BELLY_TPU : ENG_BELLY_PLA) + loop_bonus :
     0.0;
+
+
+// ==============================================================================
+// FROZEN: FLIP-LID DERIVED GEOMETRY  [review #3/#7]
+// ==============================================================================
+// Flip lids are FROZEN after a failed print test (sideways slide on the C-clip,
+// weak latch retention). The live small-organizer path is the Glide pillbox.
+// This stays because the build matrix still exercises Flip Single/Double, but do
+// NOT extend flip geometry without a deliberate mechanical redesign.
+//
+// Moved here from MasterManifest.scad (Layer 2 → Layer 1.8): it is a
+// tolerance-driven dimension (spine_gap = breathing_room(COMP_SPINE)), not
+// intent-compiler logic, so it belongs alongside breathing_room above.
+//
+// flip_half_lid_l: Flip_Double centres the spine; each lid covers one half.
+// Assembly flips the lid 180° (C-clip faces the spine). Latch lands at:
+//   hinge_y + lid_l + cc_z = l/2  →  flip_half_lid_l = l/2 - spine_gap
+// (l/2 - hinge_y left cc_z = 3.85mm short; the latch missed the recess every print.)
+function flip_half_lid_l(data) =
+    let(spine_gap = breathing_room(COMP_SPINE, data))
+    get_val(LENGTH, data, LENGTH0) / 2 - spine_gap;

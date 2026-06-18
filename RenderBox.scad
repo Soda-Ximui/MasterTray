@@ -12,8 +12,8 @@
 // All geometry: core_tray_chassis + lid-specific additions/subtractions.
 // No intermediate render_* wrappers — logic lives here, driven by opts.
 // ==============================================================================
-include <BOSL2/std.scad>
-include <MasterEngine.scad>
+// BOSL2/std comes via MasterEngine — do NOT re-include (OpenSCAD has no include dedup; re-parse cost ~21s) [perf]
+// MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included here [perf]
 include <MasterTolerance.scad>
 include <RenderTray.scad>
 
@@ -181,7 +181,26 @@ module factory_render_box(data, opts, phys) {
                 difference() {
                     apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
                         core_tray_chassis(data_g);
-                    up(groove_z) cuboid([groove_w, groove_l, groove_h], anchor=BOTTOM);
+                    up(groove_z) {
+                        cuboid([groove_w, groove_l, groove_h], anchor=BOTTOM);
+                        // 45° self-supporting ceiling ramp over each side-wall lip.
+                        // The lip (depth ≈ (sw+0.6)/2) overhangs the channel; its flat
+                        // underside prints on air. This raises the ceiling toward the
+                        // interior at 45° so it self-supports. Full channel height is kept
+                        // at the lid edge (~groove_w/2), so lid fit is unchanged — the ramp
+                        // only adds void inward, away from the lid. Applied only when a full
+                        // 45° ramp fits under the rim (else left flat — no regression). [printability]
+                        gx   = groove_w / 2;
+                        lip  = (sw + 0.6) / 2;
+                        roof = h - (groove_z + groove_h);   // solid wall above the groove
+                        if (lip <= roof - m_lh(data))
+                            for (sx = [-1, 1])
+                                rotate([90, 0, 0])
+                                    linear_extrude(height = groove_l, center = true)
+                                        polygon([[sx * (gx - lip), groove_h],
+                                                 [sx *  gx,         groove_h],
+                                                 [sx * (gx - lip), groove_h + lip]]);
+                    }
                 }
                 if (glide_snap == "Ball")
                     for (sx = [-1, 1])

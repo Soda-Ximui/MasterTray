@@ -3,8 +3,8 @@
 // ARCHITECTURE: Layer 3 (Factory)
 // PURPOSE: Cylindrical jar body with optional threaded neck.
 // ==============================================================================
-include <BOSL2/std.scad>
-include <MasterEngine.scad>
+// BOSL2/std comes via MasterEngine — do NOT re-include (OpenSCAD has no include dedup; re-parse cost ~21s) [perf]
+// MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included here [perf]
 include <RenderMesh.scad>
 include <RenderGrid.scad>
 

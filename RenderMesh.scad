@@ -23,8 +23,8 @@
 // full surface. Tiles outside the intersection are clipped and would be wasted.
 // F5 preview uses 2× step → ~4× fewer tiles, same coverage.
 // ==============================================================================
-include <BOSL2/std.scad>
-include <MasterEngine.scad>
+// BOSL2/std comes via MasterEngine — do NOT re-include (OpenSCAD has no include dedup; re-parse cost ~21s) [perf]
+// MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included here [perf]
 include <MasterMeshPatterns.scad>
 
 // ------------------------------------------------------------------------------

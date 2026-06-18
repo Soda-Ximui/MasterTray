@@ -23,7 +23,7 @@
 //       flags:    semicolon-list  e.g. DRIVES=sw;sf;chamfer;AFFECTS=snap_force
 // ==============================================================================
 
-include <MasterEngine.scad>
+// MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included here [perf]
 include <MasterTolerance.scad>
 include <GridLayout.scad>
 

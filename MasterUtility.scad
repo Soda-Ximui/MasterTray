@@ -9,7 +9,7 @@
 //        and echoes optimal wall order recommendations based on the part's TYPE taxonomy.
 // ==============================================================================
 
-include <MasterEngine.scad>
+// MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included here [perf]
 include <MasterText.scad>
 include <MasterValidation.scad>
 

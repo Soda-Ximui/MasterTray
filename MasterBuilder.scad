@@ -141,6 +141,25 @@ debug_payload = false;
 bool_overlap_eps = 0.01; // [0.001 : 0.001 : 0.1]
 // @CONFIG_SECTION_END: advanced
 
+/* [Advanced - 2D Export (laser / CNC)] */
+// When true, the whole model is sliced at Z=0 with projection(cut=true) to a flat
+// 2D outline for laser-cut / CNC stock (e.g. a clear acrylic lid). Export to .svg
+// or .dxf — NOT .stl (2D geometry can't be an STL). Drive from the CLI with:
+//   mastertray.py build ... --export-2d svg
+// Kept OUTSIDE the @CONFIG_SECTION blocks so it isn't part of the config-sync set.
+Export_2D = false;
+
+// MasterEngine (and via it BOSL2, MasterEnum, MasterConstants) is included exactly
+// ONCE here, as the first include, so the heavy BOSL2 library is parsed a single
+// time. OpenSCAD does not deduplicate includes, so every redundant include re-parses
+// BOSL2 — that was ~21s of fixed build overhead. The sub-files below NO LONGER
+// include MasterEngine themselves; they rely on this single load. [perf]
+//
+// TRADEOFF (accepted): individual sub-files (RenderBox.scad, etc.) can no longer be
+// opened standalone in the OpenSCAD GUI — they are only valid when built through
+// MasterBuilder. Open MasterBuilder.scad to preview/debug any part instead.
+include <MasterEngine.scad>
+
 include <MasterManifest.scad>
 include <MasterDebug.scad>
 
@@ -161,63 +180,78 @@ raw_w = (dimension_mode == "Usable") ? part_width + (wall_thickness * 2) : part_
 raw_l = (dimension_mode == "Usable") ? part_length + (wall_thickness * 2) : part_length;
 raw_h = (dimension_mode == "Usable") ? part_height + floor_thickness + lid_thickness : part_height;
 
-ui_payload = [
-    [BUILDER_VERSION,    "v4.26"], 
-    ["FILAMENT_TYPE",    Filament_Type], 
-    ["FIT_PROFILE",      Mechanical_Fit],
-    [DIMENSION_MODE,     dimension_mode], 
-    [WIDTH,              raw_w], 
-    [LENGTH,             raw_l], 
-    [HEIGHT,             raw_h],
-    [PEG_HEIGHT,         stackable_peg_height], 
-    [LAYER_HEIGHT,       Layer_Height], 
-    [WALL_LOOPS,         Wall_Loops], 
-    [NOZZLE_DIAMETER,    Nozzle_Diameter],
-    [PATTERN,            mesh_pattern], 
-    [HOLE_WALL,          mesh_hole_size],
-    [HOLE_FLOOR,         mesh_hole_size],
-    [HOLE_LID,           mesh_hole_size],
-    [HOLE_SPACING,       mesh_hole_spacing],
-    [STRUT_WALL,         strut_wall_perc], 
-    [STRUT_FLOOR,        strut_floor_perc], 
-    [STRUT_LID,          strut_lid_perc],
-    [WALL_MODIFY,        modify_wall], 
-    [WALL_TARGET,        target_wall], 
-    [GRID_LAYOUT,        grid_layout],
-    [PILLBOX_DAYS,       Pillbox_Days],
-    [PLAQUE_TARGET,      plaque_target],
-    [CLIP_TYPE,          clip_type],
-    [PLAQUE_W,           plaque_w],
-    [PLAQUE_H,           plaque_h],
-    [CLIP_H,             clip_h],
-    [THICK_FLOOR,        floor_thickness], 
-    [THICK_LID,          lid_thickness], 
-    [THICK_WALL,         wall_thickness], 
-    [THICK_DIVIDER,      divider_thickness],
-    [THICK_PEG_MULT,     peg_thickness_multiplier], 
-    [PLATTER_GAP,        platter_gap], 
-    [THREAD_PITCH,       thread_pitch],
-    [JAR_SHAPE,          jar_shape],
-    [SNAP_EXTERNAL,      Snap_External],
-    [SNAP_INTERNAL,      Snap_Internal],
-    [GLIDE_EXTERNAL,     Glide_External],
-    [GLIDE_INTERNAL,     Glide_Internal],
-    [BUILD_FLIP_SINGLE,  Flip_Single],
-    [BUILD_FLIP_DOUBLE,  Flip_Double],
-    [STACK_NESTING,      Nesting],
-    [STACK_PEG,          Peg],
-    [JAR_WITH_LID,       Jar_Lid],
-    [GLIDE_DIR,          Glide_Direction],
-    [GLIDE_SNAP,         Glide_Snap],
-    [LID_TYPE_SEL,       Standalone_Lid_Type],
-    [LID_STYLE,          Lid_Style],
-    [CHAMFER_SIZE,       chamfer_size],
-    [CORNER_RADIUS,      corner_radius],
-    [PEG_SOCKET_D,       peg_socket_diameter],
-    [LEDGE_DEPTH,        nesting_ledge_depth],
-    [PEG_PROTRUSION,     peg_protrusion],
-    [GRID_MOD_HINTS,     grid_modifier_hints]
-];
+ui_payload = make_env(
+    // Identity
+    builder_version   = "v4.26",
+    // Printer / slicer
+    filament_type     = Filament_Type,
+    fit_profile       = Mechanical_Fit,
+    layer_height      = Layer_Height,
+    wall_loops        = Wall_Loops,
+    nozzle_diameter   = Nozzle_Diameter,
+    // Dimensions
+    dimension_mode    = dimension_mode,
+    width             = raw_w,
+    length            = raw_l,
+    height            = raw_h,
+    // Mesh
+    pattern           = mesh_pattern,
+    hole_wall         = mesh_hole_size,
+    hole_floor        = mesh_hole_size,
+    hole_lid          = mesh_hole_size,
+    hole_spacing      = mesh_hole_spacing,
+    strut_wall        = strut_wall_perc,
+    strut_floor       = strut_floor_perc,
+    strut_lid         = strut_lid_perc,
+    // Geometry overrides
+    chamfer_size      = chamfer_size,
+    corner_radius     = corner_radius,
+    // Thicknesses
+    thick_floor       = floor_thickness,
+    thick_lid         = lid_thickness,
+    thick_wall        = wall_thickness,
+    thick_divider     = divider_thickness,
+    thick_peg_mult    = peg_thickness_multiplier,
+    // Stacking
+    peg_height        = stackable_peg_height,
+    peg_socket_d      = peg_socket_diameter,
+    ledge_depth       = nesting_ledge_depth,
+    peg_protrusion    = peg_protrusion,
+    // Layout / platter
+    platter_gap       = platter_gap,
+    grid_layout       = grid_layout,
+    grid_mod_hints    = grid_modifier_hints,
+    // Lid type selection (Box intent)
+    snap_external     = Snap_External,
+    snap_internal     = Snap_Internal,
+    glide_external    = Glide_External,
+    glide_internal    = Glide_Internal,
+    build_flip_single = Flip_Single,
+    build_flip_double = Flip_Double,
+    glide_dir         = Glide_Direction,
+    glide_snap        = Glide_Snap,
+    // Lid type selection (Container Lid / standalone intent)
+    lid_type_sel      = Standalone_Lid_Type,
+    lid_style         = Lid_Style,
+    // Simple Tray stacking variants
+    stack_nesting     = Nesting,
+    stack_peg         = Peg,
+    // Jar
+    jar_shape         = jar_shape,
+    jar_with_lid      = Jar_Lid,
+    thread_pitch      = thread_pitch,
+    // Plaque / label
+    plaque_target     = plaque_target,
+    clip_type         = clip_type,
+    plaque_w          = plaque_w,
+    plaque_h          = plaque_h,
+    clip_h            = clip_h,
+    // Pillbox
+    pillbox_days      = Pillbox_Days,
+    // Wall modifications
+    wall_modify       = modify_wall,
+    wall_target       = target_wall
+);
 
 // --- FACTORY DISPATCHER ---
 module build_part(name, data) {
@@ -253,4 +287,7 @@ module build_part(name, data) {
 // --- FINAL EXECUTION ---
 if (debug_report)  dump_build_options(Part_To_Build,  ui_payload);
 if (debug_payload) dump_build_payload(Part_To_Build, ui_payload);
-build_part(Part_To_Build, ui_payload);
+// Export_2D wraps the build in projection(cut=true) for laser/CNC 2D output.
+// Normal (3D/STL) builds keep Export_2D=false and are completely unaffected.
+if (Export_2D) projection(cut=true) build_part(Part_To_Build, ui_payload);
+else           build_part(Part_To_Build, ui_payload);

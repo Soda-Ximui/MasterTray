@@ -5,7 +5,8 @@
 //          v1: P/O/rib token syntax (legacy). v2: A(...)/[...] anchor syntax.
 // ==============================================================================
 
-include <BOSL2/std.scad>
+// BOSL2/std comes via GridLayout/MasterUtility → MasterEngine — do NOT re-include
+// (OpenSCAD has no include dedup; re-parse cost ~21s) [perf]
 include <GridLayout.scad>
 include <MasterUtility.scad>
 

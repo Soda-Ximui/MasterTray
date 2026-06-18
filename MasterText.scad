@@ -13,7 +13,14 @@ function get_text_plaque_width(txt, size, min_w=25) = max(min_w, size * len(txt)
 // --- 3D Text Renderer ---
 // Standardized wrapper for generating embossed or debossed text.
 // Ensures consistent center/center origin alignment and handles empty string skips.
-module render_embossed_text(txt, size, depth=1.0, f="Arial Black") {
+//
+// Font default is "Liberation Sans:style=Bold", which OpenSCAD bundles on every
+// platform. A system font like "Arial Black" renders locally on Windows but is
+// ABSENT on headless/Linux cloud render servers and CI — where text() silently
+// falls back or fails, producing a wrong or empty STL with no error. Liberation
+// is metric-compatible with Arial, so backing-plate sizing (TEXT_KERNING_MULT)
+// stays valid. Override `f` only with another guaranteed-present font.
+module render_embossed_text(txt, size, depth=1.0, f="Liberation Sans:style=Bold") {
     if (txt != "") {
         linear_extrude(depth) text(txt, size=size, font=f, halign="center", valign="center");
     }

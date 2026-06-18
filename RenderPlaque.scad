@@ -37,8 +37,8 @@
 //
 // All pieces print support-free in their shipped orientations.
 // ==============================================================================
-include <BOSL2/std.scad>
-include <MasterEngine.scad>
+// BOSL2/std comes via MasterEngine — do NOT re-include (OpenSCAD has no include dedup; re-parse cost ~21s) [perf]
+// MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included here [perf]
 include <MasterTolerance.scad>
 
 // ── Private constants ─────────────────────────────────────────────────────────

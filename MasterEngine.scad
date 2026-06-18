@@ -13,6 +13,18 @@
 //
 // ==============================================================================
 
+// MasterEngine is the single canonical owner of the BOSL2 includes. Every other
+// file in the system includes MasterEngine, so it gets BOSL2 transitively — it
+// must NOT `include <BOSL2/std.scad>` itself.
+//
+// WHY THIS MATTERS [perf, 2026-06-17]: OpenSCAD's `include` does NOT deduplicate.
+// Each textual `include <BOSL2/std.scad>` re-parses the whole BOSL2 library. The
+// Render files used to include BOSL2 directly AND via MasterEngine AND via each
+// other (RenderBox→RenderTray→…), so BOSL2 was re-parsed dozens of times through
+// the diamond-shaped include graph — ~21s of pure parse overhead on EVERY build,
+// regardless of geometry (measured: a 125 KB box and an 8.7 MB jar both took ~23s).
+// Removing the redundant direct includes leaves BOSL2 parsed via this file only.
+// Do not add `include <BOSL2/...>` anywhere that already includes MasterEngine.
 include <BOSL2/std.scad>
 include <BOSL2/threading.scad>
 include <MasterEnum.scad>
@@ -84,6 +96,157 @@ THREAD_PITCH0 = 2.0;            // Default thread pitch (mm)
 MAX_BUILD_PLATE_WIDTH0 = 250;   // Default print bed width (mm)
 GRID_LAYOUT0 = "";              // Default grid specification
 GRID_HAS_BASE0 = false;         // Default grid base
+
+// ==============================================================================
+// ENVIRONMENT CONSTRUCTOR
+// ==============================================================================
+// make_env(...) is the single authoritative way to construct the ui_payload data
+// array passed through the entire render pipeline.
+//
+// WHY: the previous approach was a 55-entry [[KEY, value], ...] literal built
+// directly in MasterBuilder.scad.  A typo in a VALUE was silent; a typo in a KEY
+// string was only caught by STRICT_KEYS (undefined constant → undef → fallback).
+// With named parameters, a typo in a parameter name produces an OpenSCAD
+// "unknown parameter" warning at parse time — caught before any geometry runs.
+//
+// HOW TO OVERRIDE downstream: concat([[KEY, new_val]], data) still works exactly
+// as before.  Only the *construction site* (MasterBuilder.scad) changes.
+//
+// Parameter names use snake_case and map 1-to-1 to the KEY constants in
+// MasterEnum.scad.  Defaults come from the *0 constants defined above.
+//
+// ADDING A KEY: add the parameter here, a matching constant in MasterEnum.scad,
+// and the [KEY, param] pair to the return array.  Then pass the Customizer
+// variable in MasterBuilder.scad.  Three files, three co-located changes.
+
+function make_env(
+    // Identity
+    builder_version   = "v4.26",
+    // Printer / slicer
+    filament_type     = "PLA",
+    fit_profile       = "Standard",
+    layer_height      = LAYER_HEIGHT0,
+    wall_loops        = WALL_LOOPS0,
+    nozzle_diameter   = NOZZLE_DIAMETER0,
+    // Dimensions
+    dimension_mode    = "Total",
+    width             = WIDTH0,
+    length            = LENGTH0,
+    height            = HEIGHT0,
+    // Mesh
+    pattern           = PATTERN0,
+    hole_wall         = 0,
+    hole_floor        = 0,
+    hole_lid          = 0,
+    hole_spacing      = MIN_HOLE_SPACING0,
+    strut_wall        = STRUT_WALL0,
+    strut_floor       = STRUT_FLOOR0,
+    strut_lid         = STRUT_LID0,
+    // Geometry overrides
+    chamfer_size      = 0.4,
+    corner_radius     = 0.0,
+    // Thicknesses
+    thick_floor       = THICK_FLOOR0,
+    thick_lid         = THICK_LID0,
+    thick_wall        = THICK_WALL0,
+    thick_divider     = THICK_DIVIDER0,
+    thick_peg_mult    = 2.0,
+    // Stacking
+    peg_height        = 80,
+    peg_socket_d      = 8.0,
+    ledge_depth       = 2.0,
+    peg_protrusion    = 0.0,
+    // Layout / platter
+    platter_gap       = PLATTER_GAP0,
+    grid_layout       = GRID_LAYOUT0,
+    grid_mod_hints    = true,
+    // Lid type selection (Box intent)
+    snap_external     = false,
+    snap_internal     = false,
+    glide_external    = false,
+    glide_internal    = false,
+    build_flip_single = false,
+    build_flip_double = false,
+    glide_dir         = "H",
+    glide_snap        = "Ball",
+    // Lid type selection (Container Lid / standalone intent)
+    lid_type_sel      = "Flip_Single",
+    lid_style         = "External",
+    // Simple Tray stacking variants
+    stack_nesting     = true,
+    stack_peg         = true,
+    // Jar
+    jar_shape         = "Circle",
+    jar_with_lid      = false,
+    thread_pitch      = THREAD_PITCH0,
+    // Plaque / label
+    plaque_target     = "Wall",
+    clip_type         = "Vertical",
+    plaque_w          = 50,
+    plaque_h          = 40,
+    clip_h            = 20,
+    // Pillbox
+    pillbox_days      = 7,
+    // Wall modifications
+    wall_modify       = WALL_MODIFY0,
+    wall_target       = WALL_TARGET0
+) = [
+    [BUILDER_VERSION,   builder_version],
+    [FILAMENT_TYPE,     filament_type],
+    [FIT_PROFILE,       fit_profile],
+    [LAYER_HEIGHT,      layer_height],
+    [WALL_LOOPS,        wall_loops],
+    [NOZZLE_DIAMETER,   nozzle_diameter],
+    [DIMENSION_MODE,    dimension_mode],
+    [WIDTH,             width],
+    [LENGTH,            length],
+    [HEIGHT,            height],
+    [PATTERN,           pattern],
+    [HOLE_WALL,         hole_wall],
+    [HOLE_FLOOR,        hole_floor],
+    [HOLE_LID,          hole_lid],
+    [HOLE_SPACING,      hole_spacing],
+    [STRUT_WALL,        strut_wall],
+    [STRUT_FLOOR,       strut_floor],
+    [STRUT_LID,         strut_lid],
+    [CHAMFER_SIZE,      chamfer_size],
+    [CORNER_RADIUS,     corner_radius],
+    [THICK_FLOOR,       thick_floor],
+    [THICK_LID,         thick_lid],
+    [THICK_WALL,        thick_wall],
+    [THICK_DIVIDER,     thick_divider],
+    [THICK_PEG_MULT,    thick_peg_mult],
+    [PEG_HEIGHT,        peg_height],
+    [PEG_SOCKET_D,      peg_socket_d],
+    [LEDGE_DEPTH,       ledge_depth],
+    [PEG_PROTRUSION,    peg_protrusion],
+    [PLATTER_GAP,       platter_gap],
+    [GRID_LAYOUT,       grid_layout],
+    [GRID_MOD_HINTS,    grid_mod_hints],
+    [SNAP_EXTERNAL,     snap_external],
+    [SNAP_INTERNAL,     snap_internal],
+    [GLIDE_EXTERNAL,    glide_external],
+    [GLIDE_INTERNAL,    glide_internal],
+    [BUILD_FLIP_SINGLE, build_flip_single],
+    [BUILD_FLIP_DOUBLE, build_flip_double],
+    [GLIDE_DIR,         glide_dir],
+    [GLIDE_SNAP,        glide_snap],
+    [LID_TYPE_SEL,      lid_type_sel],
+    [LID_STYLE,         lid_style],
+    [STACK_NESTING,     stack_nesting],
+    [STACK_PEG,         stack_peg],
+    [JAR_SHAPE,         jar_shape],
+    [JAR_WITH_LID,      jar_with_lid],
+    [THREAD_PITCH,      thread_pitch],
+    [PLAQUE_TARGET,     plaque_target],
+    [CLIP_TYPE,         clip_type],
+    [PLAQUE_W,          plaque_w],
+    [PLAQUE_H,          plaque_h],
+    [CLIP_H,            clip_h],
+    [PILLBOX_DAYS,      pillbox_days],
+    [WALL_MODIFY,       wall_modify],
+    [WALL_TARGET,       wall_target]
+];
 
 // ==============================================================================
 // TIER 0: PRIMITIVE GETTERS (Extract raw values from data array)

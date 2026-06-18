@@ -1,5 +1,6 @@
 {
   "Corner_Round_Ratio": 0.2,
+  "Export_2D": false,
   "Filament_Type": "PLA",
   "Flip_Double": false,
   "Flip_Single": true,

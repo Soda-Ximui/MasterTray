@@ -3,7 +3,9 @@
 // ARCHITECTURE: Layer 0 (The Lexicon & Dictionary)
 // ==============================================================================
 
-TYPE = "TYPE";
+TYPE          = "TYPE";
+FILAMENT_TYPE = "FILAMENT_TYPE";
+FIT_PROFILE   = "FIT_PROFILE";
 WIDTH = "WIDTH";
 LENGTH = "LENGTH";
 HEIGHT = "HEIGHT";

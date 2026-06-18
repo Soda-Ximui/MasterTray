@@ -4,7 +4,7 @@
 // PURPOSE: Pre-build validation to catch user errors early
 // ==============================================================================
 
-include <MasterEngine.scad>
+// MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included here [perf]
 include <MasterConstants.scad>
 include <GridLayout.scad>
 

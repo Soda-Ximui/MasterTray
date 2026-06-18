@@ -19,8 +19,8 @@
 //   S1/1/2/3/25    — same span, wall=25mm absolute
 //   R6 C20%        — 6 radial spokes, centre hub = 20% of diameter
 // ==============================================================================
-include <BOSL2/std.scad>
-include <MasterEngine.scad>
+// BOSL2/std comes via MasterEngine — do NOT re-include (OpenSCAD has no include dedup; re-parse cost ~21s) [perf]
+// MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included here [perf]
 include <GridLayout.scad>
 include <RenderRib.scad>
 

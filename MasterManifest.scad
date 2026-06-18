@@ -16,7 +16,7 @@
 // Render*.scad, and add a dispatch case in MasterBuilder.scad.
 // ==============================================================================
 
-include <MasterEngine.scad>
+// MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included here [perf]
 include <MasterProcessor.scad>
 include <GridLayout.scad>
 
@@ -84,19 +84,17 @@ function jar_sides(data) =
 
 function jar_opts(base, data) = concat(base, [["JAR_SIDES", jar_sides(data)]]);
 
-// Shared hinge geometry for all double-flip / pill-box intents.
-function flip_hinge_y(data) =
-  let(clearance = breathing_room(COMP_CCLIP, data),
-      spine_gap  = breathing_room(COMP_SPINE, data))
-  (4.0 + clearance*2 + get_val(NOZZLE_DIAMETER, data, 0.4)*8) / 2 + spine_gap;
-
-// Half-lid length for Flip_Double: spine is centred, each lid covers one half.
-// Assembly requires flipping the lid 180° (C-clip faces spine). Latch lands at:
-//   hinge_y + lid_l + cc_z = l/2  →  flip_half_lid_l = l/2 - spine_gap
-// (l/2 - hinge_y was cc_z = 3.85mm short; latch missed the recess on every print.)
-function flip_half_lid_l(data) =
-  let(spine_gap = breathing_room(COMP_SPINE, data))
-  get_val(LENGTH, data, LENGTH0) / 2 - spine_gap;
+// FLIP-LID GEOMETRY MOVED OUT OF THIS LAYER [review #3/#7]
+// flip_half_lid_l() — a tolerance-derived dimension — now lives in
+// MasterTolerance.scad (Layer 1.8), next to its dependency breathing_room().
+// It is still called from the flip branches below (functions are global), but
+// no longer DEFINED in the intent compiler. flip_hinge_y() was dead code
+// (defined, never called) and has been deleted.
+//
+// FROZEN: flip lids failed their print test (sideways slide on the C-clip,
+// weak latch retention). The live small-organizer path is the Glide pillbox.
+// The branches below stay because the build matrix still exercises them; do
+// NOT extend flip geometry without a deliberate mechanical redesign.
 
 function compile_manifest(intent, data) =
 

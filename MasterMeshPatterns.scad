@@ -3,8 +3,8 @@
 // ARCHITECTURE: Layer 2.1 (Mesh Pattern Generation)
 // ==============================================================================
 
-include <BOSL2/std.scad>
-include <MasterEngine.scad>
+// BOSL2/std comes via MasterEngine — do NOT re-include (OpenSCAD has no include dedup; re-parse cost ~21s) [perf]
+// MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included here [perf]
 
 // Flat-top teardrop — 45° self-supporting roof, tip truncated to one extrusion width.
 //

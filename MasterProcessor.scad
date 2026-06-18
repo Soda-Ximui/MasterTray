@@ -3,7 +3,7 @@
 // ARCHITECTURE: Layer 2.1 (Data Transformation Pipeline)
 // ==============================================================================
 
-include <MasterEngine.scad>
+// MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included here [perf]
 
 // --- PHYSICS ENGINE ---
 function get_physics_profile(data) = [
