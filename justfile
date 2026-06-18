@@ -163,6 +163,14 @@ validate-stl dir='STL':
 check-printable dir='STL':
     python build/scripts/check_printable.py "{{dir}}"
 
+# ── REAL overhang gate via OrcaSlicer (context-aware: bridges vs prints-on-air) ──
+# Reliable on SOLID/structural geometry (mechanisms must self-support); on dense MESH
+# it over-reports (teardrop apexes) — slice mesh-off structural geometry for this gate.
+# Needs OrcaSlicer (ORCA_* env vars to override paths). `just check-printable-slicer "STL/Test Prints"`
+[group('test')]
+check-printable-slicer dir='STL':
+    python build/scripts/check_printable.py "{{dir}}" --slicer
+
 # ── local-only live build server for the /builder web page ────────────────────
 [group('build')]
 build-server:

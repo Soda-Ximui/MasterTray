@@ -23,11 +23,56 @@ Usage:
     python build/scripts/check_printable.py <file.stl | dir> [--overhang-mm2 N] [--overhang-deg D]
 """
 import argparse
+import os
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
 import pymeshlab
+
+# --- OrcaSlicer-based overhang detection (opt-in: --slicer) ----------------------
+# OrcaSlicer's slicer KNOWS what bridges vs what needs support — its gcode marks
+# real overhang perimeters as "; FEATURE: Overhang ..." and self-supporting spans
+# (e.g. mesh teardrops) as "; FEATURE: Bridge". Counting overhang features is a
+# context-aware "prints on air" signal the geometric normal screen can't match.
+# Validated: a flat cap-on-post = 4 overhang features; a 45°-undercut box = 0.
+# Paths are install/version specific — override via env if needed.
+_ORCA = os.environ.get("ORCA_SLICER",
+                       r"C:\Program Files\OrcaSlicer\orca-slicer.exe")
+_ORCA_PROFILES = Path(os.environ.get(
+    "ORCA_PROFILES", r"C:\Program Files\OrcaSlicer\resources\profiles\BBL"))
+_ORCA_MACHINE = os.environ.get("ORCA_MACHINE", "Bambu Lab A1 0.4 nozzle.json")
+_ORCA_PROCESS = os.environ.get("ORCA_PROCESS", "0.20mm Standard @BBL A1.json")
+_ORCA_FILAMENT = os.environ.get("ORCA_FILAMENT", "Bambu PLA Basic @BBL A1.json")
+
+
+def slicer_overhang(stl_path):
+    """Slice with OrcaSlicer and count real overhang-wall features in the gcode.
+    Returns (overhang_count, bridge_count) or None if the slicer/profiles are absent
+    or slicing fails. Overhang>0 = unsupported overhangs the slicer can't bridge."""
+    orca = Path(_ORCA)
+    ms = _ORCA_PROFILES / "machine" / _ORCA_MACHINE
+    pr = _ORCA_PROFILES / "process" / _ORCA_PROCESS
+    fl = _ORCA_PROFILES / "filament" / _ORCA_FILAMENT
+    if not (orca.exists() and ms.exists() and pr.exists() and fl.exists()):
+        return None
+    with tempfile.TemporaryDirectory(prefix="orca-oh-") as td:
+        cmd = [str(orca), "--slice", "0",
+               "--load-settings", f"{ms};{pr}",
+               "--load-filaments", str(fl),
+               "--outputdir", td, str(stl_path)]
+        try:
+            subprocess.run(cmd, capture_output=True, text=True, timeout=240)
+        except Exception:  # noqa: BLE001
+            return None
+        gcodes = list(Path(td).glob("*.gcode"))
+        if not gcodes:
+            return None  # slice failed (GUI app is console-silent; no gcode = fail)
+        txt = gcodes[0].read_text(errors="ignore")
+        return txt.count("; FEATURE: Overhang"), \
+            txt.count("; FEATURE: Bridge") + txt.count("; FEATURE: Internal Bridge")
 
 
 def find_stls(path):
@@ -83,6 +128,12 @@ def main():
                          "(so 45° self-supporting ramps are NOT flagged).")
     ap.add_argument("--plate-eps", type=float, default=0.5,
                     help="Ignore faces within this many mm of the lowest point (build plate).")
+    ap.add_argument("--slicer", action="store_true",
+                    help="Use OrcaSlicer to detect REAL (context-aware) overhangs and FAIL on "
+                         "them — distinguishes unsupported overhangs from bridges/teardrops. "
+                         "Requires OrcaSlicer (see ORCA_* env vars). Slower (~1s/part).")
+    ap.add_argument("--max-overhang-features", type=int, default=0,
+                    help="With --slicer, max overhang-wall features allowed before failing. Default 0.")
     args = ap.parse_args()
 
     overhang_cos = np.sin(np.radians(args.overhang_deg))
@@ -94,6 +145,7 @@ def main():
     print(f"Printability gate — {len(files)} file(s)  "
           f"(overhang > {args.overhang_deg:.0f}° flagged, fail above {args.overhang_mm2:.0f} mm²)\n")
     fails = []
+    slicer_unavailable = [False]
     W = max(len(f.name) for f in files)
     for f in files:
         try:
@@ -108,26 +160,48 @@ def main():
         # overhangs, so it must NOT fail the build (proven: a clean jar flags more area
         # than a groove'd box). Real overhang verification = slicer preview / print.
         manifold_ok = r["nm"] == 0 and r["bnd"] == 0
-        verdict = "MANIFOLD-OK" if manifold_ok else "NOT MANIFOLD"
         reasons = []
         if r["nm"]:
             reasons.append(f"{r['nm']} non-manifold")
         if r["bnd"]:
             reasons.append(f"{r['bnd']} open-boundary")
-        manifold_note = ("  [" + "; ".join(reasons) + "]") if reasons else ""
-        hint = f"  overhang≈{r['oh_area']:.0f}mm² (hint only — render-review)"
-        print(f"  {f.name:<{W}}  {verdict}{manifold_note}{hint}")
-        if not manifold_ok:
+
+        # Overhang: slicer-based (reliable, context-aware) when --slicer, else the
+        # geometric hint only.
+        ok = manifold_ok
+        if args.slicer:
+            sl = slicer_overhang(f)
+            if sl is None:
+                oh_str = "  overhang=?(slicer/profile missing)"
+                slicer_unavailable[0] = True
+            else:
+                oh_n, br_n = sl
+                bad = oh_n > args.max_overhang_features
+                oh_str = f"  overhang-features={oh_n} (bridges={br_n})"
+                if bad:
+                    reasons.append(f"{oh_n} unsupported-overhang feature(s)")
+                    ok = False
+        else:
+            oh_str = f"  overhang≈{r['oh_area']:.0f}mm² (geometric hint — unreliable on mesh)"
+
+        verdict = "PRINTABLE" if ok else "NOT PRINTABLE"
+        note = ("  [" + "; ".join(reasons) + "]") if reasons else ""
+        print(f"  {f.name:<{W}}  {verdict}{note}{oh_str}")
+        if not ok:
             fails.append(f.name)
 
     print()
-    print("Overhang figures are a HINT only (mesh/thread false-positives) — confirm true")
-    print("printability with a slicer preview or a test print; fix known overhangs at source.\n")
+    if not args.slicer:
+        print("Overhang shown is a HINT only (mesh/thread false-positives). For a REAL overhang")
+        print("gate, re-run with --slicer (OrcaSlicer), or confirm with a slicer preview / print.\n")
+    elif slicer_unavailable[0]:
+        print("NOTE: OrcaSlicer or its profiles weren't found — overhang NOT checked for some "
+              "files. Set ORCA_SLICER / ORCA_PROFILES env vars.\n")
     if fails:
-        print(f"NOT MANIFOLD ({len(fails)}/{len(files)}): {', '.join(fails)} — do NOT send.")
+        print(f"NOT PRINTABLE ({len(fails)}/{len(files)}): {', '.join(fails)} — do NOT send.")
         sys.exit(1)
-    print(f"All {len(files)} file(s) manifold + watertight. "
-          f"Overhang/support still needs slicer-preview/print review before sending.")
+    print(f"All {len(files)} file(s) verified printable"
+          f"{' (manifold + slicer-overhang)' if args.slicer else ' (manifold; overhang needs --slicer/preview)'}.")
 
 
 if __name__ == "__main__":

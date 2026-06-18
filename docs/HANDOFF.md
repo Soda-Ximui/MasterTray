@@ -73,11 +73,20 @@ overhang, not a topology defect). Two instances:
 **Printability verification (hard requirement: nothing ships unverified):**
 - Manifold/watertight is the AUTO hard-gate — `just check-printable` / `just validate-stl` /
   the gate `nm=` column / `mastertray.py --validate`. All reliable (pymeshlab).
-- Overhang/"prints on air" is NOT reliably auto-detectable: a geometric normal screen is
-  dominated by self-supporting mesh teardrops + thread flanks (a clean jar flags more overhang
-  area than a groove'd box). So overhang is handled by (a) fixing known overhangs at the SOURCE
-  (slide + snap-inner grooves, done) and (b) slicer-preview / test-print review. The
-  check_printable overhang figure is a HINT only, never a gate.
+- Overhang/"prints on air":
+  - GEOMETRIC normal screen — HINT only (dominated by self-supporting mesh teardrops + thread
+    flanks; a clean jar flags more area than a groove'd box). Never a gate.
+  - SLICER gate (`check_printable --slicer`, `just check-printable-slicer`, OrcaSlicer CLI) —
+    REAL, context-aware (counts gcode `; FEATURE: Overhang`, distinguishes bridges). Validated:
+    flat-overhang test = 4 features; fixed snap-inner SOLID = 0; snap-outer SOLID = 0; slide
+    SOLID = 1 residual. **Reliable on SOLID/structural geometry; over-reports on dense MESH**
+    (every teardrop apex marks an overhang) — so slice the mesh-OFF structural geometry to
+    certify mechanisms self-support, and treat the mesh as teardrop-design + test-print.
+  - Known overhangs are fixed at SOURCE (slide + snap-inner grooves). Slide has 1 residual
+    overhang feature (solid) — minor, likely the tab; follow-up.
+- Net: manifold = full auto; overhang = slicer-gate on structural geometry + source-fixes +
+  print-test for mesh. OrcaSlicer headless slicing works (~1s/part, gcode produced; console is
+  silent — a GUI app — so absence of gcode = slice failure).
 
 **Manifold safeguards added:**
 - Gate reports `nm=` per case (pymeshlab-gated); `just check-build-manifold` / `--strict-manifold` fail on it.
