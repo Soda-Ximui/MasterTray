@@ -510,38 +510,45 @@ just check-printable-slicer "STL/Test Prints"  # empty-layer + coverage gate</co
 
 <h3>Regeneration commands</h3>
 
-<pre><code># snap-outer
+<pre><code># Shared stress-test flags (hardware + mesh)
+$HW   = "--set Nozzle_Diameter=0.6 --set Wall_Loops=2 --set Layer_Height=0.30"
+$MESH = "--set mesh_hole_size=1.6 --set mesh_hole_spacing=1.6 --set mesh_pattern=Teardrop ``
+         --set strut_floor_perc=0 --set strut_lid_perc=0 --set strut_wall_perc=0"
+
+# snap-outer
 python build/mastertray.py build --intent Container --lid "Snap (Outer Wall)" `
-  --width 40 --length 40 --height 15 --export-format asciistl `
-  --out "STL/Test Prints/snap-outer_40x40x15.stl" --no-report
+  --width 40 --length 40 --height 15 --export-format asciistl --no-report $HW $MESH `
+  --out "STL/Test Prints/snap-outer_40x40x15.stl"
 
 # snap-inner
 python build/mastertray.py build --intent Container --lid "Snap (Inner Wall)" `
-  --width 40 --length 40 --height 15 --export-format asciistl `
-  --out "STL/Test Prints/snap-inner_40x40x15.stl" --no-report
+  --width 40 --length 40 --height 15 --export-format asciistl --no-report $HW $MESH `
+  --out "STL/Test Prints/snap-inner_40x40x15.stl"
 
 # slide-outer + tab detent  (footprint must be >= 55 mm)
 python build/mastertray.py build --intent Container --lid "Slide (Outer Wall)" `
   --slide-catch "Tab Detent" `
-  --width 55 --length 55 --height 22 --export-format asciistl `
-  --out "STL/Test Prints/slide-outer-tab_55x55x22.stl" --no-report
+  --width 55 --length 55 --height 22 --export-format asciistl --no-report $HW $MESH `
+  --out "STL/Test Prints/slide-outer-tab_55x55x22.stl"
 
 # threaded jar
 python build/mastertray.py build --intent "Threaded Jar" `
-  --width 35 --height 30 --export-format asciistl `
-  --out "STL/Test Prints/threaded-jar_d35h30.stl" --no-report
+  --width 35 --height 30 --export-format asciistl --no-report $HW $MESH `
+  --out "STL/Test Prints/threaded-jar_d35h30.stl"
 
 # open jar (full-size)
 python build/mastertray.py build --intent "Jar" `
-  --width 55 --height 55 --export-format asciistl `
-  --out "STL/Test Prints/jar_d55h55.stl" --no-report</code></pre>
+  --width 55 --height 55 --export-format asciistl --no-report $HW $MESH `
+  --out "STL/Test Prints/jar_d55h55.stl"</code></pre>
 
 <p class="note">
-  The stress-test config uses <strong>0.6 mm nozzle / 2 wall loops / 0.30 mm
-  layer / PLA / Teardrop mesh</strong>.  Add
-  <code>--set Nozzle_Diameter=0.6 --set Wall_Loops=2 --set Layer_Height=0.30</code>
-  to match.  See <code>STL/Test Prints/README.md</code> for the full printer
-  config and what to evaluate from each print.
+  The stress-test config uses <strong>0.6 mm nozzle / 2 wall loops / 0.30 mm layer / PLA</strong>
+  with <strong>Teardrop mesh — 1.6 mm holes, 1.6 mm spacing, 0% strut on all surfaces</strong>.
+  This stresses both hardware limits (thin walls at 0.6 mm nozzle) and mesh geometry (dense
+  teardrop pattern with no solid border — worst-case for empty layers and floor adhesion).
+  Loading box + lid in OrcaSlicer as a combined STL may show a false "floating cantilever" warning
+  due to the interlocked shells — split into separate objects to clear it.
+  See <code>STL/Test Prints/README.md</code> for the full config and what to evaluate from each print.
 </p>
 
 </DocsPage>
