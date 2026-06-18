@@ -59,6 +59,46 @@ docker run --rm -v ${PWD}:/work openscad/openscad:latest `
 
 ---
 
+## OpenSCAD — SCAD file authoring rules
+
+### BOSL2 / MasterEngine includes — single-owner rule (MANDATORY)
+
+OpenSCAD's `include` is **textual substitution with no dedup**. Every `include` re-parses the
+target file in full. BOSL2 is large; re-parsing it costs ~21 s per extra include.
+
+**How it is wired:**
+
+```
+MasterBuilder.scad
+  └── include <MasterEngine.scad>   ← ONLY file that includes MasterEngine
+        └── include <BOSL2/std.scad>   ← ONLY file that includes BOSL2
+        └── include <BOSL2/threading.scad>
+```
+
+All sub-files (`RenderBox`, `RenderMesh`, `RenderJar`, `RenderLid`, `RenderGrid`, …) inherit
+BOSL2 and MasterEngine symbols because MasterBuilder loaded them first. They must NOT include
+them again.
+
+**Correct header for any new sub-file:**
+
+```openscad
+// BOSL2/std comes via MasterEngine — do NOT re-include (OpenSCAD has no include dedup;
+// re-parse cost ~21s) [perf]
+// MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included
+// here [perf]
+include <RenderMesh.scad>   // only other sub-files you directly depend on
+```
+
+**What happens if you break the rule:** the build still succeeds but slows by ~21 s per extra
+BOSL2 include. A diamond graph (A→B, A→C, B→D, C→D each including BOSL2) multiplies this.
+This was the measured root cause of a 23.8 s → 1.6 s improvement once the graph was flattened.
+
+**Tradeoff (accepted):** sub-files cannot be opened standalone in the OpenSCAD GUI — symbols
+are undefined without MasterBuilder's includes. To preview a part, open `MasterBuilder.scad`
+and set `Part_To_Build` in the Customizer panel.
+
+---
+
 ## ImageMagick
 
 `magick` command available system-wide. Useful operations:
