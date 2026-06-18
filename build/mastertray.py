@@ -458,6 +458,10 @@ def build_overrides(args, mapping):
     if getattr(args, "export_2d", None):
         overrides["Export_2D"] = True
 
+    # --- Modifier export: emit only the grid hint discs ---
+    if getattr(args, "export_modifiers", False):
+        overrides["Hints_Only"] = True
+
     # --- Raw escape hatch (developers only) ---
     # Values pass through verbatim, but warn on a key that is neither a known
     # Customizer variable nor a recognised dev var -- catches typos like
@@ -707,6 +711,10 @@ def main():
                           help="Laser/CNC 2D derivation: slice the model at Z=0 "
                                "(projection cut) and export a flat .svg/.dxf outline. "
                                "Sets Export_2D=true; use a .svg/.dxf --out path.")
+    p_build.add_argument("--export-modifiers", action="store_true",
+                          help="Emit ONLY the grid modifier-hint discs (no grid/box/lid) "
+                               "as a standalone STL to load as a slicer modifier volume. "
+                               "Sets Hints_Only=true; requires a grid layout with circular hubs.")
     p_build.add_argument("--hardwarnings", action="store_true",
                           help="Promote OpenSCAD warnings to errors (exit 1 on geometry issues)")
     p_build.add_argument("--openscad", help=f"Path to openscad executable (default: {DEFAULT_OPENSCAD})")

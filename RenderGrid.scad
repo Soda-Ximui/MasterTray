@@ -266,15 +266,22 @@ module factory_render_grid(data, opts, phys) {
         echo(str("WARNING: layout '", g_str, "' contains radial tokens (R/C) but this is",
                  " not a jar grid — radial dividers ignored. Add IS_JAR_GRID flag or",
                  " remove R/C tokens for box/tray grids."));
+    // Hints_Only (modifier export): emit just the marker discs, no grid body.
+    // Guarded with is_undef so the module is robust if the flag isn't defined.
+    hints_only = is_undef(Hints_Only) ? false : Hints_Only;
     sf = m_safe_floor(d);
     up(sf) {
-        if (rays > 0 && is_jar)
-            render_jar_grid_core(d, false);
-        else
-            render_box_grid_core(d, false);
-        cfg = get_grid_config(d);
-        up(cfg[4]) render_franken_ribs(d);
-        if (mod_hint) _render_grid_mod_hints(d, sf);
+        if (hints_only) {
+            _render_grid_mod_hints(d, sf);   // modifier-volume discs only
+        } else {
+            if (rays > 0 && is_jar)
+                render_jar_grid_core(d, false);
+            else
+                render_box_grid_core(d, false);
+            cfg = get_grid_config(d);
+            up(cfg[4]) render_franken_ribs(d);
+            if (mod_hint) _render_grid_mod_hints(d, sf);
+        }
     }
 }
 

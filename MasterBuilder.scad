@@ -149,6 +149,14 @@ bool_overlap_eps = 0.01; // [0.001 : 0.001 : 0.1]
 // Kept OUTSIDE the @CONFIG_SECTION blocks so it isn't part of the config-sync set.
 Export_2D = false;
 
+/* [Advanced - Modifier Export] */
+// When true, emit ONLY the grid modifier-hint discs (no grid/box/lid geometry) as
+// a standalone STL. Load it into the slicer alongside the normal model and set it
+// as a modifier volume — no manual "split to objects" needed. Requires an intent
+// with a grid layout that has circular hubs (C/S/D/T). Drive from the CLI with:
+//   mastertray.py build --intent Grid ... --export-modifiers
+Hints_Only = false;
+
 // MasterEngine (and via it BOSL2, MasterEnum, MasterConstants) is included exactly
 // ONCE here, as the first include, so the heavy BOSL2 library is parsed a single
 // time. OpenSCAD does not deduplicate includes, so every redundant include re-parses
@@ -265,7 +273,10 @@ module build_part(name, data) {
         physics = item[3];
         pos     = get_xy(manifest, i);
         translate([pos[0], pos[1], 0]) {
-            if      (type == "TRAY")             { factory_render_tray(payload, options, physics); }
+            // Modifier-export mode (Hints_Only): only GRID components render, and the
+            // grid factory emits just its marker discs (see factory_render_grid).
+            if      (Hints_Only && type != "GRID") { /* skip non-grid in modifier export */ }
+            else if (type == "TRAY")             { factory_render_tray(payload, options, physics); }
             else if (type == "BOX")              { factory_render_box(payload, options, physics); }
             else if (type == "FLIP_BOX")         { factory_render_flip_box(payload, options, physics); }
             else if (type == "DOUBLE_FLIP_BOX")  { factory_render_double_flip_box(payload, options, physics); }

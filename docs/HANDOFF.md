@@ -240,7 +240,7 @@ bbox/component diff before-vs-after.
 | 6.1/6.2 NopSCADlib, dotSCAD | **Defer (design)** | New deps; additive features (heat-set inserts, magnet recesses, Voronoi floors) need a product decision on WHERE they apply. |
 | 7.2/7.3 `quantize`, `flawless_wall` | **Defer** | `quantize` is not a built-in (none of quantize/offset3d/vnf_union/trapezoidal_threaded/projection exist in repo); `flawless_wall` bakes Bambu magic numbers into all wall math — needs calibration data. |
 | 7.5 `projection(cut=true)` → DXF/SVG | **Done** | `Export_2D` flag in MasterBuilder + `mastertray.py --export-2d {svg,dxf}`. Verified: SVG outline produced, normal 3D builds unaffected. Additive — no tested geometry touched. |
-| 2.2 modifier-STL export | **Scoped (deferred)** | Hints are emitted *inside* the grid render (`_render_grid_mod_hints`), not as manifest components, so a separate-STL export needs a `Hints_Only` render-mode plumbed through every render module to suppress non-hint geometry. Invasive — needs a dedicated pass, not a contained add. |
+| 2.2 modifier-STL export | **Done** | `Hints_Only` flag + `mastertray.py --export-modifiers`. build_part skips non-GRID components and the grid factory emits only the marker discs. Verified: Grid Test 31 comp → 6 comp (discs only) in modifier mode; gate 26/26 unaffected (default off). Turned out contained (2 SCAD spots + 1 CLI flag), not the invasive plumbing first feared. |
 
 See "PERFORMANCE PASS" below for measured build times that gate the perf-oriented pillars.
 
@@ -307,6 +307,24 @@ any existing geometry path.
 Usage: `python build/mastertray.py build --intent "Container Lid" --lid Plain --width 60
 --length 60 --export-2d svg --out lid.svg --no-report`. Verified: produces a 58×60mm outline
 SVG; normal 3D STL builds with `Export_2D=false` are byte-unaffected.
+
+---
+
+## 🆕 NEW FEATURE — modifier-volume STL export (Master Document Pillar 2.2)
+
+Emit ONLY the grid modifier-hint discs as a standalone STL, to load as a slicer modifier
+volume (no manual "split to objects"). Additive: default off, existing builds unaffected.
+
+| File | Change |
+|------|--------|
+| `MasterBuilder.scad` | `Hints_Only` flag (default false). `build_part` skips non-GRID components when set. |
+| `RenderGrid.scad` | `factory_render_grid`: when `Hints_Only`, emits only `_render_grid_mod_hints` (no grid body), guarded with `is_undef`. |
+| `build/mastertray.py` | `--export-modifiers` → sets `Hints_Only=true`. |
+| `build/scad_defaults.json` | regenerated (`Hints_Only` present). |
+
+Usage: `mastertray.py build --intent "Grid Test" ... --export-modifiers --out mods.stl`.
+Requires a grid layout with circular hubs (C/S/D/T) — else the modifier STL is empty.
+Verified: Grid Test 31 comp → 6 comp (discs only); gate 26/26 unaffected.
 
 ---
 
