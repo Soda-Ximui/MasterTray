@@ -193,12 +193,18 @@ module factory_render_box(data, opts, phys) {
                         gx   = groove_w / 2;
                         lip  = (sw + 0.6) / 2;
                         roof = h - (groove_z + groove_h);   // solid wall above the groove
+                        // [GEOM-FIX: slide chamfer non-manifold] The ramp's base edge was
+                        // coplanar with the groove cuboid's top (z=groove_h) — a coincident
+                        // edge that left 2 non-manifold edges at 0.6mm nozzle / 0.30mm layer
+                        // (caught by validSTL, not the component-count gate). Dropping the
+                        // base by EPS makes the ramp OVERLAP the cuboid so the union merges
+                        // cleanly (the EPS-overlap rule). [manifold]
                         if (lip <= roof - m_lh(data))
                             for (sx = [-1, 1])
                                 rotate([90, 0, 0])
                                     linear_extrude(height = groove_l, center = true)
-                                        polygon([[sx * (gx - lip), groove_h],
-                                                 [sx *  gx,         groove_h],
+                                        polygon([[sx * (gx - lip), groove_h - EPS],
+                                                 [sx *  gx,         groove_h - EPS],
                                                  [sx * (gx - lip), groove_h + lip]]);
                     }
                 }
