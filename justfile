@@ -10,6 +10,8 @@
 # just e2e       — run Playwright tests
 # just check-build — build every public intent under STRICT_KEYS (regression gate)
 # just check-build-strict — check-build + promote OpenSCAD warnings to failures
+# just check-build-manifold — check-build that FAILS on non-manifold STL (pymeshlab)
+# just validate-stl [dir] — check STLs for non-manifold edges (run before printing!)
 # just render    — render MasterBuilder.scad to output/preview.png (smoke test)
 # just render-all — render all 23 intents to output/
 # just mapping   — regenerate build/mapping.json from build/mapping.yaml
@@ -141,6 +143,18 @@ check-build:
 [group('test')]
 check-build-strict:
     python build/scripts/build_matrix.py --hardwarnings
+
+# ── build-matrix gate that FAILS on non-manifold STL export (needs pymeshlab) ──
+# Component count does NOT detect non-manifold edges; this does. Jars currently fail.
+[group('test')]
+check-build-manifold:
+    python build/scripts/build_matrix.py --strict-manifold
+
+# ── validate STL files for non-manifold edges / open boundaries (pymeshlab) ────
+# ALWAYS run before sending any STL to print. `just validate-stl "STL/Test Prints"`
+[group('test')]
+validate-stl dir='STL':
+    python validSTL.py "{{dir}}"
 
 # ── local-only live build server for the /builder web page ────────────────────
 [group('build')]

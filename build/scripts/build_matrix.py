@@ -69,6 +69,27 @@ def component_count(stl_path):
     return "(unknown)"
 
 
+def manifold_nm(stl_path):
+    """Non-manifold edge count via pymeshlab. Returns int (0 = clean), or None if
+    pymeshlab isn't installed (check skipped).
+
+    CRITICAL: component_count() above counts connected COMPONENTS — it does NOT
+    detect non-manifold edges. A mesh can be "2 clean components" yet have
+    thousands of non-manifold edges that a slicer rejects (threads/round bodies
+    are common offenders). This is the check that was missing when non-manifold
+    jar coupons shipped to test prints. See validSTL.py."""
+    try:
+        import pymeshlab  # noqa: PLC0415
+    except ImportError:
+        return None
+    try:
+        ms = pymeshlab.MeshSet()
+        ms.load_new_mesh(str(stl_path))
+        return int(ms.get_topological_measures()["non_two_manifold_edges"])
+    except Exception:  # noqa: BLE001
+        return -1  # load/analyze error
+
+
 def run_case(label, extra_args, out_dir, hardwarnings):
     stl = out_dir / (label.replace("/", "_").replace(" ", "") + ".stl")
     cmd = [sys.executable, str(MASTERTRAY), "build", *extra_args, *DIMS,
@@ -80,7 +101,8 @@ def run_case(label, extra_args, out_dir, hardwarnings):
     proc = subprocess.run(cmd, capture_output=True, text=True, cwd=REPO_ROOT)
     ok = proc.returncode == 0 and stl.exists()
     count = component_count(stl) if ok else "-"
-    return ok, count, proc.stderr.strip()
+    nm = manifold_nm(stl) if ok else None
+    return ok, count, nm, proc.stderr.strip()
 
 
 def main():
@@ -90,6 +112,9 @@ def main():
     ap.add_argument("--keep", action="store_true", help="Keep the generated STLs")
     ap.add_argument("--only", metavar="SUBSTR",
                     help="Only run cases whose label contains SUBSTR")
+    ap.add_argument("--strict-manifold", action="store_true",
+                    help="Fail a case if its STL has non-manifold edges (needs pymeshlab). "
+                         "Default: report nm count but don't fail (jars are currently non-manifold).")
     args = ap.parse_args()
 
     mapping = load_mapping()
@@ -106,14 +131,34 @@ def main():
     print(f"Output: {out_dir}\n")
 
     failures = []
+    nm_seen = False
+    nm_skipped = False
     for label, extra in cases:
-        ok, count, stderr = run_case(label, extra, out_dir, args.hardwarnings)
-        status = "PASS" if ok else "FAIL"
-        print(f"  [{status}] {label:<38} components={count}")
-        if not ok:
-            failures.append((label, stderr))
+        ok, count, nm, stderr = run_case(label, extra, out_dir, args.hardwarnings)
+        # nm: None = pymeshlab unavailable, -1 = analyze error, >=0 = edge count
+        if nm is None:
+            nm_skipped = True
+            nm_str = "nm=?"
+        elif nm < 0:
+            nm_str = "nm=err"
+        else:
+            nm_str = f"nm={nm}"
+            if nm > 0:
+                nm_seen = True
+        manifold_bad = args.strict_manifold and isinstance(nm, int) and nm > 0
+        case_ok = ok and not manifold_bad
+        status = "PASS" if case_ok else "FAIL"
+        print(f"  [{status}] {label:<38} components={count:<26} {nm_str}")
+        if not case_ok:
+            failures.append((label, stderr or f"non-manifold edges: {nm_str}"))
 
     print()
+    if nm_skipped:
+        print("NOTE: pymeshlab not installed — non-manifold check skipped (nm=?). "
+              "`pip install pymeshlab` to enable, or run `python validSTL.py <dir>`.\n")
+    elif nm_seen and not args.strict_manifold:
+        print("NOTE: non-manifold edges present (nm>0). Component count does NOT detect this; "
+              "re-run with --strict-manifold to fail on it. See validSTL.py.\n")
     if failures:
         print(f"{len(failures)}/{len(cases)} FAILED:")
         for label, stderr in failures:

@@ -328,6 +328,35 @@ Verified: Grid Test 31 comp → 6 comp (discs only); gate 26/26 unaffected.
 
 ---
 
+## ⚠️ MANIFOLD-CHECK GAP — non-manifold coupons shipped, now fixed
+
+**What happened:** test-print coupons were validated with `component_bboxes.py` (connected-
+component COUNT) and "2 components = jar+cap" was treated as a pass. **Component count does NOT
+detect non-manifold edges.** The threaded/circular jar coupons had thousands of non-manifold
+edges and shipped to print anyway. The correct tool — `validSTL.py` (pymeshlab) — was in the
+repo, unused. Even OpenSCAD `--hardwarnings` passes these (CGAL's manifold notion ≠ slicer's).
+
+**Scope (gate now reports `nm=` per case):** circular **Jar / Threaded Jar = 8012**, **Grid
+Test = 30452**, Slide-Outer = 10, Lid Test Set = 40 (at 80×120×30). Polygon **Square/Spool Jar
+= 0** (clean). nm scales with facet count → it's the circular faceting + solid-body union seams
+(floor ring↔disc, floor↔wall meet face-to-face with zero overlap — the EPS-overlap rule).
+
+**Fixes (committed):**
+| File | Change |
+|------|--------|
+| `build/scripts/build_matrix.py` | `manifold_nm()` (pymeshlab) + `nm=` column every run; `--strict-manifold` fails on it. |
+| `validSTL.py` | committed (was untracked) — the canonical non-manifold/boundary checker. |
+| `justfile` | `just validate-stl [dir]` and `just check-build-manifold`. |
+
+**Rule:** ALWAYS run `just validate-stl "STL/Test Prints"` (or validSTL) before sending any STL
+to print. Component count is necessary but NOT sufficient.
+
+**Open (not yet fixed — geometry):** solid circular jars are non-manifold (body union seams; EPS-
+overlap fix needed) and BOSL2 threads add more. NOTE: *meshed* jars (with a pattern + struts)
+come out manifold — the mesh code path rebuilds the wall/floor and sidesteps the solid-union seams.
+
+---
+
 ## 🖨️ TEST PRINTS — physical fit validation (`STL/Test Prints/`)
 
 To start the print-validation loop the gate can't cover, four small mechanism coupons were
