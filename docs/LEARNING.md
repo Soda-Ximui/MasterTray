@@ -570,3 +570,80 @@ The full fix would be to parse G2/G3 arcs and add their x/y extents to the bound
 
 The lesson: when a metric can be zero for two completely different reasons (parser gap vs genuine problem), the gate must distinguish them. Treating "not measured" the same as "measured zero" produces false positives. Always check whether zero means "no data" before deciding it means "bad data."
 
+---
+
+── NOTE: BOSL2 `chamfer` is always 45° — no additional angle cap is needed on rim_chamf (2026-06-18)
+
+After capping `rim_chamf = min(noz*4, sw-noz)` (B10 fix), the question arose: should rim_chamf
+also be limited by the 45° self-supporting angle rule for FDM printing?
+
+The answer is no, and the reason is definitional: BOSL2's `chamfer` parameter is not an angle —
+it is a SIZE (mm). The angle is always exactly 45°, regardless of how large or small the chamfer
+is. A `chamfer=1.6mm` and a `chamfer=1.8mm` both produce a 1:1 rise-to-run slope (45° from
+horizontal). The size changes; the angle does not.
+
+Printed bottom-up, the chamfer zone at the base of a cylinder looks like this:
+
+  z = rim_chamf:  ████████████████████████  ← full outer radius r
+  z = rim_chamf/2: ██████████████████████   ← r - rim_chamf/2 (each layer extends outward by lh)
+  z = 0 (bed):   ████████████████████     ← r - rim_chamf (sits on bed, no overhang)
+
+Each successive layer extends outward by exactly one layer height — that 1:1 ratio is the 45°
+angle. The geometry is self-supporting by construction. No constraint on rim_chamf can change
+this, because the angle isn't a function of size.
+
+The top chamfer on the wall cylinder (chamfer= applies both ends) is even safer: the outer
+boundary SHRINKS as layers go up, so there is no overhang at all — each new layer prints
+fully supported inside the previous one.
+
+The only constraint on rim_chamf that matters is the one already in place:
+
+  rim_chamf = min(noz * 4, sw - noz)   // annulus ≥ 1 perimeter at z=0
+
+That cap is about annulus WIDTH at the base face, not about the slope angle. The 45° rule is
+satisfied automatically because `chamfer` in BOSL2 is defined as a 45° bevel.
+
+The lesson: understand what a parameter actually controls. `chamfer` in BOSL2 is a SIZE, not an
+angle. Trying to cap it "for the 45° rule" would be solving a non-problem — the rule is already
+baked into the operation's definition.
+
+---
+
+── NOTE: Never add `include <BOSL2/...>` or `include <MasterEngine.scad>` to a sub-file (2026-06-17)
+
+OpenSCAD's `include` directive is NOT deduplicated. If two files both include the same file,
+that file is parsed TWICE — there is no include guard, no once-per-translation-unit semantics.
+
+Before the fix, BOSL2 was being re-parsed on every build by 11 different files through a diamond
+include graph (RenderBox→RenderTray→RenderMesh/RenderGrid etc., each with their own
+`include <BOSL2/std.scad>`). The measured cost: ~22s of FIXED overhead per build, regardless of
+geometry size. A 125 KB box and an 8.7 MB jar both took ~23s. All of that overhead was re-parsing.
+
+The fix: single-owner includes. MasterBuilder.scad is the ONLY file that includes MasterEngine.scad.
+MasterEngine.scad is the ONLY file that includes BOSL2/std.scad. Every other file relies on those
+symbols being available because MasterBuilder loaded them first. Result: plain box build time
+went from 23.8s → 1.6s (~15× faster). Geometry byte-identical; gate 26/26.
+
+RULE (hard requirement):
+- Do NOT add `include <BOSL2/std.scad>`, `include <BOSL2/threading.scad>`, or any other BOSL2
+  include to any sub-file (RenderBox, RenderMesh, RenderGrid, RenderJar, RenderLid, etc.).
+- Do NOT add `include <MasterEngine.scad>` to any sub-file.
+- MasterBuilder.scad includes MasterEngine first. MasterEngine includes BOSL2. Sub-files
+  inherit both. This is the only correct configuration.
+
+The correct include header for any new sub-file:
+
+  // BOSL2/std comes via MasterEngine — do NOT re-include (OpenSCAD has no include dedup;
+  // re-parse cost ~21s) [perf]
+  // MasterEngine is included once by MasterBuilder.scad (single owner) — not re-included
+  // here [perf]
+  include <RenderMesh.scad>    // only other sub-files you directly depend on
+
+Tradeoff (user-approved): sub-files no longer open standalone in the OpenSCAD GUI. To preview
+a part, open MasterBuilder.scad and set Part_To_Build in the Customizer panel.
+
+The lesson: OpenSCAD's include model is textual substitution with no dedup. Every include is a
+full re-parse. Diamond graphs are lethal to build times. Enforce single-owner includes from the
+start; measuring ~22s of unexplained fixed cost is how this was discovered, not a review.
+
+
