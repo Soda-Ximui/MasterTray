@@ -477,7 +477,31 @@ def build_overrides(args, mapping):
                       f"(typo?). Passing through verbatim.", file=sys.stderr)
             overrides[key] = RawLiteral(value)
 
+    warn_zero_strut_on_lid(args, overrides)
     return overrides
+
+
+# Intents whose part has a closing lid/cap (so a 0% strut wall leans entirely on the
+# mesh safety margins for the lid mechanism — worth a heads-up). Used by safeguard A.
+_LIDDED_INTENTS = {"Container", "Container Lid", "Pill Organizer", "Threaded Jar"}
+
+
+def warn_zero_strut_on_lid(args, overrides):
+    """Safeguard A: warn when any strut is set to 0% on a lidded container.
+
+    The closing mechanism stays solid via MESH_TOP_MARGIN + min_m regardless, but a
+    0% strut wall/floor is otherwise edge-to-edge mesh — worth surfacing so it's a
+    deliberate choice, not an accident. Targeted (only lidded builds), advisory only."""
+    lidded = bool(args.lid) or args.intent in _LIDDED_INTENTS
+    if not lidded:
+        return
+    zeroed = [k for k in ("strut_wall_perc", "strut_floor_perc", "strut_lid_perc")
+              if k in overrides and str(overrides[k]).strip() in ("0", "0.0")]
+    if zeroed:
+        print(f"WARNING: {', '.join(zeroed)} = 0% on a lidded container "
+              f"('{args.intent}'). The lid mechanism stays solid (MESH_TOP_MARGIN + "
+              f"min_m), but the rest is edge-to-edge mesh. Run validSTL before printing.",
+              file=sys.stderr)
 
 
 def render_report_html(report):
@@ -656,8 +680,54 @@ def run_build(args, mapping, overrides):
     if result.returncode != 0:
         sys.exit(result.returncode)
 
+    check_manifold(args)
+
     if not args.no_report:
         write_build_report(args, mapping, overrides, cmd)
+
+
+def check_manifold(args):
+    """Safeguard B: post-build manifold check.
+
+    OpenSCAD exit 0 / component count do NOT detect non-manifold edges — that gap
+    is exactly how non-manifold jar coupons once shipped to print. With --validate
+    we run pymeshlab now; otherwise we print a one-line reminder. Never blocks
+    (advisory) unless the caller wants --strict-validate."""
+    out = Path(args.out)
+    if out.suffix.lower() not in (".stl", ".3mf", ".obj"):
+        return  # 2D / image exports have no manifold notion
+    if not getattr(args, "validate", False):
+        # Reminder only for interactive/user builds — suppress in automated (--no-report)
+        # runs like the build-matrix gate, which does its own nm check.
+        if not args.no_report:
+            print(f"  NOTE: run `python validSTL.py \"{out}\"` (or `--validate`) "
+                  f"before printing — component count does not detect non-manifold edges.")
+        return
+    try:
+        import pymeshlab  # noqa: PLC0415
+    except ImportError:
+        print("  validate: pymeshlab not installed — skipped (pip install pymeshlab).",
+              file=sys.stderr)
+        return
+    try:
+        ms = pymeshlab.MeshSet()
+        ms.load_new_mesh(str(out))
+        t = ms.get_topological_measures()
+        nm = int(t["non_two_manifold_edges"])
+        bnd = int(t["boundary_edges"])
+    except Exception as e:  # noqa: BLE001
+        print(f"  validate: could not analyze {out.name}: {e}", file=sys.stderr)
+        return
+    if nm > 0:
+        msg = f"  validate: {out.name} has {nm} NON-MANIFOLD edge(s) — not print-ready."
+        if getattr(args, "strict_validate", False):
+            sys.exit(msg)
+        print(msg, file=sys.stderr)
+    elif bnd > 0:
+        print(f"  validate: {out.name} has {bnd} open boundary edge(s) "
+              f"(slicer may auto-repair).", file=sys.stderr)
+    else:
+        print(f"  validate: {out.name} is a watertight manifold (nm=0).")
 
 
 def cmd_build(args, mapping):
@@ -715,6 +785,11 @@ def main():
                           help="Emit ONLY the grid modifier-hint discs (no grid/box/lid) "
                                "as a standalone STL to load as a slicer modifier volume. "
                                "Sets Hints_Only=true; requires a grid layout with circular hubs.")
+    p_build.add_argument("--validate", action="store_true",
+                          help="After building, run a pymeshlab non-manifold/watertight check "
+                               "on the output (warns if non-manifold). ALWAYS use before printing.")
+    p_build.add_argument("--strict-validate", action="store_true",
+                          help="Like --validate but exits non-zero if the output is non-manifold.")
     p_build.add_argument("--hardwarnings", action="store_true",
                           help="Promote OpenSCAD warnings to errors (exit 1 on geometry issues)")
     p_build.add_argument("--openscad", help=f"Path to openscad executable (default: {DEFAULT_OPENSCAD})")

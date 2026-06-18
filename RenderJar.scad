@@ -53,9 +53,10 @@ module factory_render_jar(data, opts, phys) {
             // true inner_d (so its polygon matches the wall exactly on low-facet jars).
             linear_extrude(height=sf, center=true)
                 difference() { circle(d=w, $fn=jar_fn); circle(d=inner_d, $fn=jar_fn); }
-            // Inner disc grown by EPS*2 so it OVERLAPS the ring's inner edge instead of
-            // meeting it face-to-face — coincident faces left non-manifold seam edges
-            // along the inner_d boundary (the EPS-overlap rule). Growing the disc (rather
+            // [GEOM-FIX: jar floor union seam non-manifold] Inner disc grown by EPS*2 so it
+            // OVERLAPS the ring's inner edge instead of meeting it face-to-face — coincident
+            // faces left non-manifold seam edges along the inner_d boundary (Jar/Threaded Jar
+            // 8012 nm, Grid Test 30452 nm; the EPS-overlap rule). Growing the disc (rather
             // than shrinking the ring) keeps the ring/wall polygons vertex-aligned, which
             // matters for low-facet jars (Quad/Spool) where a shrunk ring mis-meshed. [manifold]
             framed_mesh(data, inner_d + EPS*2, inner_d + EPS*2, sf, true,

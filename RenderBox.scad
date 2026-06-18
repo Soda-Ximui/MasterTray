@@ -173,6 +173,14 @@ module factory_render_box(data, opts, phys) {
         // Nested difference: boss is unioned after groove cut so it protrudes into the
         // groove space and gives the socket ring structural wall thickness.
         // boss_th = ball_d + noz*4 — deep enough that the sphere leaves noz*2 ring material.
+        // [GEOM-FIX: ball-snap boss disconnect — KNOWN, NOT fixed] With Glide_Snap="Ball"
+        // the dimple (sphere, r≈ball_r+glide_tol/2) is centred at the groove edge and cuts
+        // inward, leaving only (lip − ~1.08mm) of wall behind it to bond the boss to. The
+        // box splits into separate components (Slide+Ball = 4, and ~10 non-manifold edges).
+        // Lip-widening was DISPROVEN: a CGAL-bondable ~1.5mm would need lip >2.6mm > the
+        // 2.4mm wall. Real fix = smaller/shallower detent or relocating it off the thin
+        // wall (mechanism redesign + print). WORKAROUND/STANDARD: Glide_Snap="Tab" (no boss
+        // → clean 2 components). See docs/HANDOFF.md #5.
         boss_d  = ball_d * 2 + noz * 4;
         boss_th = ball_d + noz * 4;
 

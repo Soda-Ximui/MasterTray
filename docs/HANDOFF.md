@@ -41,6 +41,39 @@ Review #4 (mapping.yaml schema) resolved this session — see "THIS SESSION" sec
 
 ---
 
+## ✅ MANIFOLD PASS (jar/slide fixes + manifold safeguards)
+
+**The gap that started it:** test-print coupons were validated with `component_bboxes.py`
+(component COUNT), which cannot see non-manifold edges. Non-manifold jar coupons shipped to
+print. The correct tool (`validSTL.py`, pymeshlab) was in the repo, unused.
+
+**Jar non-manifold — NOT a regression, now fixed.** Verified the pre-session commit (42ae96e)
+produced a byte-identical non-manifold jar (nm=671), so recent changes didn't cause it — it had
+been non-manifold per pymeshlab all along (OpenSCAD's own check passes it; slicers auto-repair
+the seam edges → it looked stable). Cause: jar floor = ring + disc + wall meeting face-to-face
+with zero overlap. Fix (EPS-overlap rule, commit `1d03992`): grow the inner disc by EPS·2
+(not shrink the ring — that mis-meshed low-facet Quad/Spool jars); drop the wall EPS into the
+floor. Result: **Jar 8012→0, Threaded Jar 8012→0, Grid Test 30452→0**, all jar variants nm=0.
+The BOSL2 threads were clean all along.
+
+**Slide groove-chamfer non-manifold — fixed** (commit `e3b9847`). The 45° ramp's base edge was
+coplanar with the groove cutter top (coincident edge → nm=2 at 0.6/0.30). Dropped the base by
+EPS to overlap. (Gate Slide-Outer still nm=10 = the separate ball-snap boss, documented.)
+
+**Manifold safeguards added:**
+- Gate reports `nm=` per case (pymeshlab-gated); `just check-build-manifold` / `--strict-manifold` fail on it.
+- `mastertray.py --validate` / `--strict-validate`: post-build pymeshlab check; a reminder prints otherwise.
+- Safeguard A: warning when a strut is 0% on a lidded container.
+- All geometry fix-points tagged `// [GEOM-FIX: …]` (what was wrong + how fixed).
+
+**Deferred for confirmation (design fork):** the **wall-thickness accommodation** (auto-bump
+`m_safe_wall` so the groove fits with a sound lip at low loops) and **closing-zone lip-height
+resizing** — both touch tested wall/margin geometry, and they hinge on whether `Wall_Loops`
+should *drive* wall thickness (today `thick_wall` dominates; at 2 loops + 0.6mm the wall is still
+2.4mm). Implemented only the safe, regression-free parts above; the invasive resizing awaits a nod.
+
+---
+
 ## ✅ THIS SESSION (items #4, #1, #2, #3 + font portability)
 
 _Items #4/#1/#2 done under Sonnet; #3 + font + performance pass under Opus._
