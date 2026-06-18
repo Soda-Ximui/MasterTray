@@ -65,8 +65,19 @@ a trapping/retaining lip above it has the lip underside bridging the groove void
 bottom-up the ceiling prints on air. Caught on physical prints, not validSTL (it's a slicer
 overhang, not a topology defect). Two instances:
 - **Slide-Outer groove** — FIXED with a 45° self-supporting ceiling ramp ([GEOM-FIX: slide chamfer]).
-- **Snap-Inner (Rabbet) groove** — FLAGGED, fix pending ([GEOM-WARN: snap-inner groove], RenderBox.scad).
-  Confirmed on print + render; ~0.84mm (bead_h) overhang. The same 45° ramp treatment applies.
+- **Snap-Inner (Rabbet) groove** — FIXED ([GEOM-FIX: snap-inner groove], RenderBox.scad). The
+  groove cutter's inner boundary is now a 45° prismoid taper, so the trapping-lip underside is a
+  self-supporting 45° undercut (prints without support, still traps the bead). Render + gate +
+  validSTL verified; overhang hint dropped to the snap-outer baseline.
+
+**Printability verification (hard requirement: nothing ships unverified):**
+- Manifold/watertight is the AUTO hard-gate — `just check-printable` / `just validate-stl` /
+  the gate `nm=` column / `mastertray.py --validate`. All reliable (pymeshlab).
+- Overhang/"prints on air" is NOT reliably auto-detectable: a geometric normal screen is
+  dominated by self-supporting mesh teardrops + thread flanks (a clean jar flags more overhang
+  area than a groove'd box). So overhang is handled by (a) fixing known overhangs at the SOURCE
+  (slide + snap-inner grooves, done) and (b) slicer-preview / test-print review. The
+  check_printable overhang figure is a HINT only, never a gate.
 
 **Manifold safeguards added:**
 - Gate reports `nm=` per case (pymeshlab-gated); `just check-build-manifold` / `--strict-manifold` fail on it.

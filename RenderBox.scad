@@ -63,13 +63,13 @@ module factory_render_box(data, opts, phys) {
             // Groove occupies h−2·bead_h to h−bead_h; bead_h wall above traps the bead.
             // Lid bead at sl−2·bead_h → when seated (bottom at h−sl) bead aligns with groove.
             //
-            // [GEOM-WARN: snap-inner groove PRINTS ON AIR — flagged, not yet fixed]
-            // The bead-trapping lip above the groove (h−bead_h .. h) has its underside
-            // bridging the groove void: printed bottom-up, that ceiling prints on air
-            // (~bead_h ≈ 0.84mm overhang into the wall). Confirmed on print + render.
-            // Same overhang class as the slide-outer groove, which was fixed with a 45°
-            // self-supporting ceiling ramp (see [GEOM-FIX: slide chamfer] in the Glide
-            // External branch). The same ramp treatment applies here — pending go-ahead.
+            // [GEOM-FIX: snap-inner groove 45° self-supporting undercut — prints-on-air fixed]
+            // The trapping lip's underside used to be a FLAT (90°) overhang that printed on
+            // air (~bead_h overhang into the wall; reported on print). The groove cutter's
+            // inner boundary is now a 45° PRISMOID taper: the channel is full depth at the
+            // groove floor and closes to the inner wall face at the top, so the lip underside
+            // is a 45° undercut — self-supporting (prints without support) AND still traps the
+            // lid bead (which is chamfered to mate). Same intent as the slide-outer chamfer.
             groove_z = h - 2 * bead_h;
             difference() {
                 apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
@@ -78,7 +78,12 @@ module factory_render_box(data, opts, phys) {
                     difference() {
                         cuboid([w-sw*2 + bead_h*2 + EPS, l-sw*2 + bead_h*2 + EPS,
                                 bead_h + EPS], anchor=BOTTOM);
-                        cuboid([w-sw*2 - EPS, l-sw*2 - EPS, bead_h*2], anchor=BOTTOM);
+                        // Inner taper grows from the inner face (bottom) out to the channel
+                        // back (top) → closes the channel at the top at 45°, leaving a
+                        // self-supporting sloped ceiling instead of a flat overhang.
+                        prismoid(size1=[w-sw*2 - EPS,            l-sw*2 - EPS],
+                                 size2=[w-sw*2 + bead_h*2 + EPS*2, l-sw*2 + bead_h*2 + EPS*2],
+                                 h=bead_h + EPS, anchor=BOTTOM);
                     }
             }
         } else {
