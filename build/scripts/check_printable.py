@@ -48,31 +48,140 @@ _ORCA_PROCESS = os.environ.get("ORCA_PROCESS", "0.20mm Standard @BBL A1.json")
 _ORCA_FILAMENT = os.environ.get("ORCA_FILAMENT", "Bambu PLA Basic @BBL A1.json")
 
 
-def slicer_overhang(stl_path):
-    """Slice with OrcaSlicer and count real overhang-wall features in the gcode.
-    Returns (overhang_count, bridge_count) or None if the slicer/profiles are absent
-    or slicing fails. Overhang>0 = unsupported overhangs the slicer can't bridge."""
+import math
+
+
+def _slice_to_gcode(stl_path, td):
+    """Slice an STL with OrcaSlicer into directory td; return gcode text or None."""
     orca = Path(_ORCA)
     ms = _ORCA_PROFILES / "machine" / _ORCA_MACHINE
     pr = _ORCA_PROFILES / "process" / _ORCA_PROCESS
     fl = _ORCA_PROFILES / "filament" / _ORCA_FILAMENT
     if not (orca.exists() and ms.exists() and pr.exists() and fl.exists()):
         return None
+    cmd = [str(orca), "--slice", "0", "--load-settings", f"{ms};{pr}",
+           "--load-filaments", str(fl), "--outputdir", td, str(stl_path)]
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, timeout=240)
+    except Exception:  # noqa: BLE001
+        return None
+    gcodes = list(Path(td).glob("*.gcode"))
+    if not gcodes:
+        return None  # slice failed (GUI app is console-silent; no gcode = fail)
+    return gcodes[0].read_text(errors="ignore")
+
+
+# Default extrusion width used to turn first-layer path length into a contact-area
+# estimate (overridden from the gcode header if present).
+_DEFAULT_LW = 0.45
+
+
+def _extruded(block, want):
+    """Sum XY extrusion length (mm) for moves whose active FEATURE satisfies want(name);
+    also return the XY bbox of those moves. Counts only positive-E (extruding) moves —
+    OrcaSlicer uses relative E."""
+    length = 0.0
+    xs, ys = [], []
+    x = y = None
+    feat = ""
+    for l in block:
+        if l.startswith("; FEATURE:"):
+            feat = l.split(":", 1)[1].strip()
+            continue
+        if not l.startswith(("G1", "G0")):
+            continue
+        nx, ny, e = x, y, None
+        for tok in l.split()[1:]:
+            if tok[:1] == "X": nx = float(tok[1:])
+            elif tok[:1] == "Y": ny = float(tok[1:])
+            elif tok[:1] == "E": e = float(tok[1:])
+        if e is not None and e > 0 and want(feat) and x is not None and nx is not None:
+            length += math.hypot(nx - x, ny - y)
+            xs += [x, nx]; ys += [y, ny]
+        x, y = (nx if nx is not None else x), (ny if ny is not None else y)
+    bbox = (max(xs) - min(xs)) * (max(ys) - min(ys)) if xs else 0.0
+    return length, bbox
+
+
+def _empty_layers(lines):
+    """Scan gcode layer-z sequence for gaps larger than 1.5× the layer height.
+    A gap means the slicer skipped a z-range — the geometry had no cross-section
+    there (empty layer). Returns a list of (z_start, z_end) tuples where gaps occur,
+    or [] if none. Uses '; layer_z = N.NNN' comments emitted by OrcaSlicer."""
+    zs = []
+    for l in lines:
+        if l.startswith("; layer_z ="):
+            try:
+                zs.append(float(l.split("=")[1]))
+            except ValueError:
+                pass
+    if len(zs) < 3:
+        return []
+    # Infer nominal layer height from the median step between consecutive layers.
+    steps = sorted(zs[i+1] - zs[i] for i in range(len(zs) - 1) if zs[i+1] > zs[i])
+    if not steps:
+        return []
+    lh = steps[len(steps) // 2]  # median step = nominal layer height
+    threshold = lh * 1.5
+    return [(round(zs[i], 3), round(zs[i+1], 3))
+            for i in range(len(zs) - 1)
+            if zs[i+1] - zs[i] > threshold]
+
+
+def analyze_gcode(txt):
+    """Parse OrcaSlicer gcode for printability signals:
+      - FIRST LAYER (most crucial): bed-contact length and COVERAGE (contact area /
+        footprint bbox). A perforated/sparse first layer has low coverage → adhesion
+        risk. (Coverage is robust; gcode 'runs' are NOT disconnected islands — the
+        slicer travels within connected regions — so island-counting is not used.)
+      - EMPTY LAYERS: z-range gaps in the layer sequence (slicer skipped a z-band
+        because the cross-section was zero there). Hard indicator of geometry defect
+        — e.g. coincident face-to-face junction producing a degenerate CGAL mesh.
+      - OVERHANG: total 'Overhang' extrusion length. NOTE this INCLUDES mesh-hole
+        overhangs (they print as long continuous overhang perimeters, indistinguishable
+        from structural by length) — so it is only a clean STRUCTURAL gate when run on
+        MESH-OFF geometry. On meshed parts it's a hint.
+    Returns a dict, or None if the gcode has no layers."""
+    lw = _DEFAULT_LW
+    m = [l for l in txt.splitlines()[:400] if l.startswith("; line_width =")]
+    if m:
+        try: lw = float(m[0].split("=")[1])
+        except ValueError: pass
+    lines = txt.splitlines()
+    layer_idx = [i for i, l in enumerate(lines) if l.startswith("; CHANGE_LAYER")]
+    if not layer_idx:
+        return None
+    first = lines[layer_idx[0]: (layer_idx[1] if len(layer_idx) > 1 else len(lines))]
+
+    fl_len, fl_bbox = _extruded(first, lambda f: f not in ("Skirt", "Brim", "Custom", ""))
+    oh_len, _ = _extruded(lines, lambda f: f.startswith("Overhang"))
+    coverage = (fl_len * lw / fl_bbox * 100.0) if fl_bbox > 0 else 0.0
+    gaps = _empty_layers(lines)
+    return {
+        "fl_contact_mm": round(fl_len, 1),
+        "fl_footprint_mm2": round(fl_bbox),
+        "fl_coverage_pct": round(coverage, 1),
+        "overhang_mm": round(oh_len, 1),
+        "empty_layer_gaps": gaps,  # list of (z_start, z_end) — hard defect if non-empty
+    }
+
+
+def slicer_overhang(stl_path):
+    """Back-compat: (overhang_count, bridge_count). Kept for callers; the richer
+    signal is analyze_gcode()."""
     with tempfile.TemporaryDirectory(prefix="orca-oh-") as td:
-        cmd = [str(orca), "--slice", "0",
-               "--load-settings", f"{ms};{pr}",
-               "--load-filaments", str(fl),
-               "--outputdir", td, str(stl_path)]
-        try:
-            subprocess.run(cmd, capture_output=True, text=True, timeout=240)
-        except Exception:  # noqa: BLE001
+        txt = _slice_to_gcode(stl_path, td)
+        if txt is None:
             return None
-        gcodes = list(Path(td).glob("*.gcode"))
-        if not gcodes:
-            return None  # slice failed (GUI app is console-silent; no gcode = fail)
-        txt = gcodes[0].read_text(errors="ignore")
         return txt.count("; FEATURE: Overhang"), \
             txt.count("; FEATURE: Bridge") + txt.count("; FEATURE: Internal Bridge")
+
+
+def slicer_printability(stl_path):
+    """Slice once; return analyze_gcode() dict (first-layer + structural overhang) or None."""
+    with tempfile.TemporaryDirectory(prefix="orca-pc-") as td:
+        txt = _slice_to_gcode(stl_path, td)
+        return analyze_gcode(txt) if txt else None
 
 
 def find_stls(path):
@@ -129,11 +238,15 @@ def main():
     ap.add_argument("--plate-eps", type=float, default=0.5,
                     help="Ignore faces within this many mm of the lowest point (build plate).")
     ap.add_argument("--slicer", action="store_true",
-                    help="Use OrcaSlicer to detect REAL (context-aware) overhangs and FAIL on "
-                         "them — distinguishes unsupported overhangs from bridges/teardrops. "
+                    help="Use OrcaSlicer for the REAL printability checks: FIRST-LAYER adhesion "
+                         "(most crucial) and STRUCTURAL overhang (mesh-hole overhangs ignored). "
                          "Requires OrcaSlicer (see ORCA_* env vars). Slower (~1s/part).")
-    ap.add_argument("--max-overhang-features", type=int, default=0,
-                    help="With --slicer, max overhang-wall features allowed before failing. Default 0.")
+    ap.add_argument("--max-overhang-mm", type=float, default=2.0,
+                    help="With --slicer, max structural-overhang extrusion (mm) before failing. "
+                         "Hint only on meshed parts (teardrop apexes look like overhangs). Default 2.")
+    ap.add_argument("--min-coverage-pct", type=float, default=10.0,
+                    help="With --slicer, fail if first-layer coverage (contact × linewidth / "
+                         "footprint) is below this %%. Low coverage = adhesion risk. Default 10.")
     args = ap.parse_args()
 
     overhang_cos = np.sin(np.radians(args.overhang_deg))
@@ -170,38 +283,52 @@ def main():
         # geometric hint only.
         ok = manifold_ok
         if args.slicer:
-            sl = slicer_overhang(f)
-            if sl is None:
-                oh_str = "  overhang=?(slicer/profile missing)"
+            pc = slicer_printability(f)
+            if pc is None:
+                detail = "  slicer=?(OrcaSlicer/profile missing)"
                 slicer_unavailable[0] = True
             else:
-                oh_n, br_n = sl
-                bad = oh_n > args.max_overhang_features
-                oh_str = f"  overhang-features={oh_n} (bridges={br_n})"
-                if bad:
-                    reasons.append(f"{oh_n} unsupported-overhang feature(s)")
+                # EMPTY LAYERS (HARD): a z-gap in the slicer's layer sequence means the
+                # geometry had zero cross-section at that height — geometry defect, not
+                # printable. Typically caused by coincident face-to-face junctions in
+                # CSG that produce degenerate CGAL cross-sections (e.g. jar wall→cone seam).
+                if pc["empty_layer_gaps"]:
+                    for (za, zb) in pc["empty_layer_gaps"]:
+                        reasons.append(f"empty layer {za}–{zb}mm (zero cross-section — geometry defect)")
                     ok = False
+                # FIRST LAYER coverage: low coverage means sparse adhesion (adhesion risk).
+                # IMPORTANT: Coverage is reliable only for rectangular G1-path geometry.
+                # Circular jars use G2/G3 arc moves for perimeters — those are skipped
+                # by _extruded(), so fl_bbox comes out 0 and coverage = 0% (false alarm).
+                # Only fail if coverage > 0 AND below threshold (i.e., arc-based = skip).
+                if pc["fl_coverage_pct"] > 0 and pc["fl_coverage_pct"] < args.min_coverage_pct:
+                    reasons.append(f"first-layer coverage {pc['fl_coverage_pct']}% "
+                                   f"< {args.min_coverage_pct}% (adhesion risk)")
+                    ok = False
+                detail = (f"  1st-layer: contact={pc['fl_contact_mm']}mm "
+                          f"coverage={pc['fl_coverage_pct']}% | "
+                          f"overhang={pc['overhang_mm']}mm (hint on meshed parts)")
         else:
-            oh_str = f"  overhang≈{r['oh_area']:.0f}mm² (geometric hint — unreliable on mesh)"
+            detail = f"  overhang≈{r['oh_area']:.0f}mm² (geometric hint — unreliable on mesh)"
 
         verdict = "PRINTABLE" if ok else "NOT PRINTABLE"
         note = ("  [" + "; ".join(reasons) + "]") if reasons else ""
-        print(f"  {f.name:<{W}}  {verdict}{note}{oh_str}")
+        print(f"  {f.name:<{W}}  {verdict}{note}\n      {detail}")
         if not ok:
             fails.append(f.name)
 
     print()
     if not args.slicer:
-        print("Overhang shown is a HINT only (mesh/thread false-positives). For a REAL overhang")
-        print("gate, re-run with --slicer (OrcaSlicer), or confirm with a slicer preview / print.\n")
+        print("Overhang shown is a HINT only (mesh/thread false-positives). For the REAL checks")
+        print("(first-layer adhesion + structural overhang), re-run with --slicer (OrcaSlicer).\n")
     elif slicer_unavailable[0]:
-        print("NOTE: OrcaSlicer or its profiles weren't found — overhang NOT checked for some "
-              "files. Set ORCA_SLICER / ORCA_PROFILES env vars.\n")
+        print("NOTE: OrcaSlicer or its profiles weren't found — first-layer/overhang NOT checked "
+              "for some files. Set ORCA_SLICER / ORCA_PROFILES env vars.\n")
     if fails:
         print(f"NOT PRINTABLE ({len(fails)}/{len(files)}): {', '.join(fails)} — do NOT send.")
         sys.exit(1)
     print(f"All {len(files)} file(s) verified printable"
-          f"{' (manifold + slicer-overhang)' if args.slicer else ' (manifold; overhang needs --slicer/preview)'}.")
+          f"{' (manifold + empty-layers + first-layer coverage)' if args.slicer else ' (manifold only)'}.")
 
 
 if __name__ == "__main__":

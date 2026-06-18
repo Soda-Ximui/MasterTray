@@ -71,14 +71,23 @@ module factory_render_jar(data, opts, phys) {
                                   get_mesh_cfg(data, HOLE_WALL, STRUT_WALL), jar_fn);
 
         if (is_threaded) {
-            up(sf + cyl_wall_h)
+            // [GEOM-FIX: jar neck seam — EPS overlap at wall→cone and cone→thread junctions]
+            // Same face-to-face seam issue as the floor→wall (fixed above with EPS drop).
+            // Without EPS, the cone bottom sits exactly on the wall top face, and the
+            // thread rod bottom sits exactly on the cone top face — CGAL produces a
+            // degenerate cross-section at these junctions → OrcaSlicer "empty layer" warning.
+            // Fix: shift each piece DOWN by EPS and extend its height by EPS so it overlaps
+            // the piece below by EPS instead of touching face-to-face.
+            // sf+cyl_wall_h-EPS + sw*1.5+EPS = sf+cyl_wall_h+sw*1.5 (cone top unchanged).
+            // sf+cyl_wall_h+sw*1.5-EPS + lip_h+EPS = sf+cyl_wall_h+sw*1.5+lip_h = h (jar top unchanged).
+            up(sf + cyl_wall_h - EPS)
                 difference() {
-                    cyl(d1=w, d2=neck_od, h=sw * 1.5, anchor=BOTTOM, $fn=jar_fn);
+                    cyl(d1=w, d2=neck_od, h=sw * 1.5 + EPS, anchor=BOTTOM, $fn=jar_fn);
                     down(1) cyl(d=neck_id, h=sw * 1.5 + 2, anchor=BOTTOM, $fn=jar_fn);
                 }
-            up(sf + cyl_wall_h + sw * 1.5)
+            up(sf + cyl_wall_h + sw * 1.5 - EPS)
                 difference() {
-                    threaded_rod(d=neck_od, l=lip_h, pitch=m_thread_pitch(data),
+                    threaded_rod(d=neck_od, l=lip_h + EPS, pitch=m_thread_pitch(data),
                                  internal=false, anchor=BOTTOM, $fn=30);
                     down(1) cyl(d=neck_id, h=lip_h + 2, anchor=BOTTOM, $fn=jar_fn);
                 }
