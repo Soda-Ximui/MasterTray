@@ -55,6 +55,7 @@ SLOTTED = "Slotted";
 CIRCLE = "Circle";
 SQUARE = "Square";
 DIAMOND = "Diamond";
+VORONOI = "Voronoi";
 NONE = "None";
 NEEDS_GROOVE = "NEEDS_GROOVE";
 HAS_THREADS  = "HAS_THREADS";

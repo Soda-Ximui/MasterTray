@@ -86,6 +86,25 @@ module pattern_diamond(hole, step, nx, ny) {
   grid_copies(spacing=step, n=[nx, ny]) native_diamond(hole);
 }
 
+// Pseudo-Voronoi: organic convex blobs on a jittered grid.
+// Each cell is a hull() of 6 vertices at randomised radii (0.35–0.65 × hole)
+// with ±0.20 × step positional jitter, seeded deterministically per cell index.
+// Produces organic irregular cells that read as Voronoi without a Voronoi library.
+// Slower than grid-based patterns for large surfaces (hull() per cell).
+module pattern_voronoi(hole, step, nx, ny) {
+  ox = -(nx - 1) * step / 2;
+  oy = -(ny - 1) * step / 2;
+  for (iy = [0:ny-1], ix = [0:nx-1]) {
+    i   = iy * nx + ix;
+    jt  = rands(-step * 0.20, step * 0.20, 2, i * 13 + 7);
+    rad = rands(hole * 0.35, hole * 0.65, 6, i * 17 + 3);
+    translate([ox + ix * step + jt[0], oy + iy * step + jt[1]])
+      hull() for (k = [0:5])
+        translate([rad[k] * cos(k * 60), rad[k] * sin(k * 60)])
+          circle(d = hole * 0.12, $fn = 6);
+  }
+}
+
 module render_rectangular_pattern(pat, hole, step, nx, ny) {
   if      (pat == HONEYCOMB) pattern_honeycomb(hole, step, nx, ny);
   else if (pat == TEARDROP)  pattern_teardrop(hole, step, nx, ny);
@@ -93,6 +112,7 @@ module render_rectangular_pattern(pat, hole, step, nx, ny) {
   else if (pat == CIRCLE)    pattern_circle(hole, step, nx, ny);
   else if (pat == SQUARE)    pattern_square(hole, step, nx, ny);
   else if (pat == DIAMOND)   pattern_diamond(hole, step, nx, ny);
+  else if (pat == VORONOI)   pattern_voronoi(hole, step, nx, ny);
 }
 
 module pattern_cylindrical_honeycomb(hole, wall_t) { cyl(d=hole / sin(60), h=wall_t * 4, $fn=6); }
@@ -101,6 +121,7 @@ module pattern_cylindrical_slotted(hole, wall_t) { cuboid([hole * 2, hole, wall_
 module pattern_cylindrical_circle(hole, wall_t) { cyl(d=hole, h=wall_t * 4); }
 module pattern_cylindrical_square(hole, wall_t) { cuboid([hole, hole, wall_t * 4], rounding=max(hole * corner_round_ratio, line_width), except=TOP+BOTTOM); }
 module pattern_cylindrical_diamond(hole, wall_t) { linear_extrude(wall_t * 4, center=true) native_diamond(hole); }
+module pattern_cylindrical_voronoi(hole, wall_t) { cyl(d = hole, h = wall_t * 4); }
 
 module render_cylindrical_pattern(pat, hole, wall_t) {
   if      (pat == HONEYCOMB) pattern_cylindrical_honeycomb(hole, wall_t);
@@ -109,4 +130,5 @@ module render_cylindrical_pattern(pat, hole, wall_t) {
   else if (pat == CIRCLE)    pattern_cylindrical_circle(hole, wall_t);
   else if (pat == SQUARE)    pattern_cylindrical_square(hole, wall_t);
   else if (pat == DIAMOND)   pattern_cylindrical_diamond(hole, wall_t);
+  else if (pat == VORONOI)   pattern_cylindrical_voronoi(hole, wall_t);
 }

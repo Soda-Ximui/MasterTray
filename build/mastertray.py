@@ -475,7 +475,7 @@ def build_overrides(args, mapping):
             if key not in known_keys:
                 print(f"WARNING: --set '{key}' is not a known Customizer variable "
                       f"(typo?). Passing through verbatim.", file=sys.stderr)
-            overrides[key] = RawLiteral(value)
+            overrides[key] = parse_scad_value(value)
 
     warn_zero_strut_on_lid(args, overrides)
     return overrides
