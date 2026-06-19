@@ -6,8 +6,8 @@
 // All lids printed face-down (flat visible surface on bed) for best finish.
 //
 // LID_TYPE dispatch:
-//   "Snap"        — press-on lid that friction-fits inside the box walls.
-//                   Retention bead on two X sides clicks under the box wall top rim.
+//   "Snap"        — over-cap: flat panel + short skirt slides over box exterior.
+//                   Friction retention; thumb notch on box −Y wall for removal.
 //   "Glide"       — slides into grooves. GLIDE_DIR: "H" (Y-axis) | "V" (X-axis).
 //                   GLIDE_SNAP: "Ball" (default, two side dimples) | "Tab" (front snap).
 //   "Flip_Single" — C-clip hinge on +Y face, diamond latch on −Y face.
@@ -37,44 +37,31 @@ module factory_render_lid(data, opts, phys) {
     ball_protr = glide_ball_protr(ball_r, breathing_room(COMP_GLIDE, data), noz);
 
     if (lid_type == "Snap") {
-        // 4-wall bead ring clicks into matching ring groove on box.
-        // bead_h = noz*4 aligned to layer boundary (~1.68mm at 0.4/0.28) — firmer click
-        // than the old 3-layer value. Beads on all 4 sides; thumb-notch scoops on −Y
-        // face cut through the −Y bead giving fingernail purchase for release.
-        clearance  = breathing_room(COMP_GLIDE, data);
-        lid_w      = w - sw * 2 - clearance;
-        lid_l      = l - sw * 2 - clearance;
-        bead_h     = m_lh(data) * ceil(noz * 4 / m_lh(data));
-        snap_protr = noz;
-        chamf      = m_chamf(data);
-        // Bead root sits on the clean flat portion of the lid body, below the chamfer zone.
-        bead_z     = sl - chamf - EPS;
-        bead_h_ext = bead_h + chamf + EPS;
-        notch_r    = max(noz * 4, 3.0);
-        // bead_chamf: leaves exactly one layer of flat face at the bead tip.
-        bead_chamf = (bead_h_ext - m_lh(data)) / 2;
-        // Bead centre offset: lid half-width + clearance gap + snap protrusion, minus half bead thickness.
-        bead_cx = lid_w/2 + clearance/2 + snap_protr - sw/2;
-        bead_cy = lid_l/2 + clearance/2 + snap_protr - sw/2;
+        // Over-cap lid: flat panel + short skirt slides over box exterior.
+        // No beads or ridges — completely clean flat top face.
+        // Printed face-down: panel on bed (smooth), skirt walls rise upward.
+        // Skirt inner cavity fits over box exterior with COMP_GLIDE clearance.
+        clearance   = breathing_room(COMP_GLIDE, data);
+        skirt_h     = max(noz * 8, 4.0);
+        chamf       = m_chamf(data);
+        lid_inner_w = w + clearance;
+        lid_inner_l = l + clearance;
+        lid_ow      = lid_inner_w + sw * 2;
+        lid_ol      = lid_inner_l + sw * 2;
         difference() {
             union() {
-                apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), chamf)
-                    up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false,
-                                            get_mesh_cfg(data, HOLE_LID, STRUT_LID));
-                // 4-wall bead ring: ±X and ±Y sides, sw gap at each corner (no overlap needed).
-                for (sx = [-1, 1])
-                    translate([sx * bead_cx, 0, bead_z])
-                        cuboid([sw, lid_l - sw*2, bead_h_ext], chamfer=bead_chamf,
-                               edges="ALL", anchor=BOTTOM);
-                for (sy = [-1, 1])
-                    translate([0, sy * bead_cy, bead_z])
-                        cuboid([lid_w - sw*2, sw, bead_h_ext], chamfer=bead_chamf,
-                               edges="ALL", anchor=BOTTOM);
+                apply_master_bounds(lid_ow, lid_ol, sl, m_c_rad(data), chamf)
+                    up(sl / 2) framed_mesh(data, lid_ow, lid_ol, sl, false,
+                                           get_mesh_cfg(data, HOLE_LID, STRUT_LID));
+                // Skirt walls fused below panel; chamfer on open mouth guides lid onto box.
+                translate([0, 0, sl - EPS])
+                    cuboid([lid_ow, lid_ol, skirt_h + EPS], chamfer=chamf,
+                           edges=TOP, anchor=BOTTOM);
             }
-            // Two thumb-notch scoops on −Y face — cut through the −Y bead for fingernail release.
-            for (sx = [-1, 1])
-                translate([sx * lid_w / 3, -lid_l / 2, 0])
-                    sphere(r=notch_r, $fn=20);
+            // Hollow out skirt interior (slides over box exterior).
+            // EPS overlap into panel avoids coplanar bottom face.
+            translate([0, 0, sl - EPS])
+                cuboid([lid_inner_w, lid_inner_l, skirt_h + EPS * 2], anchor=BOTTOM);
         }
 
     } else if (lid_type == "Glide") {

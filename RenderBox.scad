@@ -4,8 +4,9 @@
 // PURPOSE: Rectangular box body — all lid-body variants driven by LID_TYPE in opts.
 //
 // One factory, one primitive shape. LID_TYPE determines what the body needs:
-//   "Snap" / "Slip" — plain chassis, no body modifications
-//   "Glide"         — groove channel cut into top + ball-catch dimples
+//   "Snap"  — plain chassis + thumb notch on −Y wall for over-cap lid removal
+//   "Slip"  — plain chassis, no body modifications
+//   "Glide" — groove channel cut into top + ball-catch dimples
 //   "Flip_Single"   — hinge boss on +Y face, axle pin, diamond latch recess on −Y
 //   "Flip_Double"   — hinge bosses on both Y faces, two axle pins, two latch recesses
 //
@@ -52,30 +53,18 @@ module factory_render_box(data, opts, phys) {
             core_tray_chassis(data_g);
 
     } else if (lid_type == "Snap") {
-        // ── Snap box ───────────────────────────────────────────────────────────
-        // Ring groove on all 4 interior wall faces; 45° prismoid ceiling is
-        // self-supporting (no supports needed). Lid has matching 4-wall bead ring.
-        // bead_h = noz*4 aligned to layer boundary: ~1.68mm at 0.4mm nozzle /
-        // 0.28mm LH — about 2× the old 3-layer value for a firmer click.
-        bead_h     = m_lh(data) * ceil(noz * 4 / m_lh(data));
-        chamf      = m_chamf(data);
-        groove_z   = h - sl - bead_h;
-        groove_h   = bead_h + chamf + EPS;
-        int_w      = w - sw * 2;
-        int_l      = l - sw * 2;
+        // ── Over-cap box: plain chassis + thumb notch ──────────────────────────
+        // No groove needed. The over-cap lid skirt wraps the exterior walls;
+        // friction holds it. Thumb notch on −Y wall lets a fingernail push the
+        // lid upward for removal.
+        notch_w = min(w * 0.4, 30.0);
+        notch_h = max(noz * 8, 4.0);
+        chamf   = m_chamf(data);
         difference() {
             apply_master_bounds(w, l, h, m_c_rad(data), chamf)
                 core_tray_chassis(data_g);
-            // Ring groove cutter: outer rect minus inner 45° taper.
-            // The taper's ceiling is self-supporting (45° undercut) and traps the bead.
-            up(groove_z)
-                difference() {
-                    cuboid([int_w + bead_h*2 + EPS, int_l + bead_h*2 + EPS,
-                            groove_h], anchor=BOTTOM);
-                    prismoid(size1=[int_w - EPS,            int_l - EPS],
-                             size2=[int_w + bead_h*2 + EPS*2, int_l + bead_h*2 + EPS*2],
-                             h=groove_h, anchor=BOTTOM);
-                }
+            translate([0, -l/2, h - notch_h])
+                cuboid([notch_w, sw + EPS * 2, notch_h + EPS], anchor=BOTTOM);
         }
 
     } else if (lid_type == "Glide") {
