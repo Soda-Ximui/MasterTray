@@ -55,7 +55,6 @@ yaml.SafeDumper.add_representer(RawLiteral, lambda dumper, data: dumper.represen
 # Top-level keys that must exist in mapping.yaml.
 _REQUIRED_MAPPING_KEYS = {
     "config", "intents", "container_lid_types", "container_lid_flags",
-    "standalone_lid_types", "slide_direction", "slide_catch",
     "dimension_mode", "cli_aliases",
 }
 _CONFIG_GROUPS = {"printer", "mesh", "advanced"}
@@ -140,19 +139,8 @@ def validate_mapping(mapping):
                         err(f"container_lid_types.{name!r}.{flag}: "
                             f"value must be bool, got {type(val).__name__}")
 
-    # ── 6. standalone_lid_types: {name: non-empty dict} ──────────────────────
-    slt = mapping["standalone_lid_types"]
-    if not isinstance(slt, dict):
-        err("'standalone_lid_types' must be a mapping")
-    else:
-        for name, overrides in slt.items():
-            if not isinstance(overrides, dict):
-                err(f"standalone_lid_types.{name!r}: must be a mapping")
-            elif not overrides:
-                err(f"standalone_lid_types.{name!r}: must have at least one override key")
-
-    # ── 7. slide_direction / slide_catch / dimension_mode: str→str ───────────
-    for section in ("slide_direction", "slide_catch", "dimension_mode"):
+    # ── 6. dimension_mode: str→str ───────────────────────────────────────────
+    for section in ("dimension_mode",):
         d = mapping[section]
         if not isinstance(d, dict):
             err(f"'{section}' must be a mapping")
@@ -359,12 +347,9 @@ def cmd_list_intents(args, mapping):
 
 
 def cmd_list_lids(args, mapping):
-    if args.intent == "Container":
-        table = mapping["container_lid_types"]
-    elif args.intent == "Container Lid":
-        table = mapping["standalone_lid_types"]
-    else:
-        sys.exit('--intent must be "Container" or "Container Lid" for lid listing')
+    if args.intent != "Container":
+        sys.exit('--intent must be "Container" for lid listing')
+    table = mapping["container_lid_types"]
     print(f'Available lid types for --intent "{args.intent}":')
     for name in table:
         print(f"  {name}")
@@ -439,20 +424,8 @@ def build_overrides(args, mapping):
             for flag in mapping["container_lid_flags"]:
                 overrides[flag] = False
             overrides.update(table[args.lid])
-        elif args.intent == "Container Lid":
-            table = mapping["standalone_lid_types"]
-            if args.lid not in table:
-                sys.exit(f"ERROR: unknown --lid '{args.lid}' for --intent \"Container Lid\". "
-                         f'Run: python mastertray.py list lids --intent "Container Lid"')
-            overrides.update(table[args.lid])
         else:
-            sys.exit('--lid only applies to --intent "Container" or "Container Lid"')
-
-    # --- Slide (Glide) sub-options ---
-    if args.slide_direction:
-        overrides["Glide_Direction"] = mapping["slide_direction"][args.slide_direction]
-    if args.slide_catch:
-        overrides["Glide_Snap"] = mapping["slide_catch"][args.slide_catch]
+            sys.exit('--lid only applies to --intent "Container"')
 
     # --- 2D laser/CNC export: slice the model at Z=0 (projection cut) ---
     if getattr(args, "export_2d", None):
@@ -483,7 +456,7 @@ def build_overrides(args, mapping):
 
 # Intents whose part has a closing lid/cap (so a 0% strut wall leans entirely on the
 # mesh safety margins for the lid mechanism — worth a heads-up). Used by safeguard A.
-_LIDDED_INTENTS = {"Container", "Container Lid", "Pill Organizer", "Threaded Jar"}
+_LIDDED_INTENTS = {"Container", "Pill Organizer", "Threaded Jar"}
 
 
 def warn_zero_strut_on_lid(args, overrides):
@@ -525,8 +498,6 @@ def render_report_html(report):
         "Length": b["length"],
         "Height": b["height"],
         "Mode": b["mode"],
-        "Slide direction": b["slide_direction"],
-        "Slide catch": b["slide_catch"],
         "Out": b["out"],
         "Config files": ", ".join(b["config_files"]) or "(none)",
         "Command": b["command"],
@@ -617,8 +588,6 @@ def write_build_report(args, mapping, overrides, cmd):
             "length": args.length,
             "height": args.height,
             "mode": args.mode,
-            "slide_direction": args.slide_direction,
-            "slide_catch": args.slide_catch,
             "out": args.out,
             "config_files": args.config or [],
             "command": " ".join(f'"{c}"' if " " in c else c for c in cmd),
@@ -761,15 +730,13 @@ def main():
 
     p_build = sub.add_parser("build", help="Build and export a part")
     p_build.add_argument("--intent", required=True,
-                          help='e.g. "Container", "Container Lid", "Tray", "Jar"')
+                          help='e.g. "Container", "Tray", "Jar"')
     p_build.add_argument("--lid", help='e.g. "Flip (Double)", "Snap (Outer Wall)"')
     p_build.add_argument("--width", type=float, help="mm")
     p_build.add_argument("--length", type=float, help="mm")
     p_build.add_argument("--height", type=float, help="mm")
     p_build.add_argument("--mode", choices=list(mapping["dimension_mode"]),
                           help="Total = outer dimensions, Usable = interior dimensions")
-    p_build.add_argument("--slide-direction", choices=list(mapping["slide_direction"]))
-    p_build.add_argument("--slide-catch", choices=list(mapping["slide_catch"]))
     p_build.add_argument("--config", action="append", metavar="FILE",
                           help="Friendly-key override file (see build/configs/ for "
                                "examples); repeatable, applied in order given. "

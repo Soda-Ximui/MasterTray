@@ -289,20 +289,34 @@ function compile_manifest(intent, data) =
   // Drop-in grids are decoration — emitted once here, not inside the private intents.
 
   (intent == "Box" || intent == "Standalone Box") ?
-    let(phys     = get_physics_profile(data),
-        snap_ext = get_val(SNAP_EXTERNAL,     data, true),
-        snap_rab = get_val(SNAP_INTERNAL,     data, false),
-        glide_ext= get_val(GLIDE_EXTERNAL,    data, true),
-        glide_rab= get_val(GLIDE_INTERNAL,    data, false),
-        do_flip1 = get_val(BUILD_FLIP_SINGLE, data, true),
-        do_flip2 = get_val(BUILD_FLIP_DOUBLE, data, true))
+    let(phys    = get_physics_profile(data),
+        do_snap = get_val(BUILD_SNAP,        data, false),
+        do_h    = get_val(SLIDE_H,           data, false),
+        do_v    = get_val(SLIDE_V,           data, false),
+        do_f1   = get_val(BUILD_FLIP_SINGLE, data, false),
+        do_f2   = get_val(BUILD_FLIP_DOUBLE, data, false))
     concat(
-      snap_ext  ? compile_manifest("Snap Box (External)",  data) : [],
-      snap_rab  ? compile_manifest("Snap Box (Internal)",  data) : [],
-      glide_ext ? compile_manifest("Glide Box (External)", data) : [],
-      glide_rab ? compile_manifest("Glide Box (Internal)", data) : [],
-      do_flip1  ? compile_manifest("Flip Box (Single)",    data) : [],
-      do_flip2  ? compile_manifest("Flip Box (Double)",    data) : [],
+      // Snap: Outer-wall + Inner-wall (thumb notch baked into each lid).
+      do_snap ? concat(
+        box_lid_variant("Snap", "External", data),
+        box_lid_variant("Snap", "Rabbet",   data)
+      ) : [],
+      // H Slide: all 4 variants (Outer+Inner × Ball+Tab). Pull tab on each lid.
+      do_h ? concat(
+        box_lid_variant("Glide","External", concat([[GLIDE_DIR,"H"],[GLIDE_SNAP,"Ball"]], data)),
+        box_lid_variant("Glide","External", concat([[GLIDE_DIR,"H"],[GLIDE_SNAP,"Tab"]], data)),
+        box_lid_variant("Glide","Rabbet",   concat([[GLIDE_DIR,"H"],[GLIDE_SNAP,"Ball"]], data)),
+        box_lid_variant("Glide","Rabbet",   concat([[GLIDE_DIR,"H"],[GLIDE_SNAP,"Tab"]], data))
+      ) : [],
+      // V Slide: same cross-product in vertical orientation.
+      do_v ? concat(
+        box_lid_variant("Glide","External", concat([[GLIDE_DIR,"V"],[GLIDE_SNAP,"Ball"]], data)),
+        box_lid_variant("Glide","External", concat([[GLIDE_DIR,"V"],[GLIDE_SNAP,"Tab"]], data)),
+        box_lid_variant("Glide","Rabbet",   concat([[GLIDE_DIR,"V"],[GLIDE_SNAP,"Ball"]], data)),
+        box_lid_variant("Glide","Rabbet",   concat([[GLIDE_DIR,"V"],[GLIDE_SNAP,"Tab"]], data))
+      ) : [],
+      do_f1 ? compile_manifest("Flip Box (Single)", data) : [],
+      do_f2 ? compile_manifest("Flip Box (Double)", data) : [],
       grid_variants(data, phys)
     )
   :

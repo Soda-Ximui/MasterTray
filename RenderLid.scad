@@ -62,19 +62,28 @@ module factory_render_lid(data, opts, phys) {
         chamf = m_chamf(data);
         bead_z = (lid_style == "Rabbet") ? sl - 2 * bead_h - EPS : sl - chamf - EPS;
         bead_h_ext = (lid_style == "Rabbet") ? bead_h + EPS : bead_h + chamf + EPS;
-        union() {
-            apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), chamf)
-                up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false,
-                                        get_mesh_cfg(data, HOLE_LID, STRUT_LID));
-            // Retention beads on X sides.
-            // chamfer=bead_h/2 with height bead_h+EPS leaves only EPS of flat face — degenerate.
-            // bead_chamf computed to leave exactly m_lh of flat section (one clean print layer).
-            // Base overlaps into lid body — bead root sits on clean flat lid surface below chamfer zone.
-            bead_chamf = (bead_h_ext - m_lh(data)) / 2;
+        // Thumb notch radius: 4 nozzle widths, minimum 3mm — just big enough for a fingertip.
+        notch_r = max(noz * 4, 3.0);
+        difference() {
+            union() {
+                apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), chamf)
+                    up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false,
+                                            get_mesh_cfg(data, HOLE_LID, STRUT_LID));
+                // Retention beads on X sides.
+                // chamfer=bead_h/2 with height bead_h+EPS leaves only EPS of flat face — degenerate.
+                // bead_chamf computed to leave exactly m_lh of flat section (one clean print layer).
+                // Base overlaps into lid body — bead root sits on clean flat lid surface below chamfer zone.
+                bead_chamf = (bead_h_ext - m_lh(data)) / 2;
+                for (sx = [-1, 1])
+                    translate([sx * (lid_w/2 + clearance/2 + snap_protr - sw/2), 0, bead_z])
+                        cuboid([sw, lid_l - sw*2, bead_h_ext], chamfer=bead_chamf,
+                               edges="ALL", anchor=BOTTOM);
+            }
+            // Two thumb-notch scoops on the −Y face (trailing edge, away from insertion side).
+            // Quarter-sphere cut centred at lid surface so only the inward quarter removes material.
             for (sx = [-1, 1])
-                translate([sx * (lid_w/2 + clearance/2 + snap_protr - sw/2), 0, bead_z])
-                    cuboid([sw, lid_l - sw*2, bead_h_ext], chamfer=bead_chamf,
-                           edges="ALL", anchor=BOTTOM);
+                translate([sx * lid_w / 3, -lid_l / 2, 0])
+                    sphere(r=notch_r, $fn=20);
         }
 
     } else if (lid_type == "Glide") {
@@ -120,12 +129,17 @@ module factory_render_lid(data, opts, phys) {
             }
             // Pull tab on −Y face (trailing end when inserted): grip point to slide lid out.
             // Height spans full lid thickness; depth = noz*4 past lid face.
+            // Offset to +X side (away from ball catch on ±X, away from tab catch on −Y centre)
+            // so the tab is easy to identify and doesn't visually conflict with the catch.
             pull_tab_d = noz * 4;
             pull_tab_h = sl_glide * 0.7;
+            pull_tab_w = 10.0;
+            // Clamp so tab never runs off lid edge: half-tab + noz clearance must fit within lid_w/2.
+            pull_tab_x = min(lid_w * 0.35, lid_w / 2 - pull_tab_w / 2 - noz);
             // Sunk EPS below Z=0 so bottom face doesn't share the lid face plane (non-manifold).
             // +EPS toward lid body so the +Y face overlaps lid body by EPS — breaks Y coplanarity.
-            translate([0, -lid_l/2 - pull_tab_d/2 + EPS, -EPS])
-                cuboid([lid_w * 0.45, pull_tab_d, pull_tab_h + EPS],
+            translate([pull_tab_x, -lid_l/2 - pull_tab_d/2 + EPS, -EPS])
+                cuboid([pull_tab_w, pull_tab_d, pull_tab_h + EPS],
                        chamfer=pull_tab_d/2, edges=[FRONT+LEFT, FRONT+RIGHT, BOTTOM+FRONT],
                        anchor=BOTTOM);
         }

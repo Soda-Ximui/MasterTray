@@ -56,7 +56,6 @@ config:
 # --- Build intents: friendly name -> Part_To_Build value ---
 intents:
   Container:        "Box"
-  Container Lid:    "Lid"
   Pill Organizer:   "Pillbox Full Set"
   Tray:             "Simple Tray"
   Jar:              "Jar"
@@ -70,62 +69,27 @@ intents:
   Grid Test:        "Grid Test"
   Lid Test Set:     "Lid Testing"
 
-# --- Lid types for the "Container" intent (box + matching lid built together) ---
-# Each entry sets the listed flag(s) true; every other flag in
-# container_lid_flags is forced false so exactly one mechanism is built.
+# --- Lid types for the "Container" intent ---
+# Each checked option auto-generates all sub-variants (Outer+Inner, Ball+Tab, etc.).
+# Every flag in container_lid_flags is first forced false, then the selected one(s) are set true.
 container_lid_types:
-  Snap (Outer Wall):
-    Snap_External: true
-  Snap (Inner Wall):
-    Snap_Internal: true
-  Slide (Outer Wall):
-    Glide_External: true
-  Slide (Inner Wall):
-    Glide_Internal: true
+  Snap (both walls):
+    Build_Snap: true
+  Slide H (all variants):
+    Slide_H: true
+  Slide V (all variants):
+    Slide_V: true
   Flip (Single):
     Flip_Single: true
   Flip (Double):
     Flip_Double: true
 
 container_lid_flags:
-  - Snap_External
-  - Snap_Internal
-  - Glide_External
-  - Glide_Internal
+  - Build_Snap
+  - Slide_H
+  - Slide_V
   - Flip_Single
   - Flip_Double
-
-# --- Lid types for the "Container Lid" intent (standalone reprint / spare) ---
-standalone_lid_types:
-  Plain:
-    Standalone_Lid_Type: "Slip"
-  Snap (Outer Wall):
-    Standalone_Lid_Type: "Snap"
-    Lid_Style: "External"
-  Snap (Inner Wall):
-    Standalone_Lid_Type: "Snap"
-    Lid_Style: "Rabbet"
-  Slide (Outer Wall):
-    Standalone_Lid_Type: "Glide"
-    Lid_Style: "External"
-  Slide (Inner Wall):
-    Standalone_Lid_Type: "Glide"
-    Lid_Style: "Rabbet"
-  Flip (Single):
-    Standalone_Lid_Type: "Flip_Single"
-  Flip (Double):
-    Standalone_Lid_Type: "Flip_Double"
-  Screw Cap:
-    Standalone_Lid_Type: "Screw"
-
-# --- Slide (Glide) sub-options, used when the chosen lid type is "Slide (...)" ---
-slide_direction:
-  Horizontal: "H"
-  Vertical:   "V"
-
-slide_catch:
-  Ball Detent: "Ball"
-  Tab Detent:  "Tab"
 
 # --- Dimension mode ---
 dimension_mode:
@@ -136,7 +100,6 @@ dimension_mode:
 # Left = lowercase alias typed on the command line. Right = key in `intents` above.
 cli_aliases:
   box:              Container
-  lid:              Container Lid
   pillbox:          Pill Organizer
   tray:             Tray
   jar:              Jar

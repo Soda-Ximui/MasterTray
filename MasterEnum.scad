@@ -77,10 +77,17 @@ PEG_PROTRUSION = "PEG_PROTRUSION"; // mm — builtin peg height above tray top (
 HAS_BUILTIN_GRID = "HAS_BUILTIN_GRID";
 GRID_MOD_HINTS   = "GRID_MOD_HINTS";  // emit modifier-hint bodies alongside drop-in grids
 MESH_TOP_MARGIN  = "MESH_TOP_MARGIN"; // injected by factory — mm of solid at top of box walls
-SNAP_EXTERNAL    = "SNAP_EXTERNAL";   // Box intent: generate Snap lid, external (default style)
-SNAP_INTERNAL    = "SNAP_INTERNAL";   // Box intent: generate Snap lid, internal (Rabbet/flush style)
-GLIDE_EXTERNAL   = "GLIDE_EXTERNAL";  // Box intent: generate Glide lid, external
-GLIDE_INTERNAL   = "GLIDE_INTERNAL";  // Box intent: generate Glide lid, internal (Rabbet/flush style)
+// Legacy per-direction flags (kept for Lid Testing intent; not set from Customizer).
+SNAP_EXTERNAL    = "SNAP_EXTERNAL";
+SNAP_INTERNAL    = "SNAP_INTERNAL";
+GLIDE_EXTERNAL   = "GLIDE_EXTERNAL";
+GLIDE_INTERNAL   = "GLIDE_INTERNAL";
+// New Customizer flags — each auto-generates all sub-variants:
+//   BUILD_SNAP  → Outer + Inner (2 pairs, thumb notch on each lid)
+//   SLIDE_H/V   → Outer+Inner × Ball+Tab (4 pairs, pull tab on each lid)
+BUILD_SNAP        = "BUILD_SNAP";
+SLIDE_H           = "SLIDE_H";
+SLIDE_V           = "SLIDE_V";
 BUILD_FLIP_SINGLE = "BUILD_FLIP_SINGLE"; // Box intent: also generate Flip_Single box+lid
 BUILD_FLIP_DOUBLE = "BUILD_FLIP_DOUBLE"; // Box intent: also generate Flip_Double box+lids
 STACK_NESTING    = "STACK_NESTING";   // Simple Tray intent: also generate nesting (Snap) variant

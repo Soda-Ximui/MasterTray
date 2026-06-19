@@ -13,7 +13,7 @@ Mechanical_Fit  = "Standard"; // ["Tighter", "Tight", "Standard", "Loose", "Loos
 // @CONFIG_SECTION_END: printer
 
 /* [Build Selection] */
-Part_To_Build = "Box"; // ["Box", "Pillbox Full Set", "Lid", "Simple Tray", "Jar", "Threaded Jar", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", "Plaque", "Grid", "Grid Test", "Lid Testing"]
+Part_To_Build = "Box"; // ["Box", "Pillbox Full Set", "Simple Tray", "Jar", "Threaded Jar", "S4 Jar", "Spool Jar", "S4 Wedge", "S4 Set", "Plaque", "Grid", "Grid Test", "Lid Testing"]
 
 /* [Dimensions: W x L x H] */
 part_width  = 140;  // [10 : 0.5 : 300]
@@ -29,19 +29,14 @@ dimension_mode = "Total"; // ["Total", "Usable"]
 grid_layout = "(A1,60,0)(A2,60,145,80%)(A3,60,195,C40,80)[A1,N][A2,E][A3,E]";
 
 /* [Box Lid Types] */
-// Standalone "Lid" intent: select which lid type to build.
-// Glide also uses Glide_Direction and Glide_Snap below.
-// Snap also uses Lid_Style below.
-Standalone_Lid_Type  = "Flip_Single"; // ["Slip", "Snap", "Glide", "Flip_Single", "Flip_Double", "Screw"]
-Lid_Style            = "External";    // ["External", "Rabbet"]
-
-// Each checked type generates an additional box+lid pair on the platter.
-Snap_External = false;
-Snap_Internal = false;
-Glide_External = false;
-Glide_Internal = false;
-Glide_Direction = "H"; // ["H", "V"]
-Glide_Snap      = "Ball"; // ["Ball", "Tab"]
+// Each checked option generates box+lid pairs on the platter:
+//   Build_Snap  — 2 pairs: Outer-wall + Inner-wall (thumb notch on each lid).
+//   Slide_H     — 4 pairs: Outer+Inner × Ball+Tab, horizontal slide (pull tab on each lid).
+//   Slide_V     — 4 pairs: same cross-product, vertical slide.
+// Flip lids are frozen (print-tested: weak retention). Keep checked only for fit testing.
+Build_Snap  = false;
+Slide_H     = false;
+Slide_V     = false;
 Flip_Single = true;
 Flip_Double = false;
 
@@ -230,17 +225,11 @@ ui_payload = make_env(
     grid_layout       = grid_layout,
     grid_mod_hints    = grid_modifier_hints,
     // Lid type selection (Box intent)
-    snap_external     = Snap_External,
-    snap_internal     = Snap_Internal,
-    glide_external    = Glide_External,
-    glide_internal    = Glide_Internal,
+    build_snap        = Build_Snap,
+    slide_h           = Slide_H,
+    slide_v           = Slide_V,
     build_flip_single = Flip_Single,
     build_flip_double = Flip_Double,
-    glide_dir         = Glide_Direction,
-    glide_snap        = Glide_Snap,
-    // Lid type selection (Container Lid / standalone intent)
-    lid_type_sel      = Standalone_Lid_Type,
-    lid_style         = Lid_Style,
     // Simple Tray stacking variants
     stack_nesting     = Nesting,
     stack_peg         = Peg,
