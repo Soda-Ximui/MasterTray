@@ -45,7 +45,8 @@ THICK_PEG_MULT = "THICK_PEG_MULT";
 TOL_SNAP_GAP = "TOL_SNAP_GAP";
 TOL_CLIP = "TOL_CLIP";
 PLATTER_GAP = "PLATTER_GAP";
-THREAD_PITCH = "THREAD_PITCH";
+THREAD_PITCH       = "THREAD_PITCH";
+LID_THREAD_COUNT   = "LID_THREAD_COUNT"; // turns on screw-cap thread (default 3)
 PEG_HEIGHT = "PEG_HEIGHT";
 SKIP_PILLARS = "SKIP_PILLARS"; // [v4.6] Added to control dynamic support pillars
 

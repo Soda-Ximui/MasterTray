@@ -246,9 +246,9 @@ module factory_render_lid(data, opts, phys) {
         //   = 8.0 + 3.6 = 11.6mm — this is the JAR NECK height, not lid height.
         //   sw*1.5 taper allowance lives on the jar body; the lid doesn't need it.
         //   Total lid was sl+11.6 = 13.6mm. See BUGS.md B2.
-        // FIX: 3 full thread turns = minimum reliable grip at any pitch.
-        //   sw*2 floor ensures at least 2 full wall passes on the cap cylinder.
-        cap_h   = max(m_thread_pitch(data) * 3, sw * 2);
+        // cap_h driven by Lid_Thread_Count (default 3). sw*2 floor ensures
+        // at least 2 full wall passes on the cap cylinder regardless of pitch.
+        cap_h   = max(m_thread_pitch(data) * get_val(LID_THREAD_COUNT, data, 3), sw * 2);
         neck_od = w - sw * 2 - 0.6;
         // Face-down: flat top on bed, interior thread on vertical walls.
         // needs_margin=false: retention is in the threaded cylinder, not the flat face.

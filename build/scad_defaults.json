@@ -51,6 +51,7 @@
   "strut_lid_perc": 75,
   "strut_wall_perc": 0,
   "target_wall": "All Walls",
+  "lid_thread_count": 3,
   "thread_pitch": 2.0,
   "wall_thickness": 2.4
 }

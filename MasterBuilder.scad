@@ -99,6 +99,9 @@ divider_thickness = 1.2;
 peg_thickness_multiplier = 2.0;
 platter_gap = 15;
 thread_pitch = 2.0;
+// Number of full thread turns on the screw-cap lid. Increase until the lid
+// reaches the bottom of the jar neck without running off the end of the threads.
+lid_thread_count = 3; // [1 : 1 : 10]
 
 /* [High-Peg Mod] */
 stackable_peg_height = 80; // [20 : 10 : 200]
@@ -237,6 +240,7 @@ ui_payload = make_env(
     jar_shape         = jar_shape,
     jar_with_lid      = Jar_Lid,
     thread_pitch      = thread_pitch,
+    lid_thread_count  = lid_thread_count,
     // Plaque / label
     plaque_target     = plaque_target,
     clip_type         = clip_type,

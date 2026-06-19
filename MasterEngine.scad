@@ -204,6 +204,7 @@ function make_env(
     jar_shape         = "Circle",
     jar_with_lid      = false,
     thread_pitch      = THREAD_PITCH0,
+    lid_thread_count  = 3,
     // Plaque / label
     plaque_target     = "Wall",
     clip_type         = "Vertical",
@@ -258,6 +259,7 @@ function make_env(
     [JAR_SHAPE,         jar_shape],
     [JAR_WITH_LID,      jar_with_lid],
     [THREAD_PITCH,      thread_pitch],
+    [LID_THREAD_COUNT,  lid_thread_count],
     [PLAQUE_TARGET,     plaque_target],
     [CLIP_TYPE,         clip_type],
     [PLAQUE_W,          plaque_w],
