@@ -37,50 +37,41 @@ module factory_render_lid(data, opts, phys) {
     ball_protr = glide_ball_protr(ball_r, breathing_room(COMP_GLIDE, data), noz);
 
     if (lid_type == "Snap") {
-        // Press-fit inside the box walls.
-        // Retention bead on two X sides clicks under box wall rim (External) or
-        // into inner-wall groove (Rabbet).
-        clearance = breathing_room(COMP_GLIDE, data);
-        lid_style = get_val(LID_STYLE, data, "External");
-        lid_w = w - sw * 2 - clearance;
-        lid_l = l - sw * 2 - clearance;
-        // Round up to nearest layer boundary, minimum 3 layers.
-        // noz*2 = 0.8mm at 0.4mm nozzle = 2.857 layers — fractional, weak retention.
-        // 3 layers at 0.28mm lh = 0.84mm — clean boundary, reliable PETG click-force.
-        bead_h = m_lh(data) * max(3, ceil(noz * 2 / m_lh(data)));
-        // snap_protr: how far bead outer face extends past box interior wall.
-        // clearance/2 closes the lid_w gap so bead starts at interior face,
-        // then protrudes noz further — enough for tactile click without over-stressing wall.
+        // 4-wall bead ring clicks into matching ring groove on box.
+        // bead_h = noz*4 aligned to layer boundary (~1.68mm at 0.4/0.28) — firmer click
+        // than the old 3-layer value. Beads on all 4 sides; thumb-notch scoops on −Y
+        // face cut through the −Y bead giving fingernail purchase for release.
+        clearance  = breathing_room(COMP_GLIDE, data);
+        lid_w      = w - sw * 2 - clearance;
+        lid_l      = l - sw * 2 - clearance;
+        bead_h     = m_lh(data) * ceil(noz * 4 / m_lh(data));
         snap_protr = noz;
-        // External: bead bottom placed below apply_master_bounds TOP chamfer zone.
-        // apply_master_bounds clips with chamfer=m_chamf on TOP+BOTTOM; chamfer zone depth
-        // = m_chamf(data) from the lid top face. bead_z = sl - EPS would land inside that zone,
-        // causing complex geometry interactions between chamfered lid top and chamfered bead bottom.
-        // Fix: lower by m_chamf so bead root starts on the clean flat portion of the lid body.
-        // Bead height increases by m_chamf to keep bead-top protrusion unchanged.
-        // Rabbet: bead at sl−2·bead_h — aligns with groove at h−2·bead_h when seated.
-        chamf = m_chamf(data);
-        bead_z = (lid_style == "Rabbet") ? sl - 2 * bead_h - EPS : sl - chamf - EPS;
-        bead_h_ext = (lid_style == "Rabbet") ? bead_h + EPS : bead_h + chamf + EPS;
-        // Thumb notch radius: 4 nozzle widths, minimum 3mm — just big enough for a fingertip.
-        notch_r = max(noz * 4, 3.0);
+        chamf      = m_chamf(data);
+        // Bead root sits on the clean flat portion of the lid body, below the chamfer zone.
+        bead_z     = sl - chamf - EPS;
+        bead_h_ext = bead_h + chamf + EPS;
+        notch_r    = max(noz * 4, 3.0);
+        // bead_chamf: leaves exactly one layer of flat face at the bead tip.
+        bead_chamf = (bead_h_ext - m_lh(data)) / 2;
+        // Bead centre offset: lid half-width + clearance gap + snap protrusion, minus half bead thickness.
+        bead_cx = lid_w/2 + clearance/2 + snap_protr - sw/2;
+        bead_cy = lid_l/2 + clearance/2 + snap_protr - sw/2;
         difference() {
             union() {
                 apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), chamf)
                     up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false,
                                             get_mesh_cfg(data, HOLE_LID, STRUT_LID));
-                // Retention beads on X sides.
-                // chamfer=bead_h/2 with height bead_h+EPS leaves only EPS of flat face — degenerate.
-                // bead_chamf computed to leave exactly m_lh of flat section (one clean print layer).
-                // Base overlaps into lid body — bead root sits on clean flat lid surface below chamfer zone.
-                bead_chamf = (bead_h_ext - m_lh(data)) / 2;
+                // 4-wall bead ring: ±X and ±Y sides, sw gap at each corner (no overlap needed).
                 for (sx = [-1, 1])
-                    translate([sx * (lid_w/2 + clearance/2 + snap_protr - sw/2), 0, bead_z])
+                    translate([sx * bead_cx, 0, bead_z])
                         cuboid([sw, lid_l - sw*2, bead_h_ext], chamfer=bead_chamf,
                                edges="ALL", anchor=BOTTOM);
+                for (sy = [-1, 1])
+                    translate([0, sy * bead_cy, bead_z])
+                        cuboid([lid_w - sw*2, sw, bead_h_ext], chamfer=bead_chamf,
+                               edges="ALL", anchor=BOTTOM);
             }
-            // Two thumb-notch scoops on the −Y face (trailing edge, away from insertion side).
-            // Quarter-sphere cut centred at lid surface so only the inward quarter removes material.
+            // Two thumb-notch scoops on −Y face — cut through the −Y bead for fingernail release.
             for (sx = [-1, 1])
                 translate([sx * lid_w / 3, -lid_l / 2, 0])
                     sphere(r=notch_r, $fn=20);

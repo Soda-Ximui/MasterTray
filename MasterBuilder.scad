@@ -30,7 +30,7 @@ grid_layout = "(A1,60,0)(A2,60,145,80%)(A3,60,195,C40,80)[A1,N][A2,E][A3,E]";
 
 /* [Box Lid Types] */
 // Each checked option generates box+lid pairs on the platter:
-//   Build_Snap  — 2 pairs: Outer-wall + Inner-wall (thumb notch on each lid).
+//   Build_Snap  — 1 pair: 4-wall bead ring, thumb notch on lid for release.
 //   Flip_Single — 1 pair: single-hinge flip lid (recommended).
 //   Flip_Double — 1 pair: dual-hinge flip lid.
 // Slide lids (Slide_H / Slide_V) are removed from standard builds: the groove

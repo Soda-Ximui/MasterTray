@@ -53,23 +53,14 @@ module factory_render_box(data, opts, phys) {
 
     } else if (lid_type == "Snap") {
         // ── Snap box ───────────────────────────────────────────────────────────
-        // Both External and Rabbet get a ring groove on the inner wall face so the
-        // bead has a defined closed position (audible click, positive retention).
-        // Groove uses a 45° prismoid ceiling — self-supporting, no supports needed.
-        //
-        // External groove height: bead rests at h−sl to h−sl+chamf from box floor.
-        //   groove_z = h − sl − bead_h  (groove base just below bead lower edge)
-        //   groove height = bead_h + chamf + EPS  (matches bead_h_ext in RenderLid)
-        // Rabbet groove height: bead at sl−2·bead_h → seated at h−2·bead_h from floor.
-        //   groove_z = h − 2·bead_h  (groove base at bead lower edge)
-        //   groove height = bead_h + EPS
-        lid_style  = get_val(LID_STYLE, data, "External");
-        bead_h     = m_lh(data) * max(3, ceil(noz * 2 / m_lh(data)));
+        // Ring groove on all 4 interior wall faces; 45° prismoid ceiling is
+        // self-supporting (no supports needed). Lid has matching 4-wall bead ring.
+        // bead_h = noz*4 aligned to layer boundary: ~1.68mm at 0.4mm nozzle /
+        // 0.28mm LH — about 2× the old 3-layer value for a firmer click.
+        bead_h     = m_lh(data) * ceil(noz * 4 / m_lh(data));
         chamf      = m_chamf(data);
-        groove_z   = (lid_style == "Rabbet") ? h - 2 * bead_h
-                                              : h - sl - bead_h;
-        groove_h   = (lid_style == "Rabbet") ? bead_h + EPS
-                                              : bead_h + chamf + EPS;
+        groove_z   = h - sl - bead_h;
+        groove_h   = bead_h + chamf + EPS;
         int_w      = w - sw * 2;
         int_l      = l - sw * 2;
         difference() {

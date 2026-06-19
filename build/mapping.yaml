@@ -73,7 +73,7 @@ intents:
 # Each checked option auto-generates all sub-variants (Outer+Inner, Ball+Tab, etc.).
 # Every flag in container_lid_flags is first forced false, then the selected one(s) are set true.
 container_lid_types:
-  Snap (both walls):
+  Snap:
     Build_Snap: true
   Flip (Single):
     Flip_Single: true

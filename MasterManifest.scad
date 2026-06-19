@@ -296,11 +296,8 @@ function compile_manifest(intent, data) =
         do_f1   = get_val(BUILD_FLIP_SINGLE, data, false),
         do_f2   = get_val(BUILD_FLIP_DOUBLE, data, false))
     concat(
-      // Snap: Outer-wall + Inner-wall (thumb notch baked into each lid).
-      do_snap ? concat(
-        box_lid_variant("Snap", "External", data),
-        box_lid_variant("Snap", "Rabbet",   data)
-      ) : [],
+      // Snap: single 4-wall bead variant (thumb notch on lid, ring groove on box).
+      do_snap ? box_lid_variant("Snap", "External", data) : [],
       // H Slide: 3 variants (External+Tab, Rabbet+Ball, Rabbet+Tab).
       // External+Ball is excluded: groove lips are ~0.9mm at standard wall thickness;
       // the boss disconnects from the box body (non-manifold). See RenderBox.scad §External.
