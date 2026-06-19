@@ -289,15 +289,18 @@ function compile_manifest(intent, data) =
   // Drop-in grids are decoration — emitted once here, not inside the private intents.
 
   (intent == "Box" || intent == "Standalone Box") ?
-    let(phys    = get_physics_profile(data),
-        do_snap = get_val(BUILD_SNAP,        data, false),
-        do_h    = get_val(SLIDE_H,           data, false),
-        do_v    = get_val(SLIDE_V,           data, false),
-        do_f1   = get_val(BUILD_FLIP_SINGLE, data, false),
-        do_f2   = get_val(BUILD_FLIP_DOUBLE, data, false))
+    let(phys      = get_physics_profile(data),
+        do_snap   = get_val(BUILD_SNAP,        data, false),
+        do_slide  = get_val(BUILD_SLIDE,       data, false),
+        do_h      = get_val(SLIDE_H,           data, false),
+        do_v      = get_val(SLIDE_V,           data, false),
+        do_f1     = get_val(BUILD_FLIP_SINGLE, data, false),
+        do_f2     = get_val(BUILD_FLIP_DOUBLE, data, false))
     concat(
-      // Snap: single 4-wall bead variant (thumb notch on lid, ring groove on box).
+      // Snap: over-cap lid — skirt wraps box exterior, thumb notch on box front wall.
       do_snap ? box_lid_variant("Snap", "External", data) : [],
+      // Slide: matchbox lid — flat panel rides in open-top ±X wall grooves, slides from front.
+      do_slide ? box_lid_variant("Slide", "External", data) : [],
       // H Slide: 3 variants (External+Tab, Rabbet+Ball, Rabbet+Tab).
       // External+Ball is excluded: groove lips are ~0.9mm at standard wall thickness;
       // the boss disconnects from the box body (non-manifold). See RenderBox.scad §External.

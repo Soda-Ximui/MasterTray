@@ -5,6 +5,7 @@
 //
 // One factory, one primitive shape. LID_TYPE determines what the body needs:
 //   "Snap"  — plain chassis + thumb notch on −Y wall for over-cap lid removal
+//   "Slide" — open-top groove channels on ±X interior wall tops; back wall is the stop
 //   "Slip"  — plain chassis, no body modifications
 //   "Glide" — groove channel cut into top + ball-catch dimples
 //   "Flip_Single"   — hinge boss on +Y face, axle pin, diamond latch recess on −Y
@@ -65,6 +66,25 @@ module factory_render_box(data, opts, phys) {
                 core_tray_chassis(data_g);
             translate([0, -l/2, h - notch_h])
                 cuboid([notch_w, sw + EPS * 2, notch_h + EPS], anchor=BOTTOM);
+        }
+
+    } else if (lid_type == "Slide") {
+        // ── Matchbox slide box: open-top groove channels on ±X interior wall tops ──
+        // No ceiling = zero bridging. Lid rails ride in the groove; front face has
+        // two small exit slots; back wall is the natural stop.
+        glide_tol  = breathing_room(COMP_GLIDE, data);
+        rail_w     = noz * 3;              // groove depth into ±X wall (from interior face)
+        groove_dep = sl + glide_tol;       // groove Z height: lid thickness + clearance
+        chamf      = m_chamf(data);
+        difference() {
+            apply_master_bounds(w, l, h, m_c_rad(data), chamf)
+                core_tray_chassis(data_g);
+            // Groove slots on ±X interior wall tops, open to the top and exiting through
+            // the −Y (front) face. Runs from front outer face to back wall interior.
+            // Y center = −sw/2, length = l − sw covers [−l/2 … l/2−sw].
+            for (sx = [-1, 1])
+                translate([sx * (w/2 - sw + rail_w/2), -sw/2, h - groove_dep])
+                    cuboid([rail_w + EPS, l - sw + EPS, groove_dep + EPS], anchor=BOTTOM);
         }
 
     } else if (lid_type == "Glide") {

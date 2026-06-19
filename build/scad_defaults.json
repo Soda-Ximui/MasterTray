@@ -3,6 +3,7 @@
   "Export_2D": false,
   "Filament_Type": "PLA",
   "Build_Snap": false,
+  "Build_Slide": false,
   "Flip_Double": false,
   "Flip_Single": true,
   "Hints_Only": false,

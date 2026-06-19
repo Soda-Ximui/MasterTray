@@ -8,6 +8,8 @@
 // LID_TYPE dispatch:
 //   "Snap"        — over-cap: flat panel + short skirt slides over box exterior.
 //                   Friction retention; thumb notch on box −Y wall for removal.
+//   "Slide"       — matchbox: flat panel rides in open-top ±X wall grooves, slides
+//                   from −Y front. Two finger holes for grip. No bridging.
 //   "Glide"       — slides into grooves. GLIDE_DIR: "H" (Y-axis) | "V" (X-axis).
 //                   GLIDE_SNAP: "Ball" (default, two side dimples) | "Tab" (front snap).
 //   "Flip_Single" — C-clip hinge on +Y face, diamond latch on −Y face.
@@ -62,6 +64,26 @@ module factory_render_lid(data, opts, phys) {
             // EPS overlap into panel avoids coplanar bottom face.
             translate([0, 0, sl - EPS])
                 cuboid([lid_inner_w, lid_inner_l, skirt_h + EPS * 2], anchor=BOTTOM);
+        }
+
+    } else if (lid_type == "Slide") {
+        // Matchbox slide lid: flat panel, rails ride in open-top ±X wall grooves.
+        // Printed face-down. Two finger holes for grip when pulling lid open.
+        // Must match box groove formulas in RenderBox "Slide" case exactly.
+        glide_tol   = breathing_room(COMP_GLIDE, data);
+        rail_w      = noz * 3;
+        chamf       = m_chamf(data);
+        finger_d    = max(noz * 8, 6.0);
+        lid_w       = w - sw * 2 + rail_w * 2 - glide_tol;
+        lid_l       = l - sw - glide_tol;
+        difference() {
+            apply_master_bounds(lid_w, lid_l, sl, m_c_rad(data), chamf)
+                up(sl / 2) framed_mesh(data, lid_w, lid_l, sl, false,
+                                       get_mesh_cfg(data, HOLE_LID, STRUT_LID));
+            // Two finger holes: one near front (−Y, for pulling) one near back (+Y, for pushing).
+            for (sy = [-1, 1])
+                translate([0, sy * lid_l / 3, -EPS])
+                    cyl(d=finger_d, h=sl + EPS * 2, $fn=24, anchor=BOTTOM);
         }
 
     } else if (lid_type == "Glide") {

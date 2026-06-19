@@ -30,13 +30,13 @@ grid_layout = "(A1,60,0)(A2,60,145,80%)(A3,60,195,C40,80)[A1,N][A2,E][A3,E]";
 
 /* [Box Lid Types] */
 // Each checked option generates box+lid pairs on the platter:
-//   Build_Snap  — 1 pair: over-cap lid (skirt slides over box exterior, thumb notch on box for removal).
-//   Flip_Single — 1 pair: single-hinge flip lid (recommended).
-//   Flip_Double — 1 pair: dual-hinge flip lid.
-// Slide lids (Slide_H / Slide_V) are removed from standard builds: the groove
-// ceiling gap is ~2× lid thickness and bridges poorly. Code is retained in
-// MasterManifest / RenderBox / RenderLid for future re-evaluation.
+//   Build_Snap   — 1 pair: over-cap lid (skirt slides over box exterior, thumb notch on box).
+//   Build_Slide  — 1 pair: matchbox slide lid (flat panel in open-top grooves on ±X walls,
+//                           slides in from front; two finger holes for grip).
+//   Flip_Single  — 1 pair: single-hinge flip lid (recommended).
+//   Flip_Double  — 1 pair: dual-hinge flip lid.
 Build_Snap  = false;
+Build_Slide = false;
 Flip_Single = true;
 Flip_Double = false;
 
@@ -229,6 +229,7 @@ ui_payload = make_env(
     grid_mod_hints    = grid_modifier_hints,
     // Lid type selection (Box intent)
     build_snap        = Build_Snap,
+    build_slide       = Build_Slide,
     build_flip_single = Flip_Single,
     build_flip_double = Flip_Double,
     // Simple Tray stacking variants

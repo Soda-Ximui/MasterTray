@@ -75,6 +75,8 @@ intents:
 container_lid_types:
   Snap:
     Build_Snap: true
+  Slide:
+    Build_Slide: true
   Flip (Single):
     Flip_Single: true
   Flip (Double):
@@ -82,6 +84,7 @@ container_lid_types:
 
 container_lid_flags:
   - Build_Snap
+  - Build_Slide
   - Flip_Single
   - Flip_Double
 

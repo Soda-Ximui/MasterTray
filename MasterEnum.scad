@@ -87,6 +87,7 @@ GLIDE_INTERNAL   = "GLIDE_INTERNAL";
 //   BUILD_SNAP  → Outer + Inner (2 pairs, thumb notch on each lid)
 //   SLIDE_H/V   → Outer+Inner × Ball+Tab (4 pairs, pull tab on each lid)
 BUILD_SNAP        = "BUILD_SNAP";
+BUILD_SLIDE       = "BUILD_SLIDE";       // Box intent: matchbox-style slide lid (open-top groove on ±X walls)
 SLIDE_H           = "SLIDE_H";
 SLIDE_V           = "SLIDE_V";
 BUILD_FLIP_SINGLE = "BUILD_FLIP_SINGLE"; // Box intent: also generate Flip_Single box+lid

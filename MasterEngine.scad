@@ -193,6 +193,7 @@ function make_env(
     // Lid type selection (Box intent) — each flag auto-generates all sub-variants.
     // SLIDE_H/V: Outer+Inner × Ball+Tab (4 pairs each).  BUILD_SNAP: Outer+Inner (2 pairs).
     build_snap        = false,
+    build_slide       = false,
     slide_h           = false,
     slide_v           = false,
     build_flip_single = false,
@@ -250,6 +251,7 @@ function make_env(
     [GRID_LAYOUT,       grid_layout],
     [GRID_MOD_HINTS,    grid_mod_hints],
     [BUILD_SNAP,        build_snap],
+    [BUILD_SLIDE,       build_slide],
     [SLIDE_H,           slide_h],
     [SLIDE_V,           slide_v],
     [BUILD_FLIP_SINGLE, build_flip_single],
