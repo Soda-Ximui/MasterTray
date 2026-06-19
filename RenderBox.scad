@@ -53,42 +53,38 @@ module factory_render_box(data, opts, phys) {
 
     } else if (lid_type == "Snap") {
         // ── Snap box ───────────────────────────────────────────────────────────
-        // External (default): plain chassis — lid bead cams past wall top rim.
-        // Rabbet: groove on inner wall face at closed position — positive click stop.
+        // Both External and Rabbet get a ring groove on the inner wall face so the
+        // bead has a defined closed position (audible click, positive retention).
+        // Groove uses a 45° prismoid ceiling — self-supporting, no supports needed.
+        //
+        // External groove height: bead rests at h−sl to h−sl+chamf from box floor.
+        //   groove_z = h − sl − bead_h  (groove base just below bead lower edge)
+        //   groove height = bead_h + chamf + EPS  (matches bead_h_ext in RenderLid)
+        // Rabbet groove height: bead at sl−2·bead_h → seated at h−2·bead_h from floor.
+        //   groove_z = h − 2·bead_h  (groove base at bead lower edge)
+        //   groove height = bead_h + EPS
         lid_style  = get_val(LID_STYLE, data, "External");
-        if (lid_style == "Rabbet") {
-            bead_h = m_lh(data) * max(3, ceil(noz * 2 / m_lh(data)));
-            glide_tol = breathing_room(COMP_GLIDE, data);
-            // Ring groove on inner wall face: bead snaps into defined closed position.
-            // Groove occupies h−2·bead_h to h−bead_h; bead_h wall above traps the bead.
-            // Lid bead at sl−2·bead_h → when seated (bottom at h−sl) bead aligns with groove.
-            //
-            // [GEOM-FIX: snap-inner groove 45° self-supporting undercut — prints-on-air fixed]
-            // The trapping lip's underside used to be a FLAT (90°) overhang that printed on
-            // air (~bead_h overhang into the wall; reported on print). The groove cutter's
-            // inner boundary is now a 45° PRISMOID taper: the channel is full depth at the
-            // groove floor and closes to the inner wall face at the top, so the lip underside
-            // is a 45° undercut — self-supporting (prints without support) AND still traps the
-            // lid bead (which is chamfered to mate). Same intent as the slide-outer chamfer.
-            groove_z = h - 2 * bead_h;
-            difference() {
-                apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
-                    core_tray_chassis(data_g);
-                up(groove_z)
-                    difference() {
-                        cuboid([w-sw*2 + bead_h*2 + EPS, l-sw*2 + bead_h*2 + EPS,
-                                bead_h + EPS], anchor=BOTTOM);
-                        // Inner taper grows from the inner face (bottom) out to the channel
-                        // back (top) → closes the channel at the top at 45°, leaving a
-                        // self-supporting sloped ceiling instead of a flat overhang.
-                        prismoid(size1=[w-sw*2 - EPS,            l-sw*2 - EPS],
-                                 size2=[w-sw*2 + bead_h*2 + EPS*2, l-sw*2 + bead_h*2 + EPS*2],
-                                 h=bead_h + EPS, anchor=BOTTOM);
-                    }
-            }
-        } else {
-            apply_master_bounds(w, l, h, m_c_rad(data), m_chamf(data))
+        bead_h     = m_lh(data) * max(3, ceil(noz * 2 / m_lh(data)));
+        chamf      = m_chamf(data);
+        groove_z   = (lid_style == "Rabbet") ? h - 2 * bead_h
+                                              : h - sl - bead_h;
+        groove_h   = (lid_style == "Rabbet") ? bead_h + EPS
+                                              : bead_h + chamf + EPS;
+        int_w      = w - sw * 2;
+        int_l      = l - sw * 2;
+        difference() {
+            apply_master_bounds(w, l, h, m_c_rad(data), chamf)
                 core_tray_chassis(data_g);
+            // Ring groove cutter: outer rect minus inner 45° taper.
+            // The taper's ceiling is self-supporting (45° undercut) and traps the bead.
+            up(groove_z)
+                difference() {
+                    cuboid([int_w + bead_h*2 + EPS, int_l + bead_h*2 + EPS,
+                            groove_h], anchor=BOTTOM);
+                    prismoid(size1=[int_w - EPS,            int_l - EPS],
+                             size2=[int_w + bead_h*2 + EPS*2, int_l + bead_h*2 + EPS*2],
+                             h=groove_h, anchor=BOTTOM);
+                }
         }
 
     } else if (lid_type == "Glide") {
