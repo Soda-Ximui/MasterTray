@@ -301,16 +301,16 @@ function compile_manifest(intent, data) =
         box_lid_variant("Snap", "External", data),
         box_lid_variant("Snap", "Rabbet",   data)
       ) : [],
-      // H Slide: all 4 variants (Outer+Inner × Ball+Tab). Pull tab on each lid.
+      // H Slide: 3 variants (External+Tab, Rabbet+Ball, Rabbet+Tab).
+      // External+Ball is excluded: groove lips are ~0.9mm at standard wall thickness;
+      // the boss disconnects from the box body (non-manifold). See RenderBox.scad §External.
       do_h ? concat(
-        box_lid_variant("Glide","External", concat([[GLIDE_DIR,"H"],[GLIDE_SNAP,"Ball"]], data)),
         box_lid_variant("Glide","External", concat([[GLIDE_DIR,"H"],[GLIDE_SNAP,"Tab"]], data)),
         box_lid_variant("Glide","Rabbet",   concat([[GLIDE_DIR,"H"],[GLIDE_SNAP,"Ball"]], data)),
         box_lid_variant("Glide","Rabbet",   concat([[GLIDE_DIR,"H"],[GLIDE_SNAP,"Tab"]], data))
       ) : [],
-      // V Slide: same cross-product in vertical orientation.
+      // V Slide: same 3 variants in vertical orientation.
       do_v ? concat(
-        box_lid_variant("Glide","External", concat([[GLIDE_DIR,"V"],[GLIDE_SNAP,"Ball"]], data)),
         box_lid_variant("Glide","External", concat([[GLIDE_DIR,"V"],[GLIDE_SNAP,"Tab"]], data)),
         box_lid_variant("Glide","Rabbet",   concat([[GLIDE_DIR,"V"],[GLIDE_SNAP,"Ball"]], data)),
         box_lid_variant("Glide","Rabbet",   concat([[GLIDE_DIR,"V"],[GLIDE_SNAP,"Tab"]], data))

@@ -31,8 +31,8 @@ grid_layout = "(A1,60,0)(A2,60,145,80%)(A3,60,195,C40,80)[A1,N][A2,E][A3,E]";
 /* [Box Lid Types] */
 // Each checked option generates box+lid pairs on the platter:
 //   Build_Snap  — 2 pairs: Outer-wall + Inner-wall (thumb notch on each lid).
-//   Slide_H     — 4 pairs: Outer+Inner × Ball+Tab, horizontal slide (pull tab on each lid).
-//   Slide_V     — 4 pairs: same cross-product, vertical slide.
+//   Slide_H     — 3 pairs: Outer+Tab, Inner+Ball, Inner+Tab, horizontal slide (pull tab on each lid).
+//   Slide_V     — 3 pairs: same, vertical slide.
 // Flip lids are frozen (print-tested: weak retention). Keep checked only for fit testing.
 Build_Snap  = false;
 Slide_H     = false;
