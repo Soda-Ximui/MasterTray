@@ -54,18 +54,25 @@ module factory_render_box(data, opts, phys) {
             core_tray_chassis(data_g);
 
     } else if (lid_type == "Snap") {
-        // ── Over-cap box: plain chassis + thumb notch ──────────────────────────
-        // No groove needed. The over-cap lid skirt wraps the exterior walls;
-        // friction holds it. Thumb notch on −Y wall lets a fingernail push the
-        // lid upward for removal.
-        notch_w = min(w * 0.4, 30.0);
-        notch_h = max(noz * 8, 4.0);
+        // ── Over-cap box: plain chassis + thumb notch + corner click notches ───
+        // No groove needed. Lid skirt wraps exterior; friction + corner notches
+        // hold it closed. Corner notches (4×) sit at the lid-skirt-bottom height:
+        // lid skirt corners flex slightly past them on close (soft click) and
+        // pushing any corner releases the lid. Thumb notch on −Y front wall
+        // as a fallback fingernail release.
+        skirt_h = max(noz * 8, 4.0);      // must match RenderLid Snap skirt_h
+        snap_r  = max(noz * 2, 0.8);      // corner notch radius — subtle click
         chamf   = m_chamf(data);
         difference() {
             apply_master_bounds(w, l, h, m_c_rad(data), chamf)
                 core_tray_chassis(data_g);
-            translate([0, -l/2, h - notch_h])
-                cuboid([notch_w, sw + EPS * 2, notch_h + EPS], anchor=BOTTOM);
+            // Thumb notch on −Y front wall (fingernail pry point)
+            translate([0, -l/2, h - skirt_h])
+                cuboid([min(w * 0.4, 30.0), sw + EPS * 2, skirt_h + EPS], anchor=BOTTOM);
+            // Corner click notches at lid-skirt-bottom height on all 4 corners
+            for (sx = [-1, 1], sy = [-1, 1])
+                translate([sx * w/2, sy * l/2, h - skirt_h])
+                    sphere(r=snap_r, $fn=16);
         }
 
     } else if (lid_type == "Slide") {
